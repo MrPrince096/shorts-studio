@@ -11,101 +11,125 @@
   }
   * { box-sizing:border-box; }
   body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:22px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header { padding:20px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
   header h1 { font-size:20px; margin:0; letter-spacing:.3px; }
   header .dot { width:10px;height:10px;border-radius:50%;background:var(--accent); box-shadow:0 0 12px var(--accent); }
   .wrap { display:grid; grid-template-columns: 1.3fr 1fr; gap:24px; padding:24px 28px; max-width:1200px; margin:0 auto; }
   @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:20px; }
   h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 16px; }
   label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
   input, select, textarea { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
     border-radius:9px; padding:10px 12px; font-size:14px; font-family:inherit; }
   input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent2); }
-  .row { display:flex; gap:12px; }
-  .row > div { flex:1; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:130px; }
   .scene { display:flex; gap:8px; margin-bottom:8px; align-items:flex-start; }
   .scene textarea { min-height:44px; resize:vertical; }
   .scene .num { color:var(--muted); font-size:12px; width:20px; padding-top:11px; text-align:center; flex:0 0 20px; }
   .scene .q { flex:0 0 34%; }
   .scene .del { flex:0 0 30px; background:var(--panel2); border:1px solid var(--line); color:var(--err);
     border-radius:8px; cursor:pointer; font-size:16px; height:44px; }
-  .btnrow { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
-  button.action { border:none; border-radius:10px; padding:11px 16px; font-size:14px; font-weight:600; cursor:pointer; }
+  .btnrow { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  button.action { border:none; border-radius:10px; padding:12px 18px; font-size:14px; font-weight:700; cursor:pointer; }
   .primary { background:var(--accent); color:#111; }
   .primary:disabled { opacity:.5; cursor:not-allowed; }
-  .ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); }
+  .ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); font-weight:600; }
   .rateval { color:var(--accent); font-weight:600; }
-  #progress { display:none; margin-top:16px; }
+  details { margin-top:6px; border:1px solid var(--line); border-radius:12px; padding:0 16px; background:var(--panel); }
+  details[open]{ padding-bottom:16px; }
+  summary { cursor:pointer; padding:14px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
+  #progress { display:none; }
   #log { background:#0a0c11; border:1px solid var(--line); border-radius:8px; padding:12px; font-family:ui-monospace,Menlo,monospace;
     font-size:12px; color:#a9d3ff; height:150px; overflow:auto; white-space:pre-wrap; }
-  .status { font-size:13px; margin:8px 0; }
+  .status { font-size:14px; margin:8px 0; }
   .spin { display:inline-block; width:14px;height:14px;border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:s .8s linear infinite; vertical-align:-2px; margin-right:6px; }
   @keyframes s { to { transform:rotate(360deg); } }
   video { width:100%; border-radius:10px; margin-top:10px; background:#000; }
   .vid { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; background:var(--panel2); }
   .vid .t { font-weight:600; font-size:14px; }
   .vid .m { color:var(--muted); font-size:12px; margin:2px 0 8px; }
-  .vid a { color:var(--accent2); text-decoration:none; font-size:13px; }
-  .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+  .vid a, #result a { color:var(--accent2); text-decoration:none; font-size:13px; }
+  .hint { color:var(--muted); font-size:12px; margin-top:8px; line-height:1.5; }
+  .hint a { color:var(--accent2); }
   .err { color:var(--err); } .ok { color:var(--ok); }
+  .big { font-size:16px; padding:13px 14px; }
 </style>
 </head>
 <body>
 <header>
   <span class="dot"></span>
   <h1>Shorts Studio</h1>
-  <span style="color:var(--muted);font-size:13px;margin-left:auto">free faceless video generator · Pexels + edge-tts + Remotion</span>
+  <span style="color:var(--muted);font-size:13px;margin-left:auto">free faceless video generator · AI script + Pexels + Remotion</span>
 </header>
 
 <div class="wrap">
-  <div class="card">
-    <h2>Create a video</h2>
-    <label>Title</label>
-    <input id="title" placeholder="e.g. Foods Your Heart Loves" />
+  <div>
+    <!-- QUICK CREATE (AI) -->
+    <div class="card">
+      <h2>✨ Quick Create — just give a topic</h2>
+      <label>Topic / idea</label>
+      <input id="topic" class="big" placeholder="e.g. foods good for the heart · facts about Japan · morning habits" />
 
-    <div class="row">
-      <div>
-        <label>Voice</label>
-        <select id="voice"></select>
+      <div class="row">
+        <div>
+          <label>How many videos</label>
+          <select id="count"></select>
+        </div>
+        <div>
+          <label>Duration</label>
+          <select id="duration"></select>
+        </div>
       </div>
-      <div>
-        <label>Aspect ratio</label>
-        <select id="aspect"></select>
+      <div class="row">
+        <div>
+          <label>Voice</label>
+          <select id="voice"></select>
+        </div>
+        <div>
+          <label>Aspect ratio</label>
+          <select id="aspect"></select>
+        </div>
+        <div>
+          <label>Resolution</label>
+          <select id="quality"></select>
+        </div>
       </div>
-      <div>
-        <label>Resolution</label>
-        <select id="quality"></select>
+      <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
+      <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
+
+      <div class="btnrow">
+        <button class="action primary big" id="goAI">✨ Make Videos</button>
       </div>
+      <div class="hint">The AI writes the script + picks the footage for each video, then renders them.
+        Needs a free Gemini key in <code>.env</code> — <a href="https://aistudio.google.com/app/apikey" target="_blank">get one free here</a>.
+        Each video takes ~1–3 min.</div>
     </div>
 
-    <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
-    <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
-
-    <label>Scenes — narration + a Pexels search term for the background clip</label>
-    <div id="scenes"></div>
-    <div class="btnrow">
-      <button class="action ghost" id="addScene">+ Add scene</button>
-      <button class="action ghost" id="loadEx">Load example</button>
-    </div>
-
-    <div class="row" style="margin-top:14px">
-      <div>
-        <label>Description (for upload)</label>
-        <input id="desc" placeholder="optional" />
+    <!-- ADVANCED: manual scenes -->
+    <details>
+      <summary>⚙️ Advanced — write the scenes yourself</summary>
+      <label>Title</label>
+      <input id="title" placeholder="e.g. Foods Your Heart Loves" />
+      <label>Scenes — narration + a Pexels search term per scene</label>
+      <div id="scenes"></div>
+      <div class="btnrow">
+        <button class="action ghost" id="addScene">+ Add scene</button>
+        <button class="action ghost" id="loadEx">Load example</button>
       </div>
-      <div>
-        <label>Tags (comma separated)</label>
-        <input id="tags" placeholder="motivation, mindset" />
+      <div class="row" style="margin-top:14px">
+        <div><label>Description</label><input id="desc" placeholder="optional" /></div>
+        <div><label>Tags (comma separated)</label><input id="tags" placeholder="motivation, mindset" /></div>
       </div>
-    </div>
+      <div class="btnrow">
+        <button class="action ghost" id="goManual">Generate this video</button>
+      </div>
+      <div class="hint">Uses the voice / format / speed chosen above.</div>
+    </details>
 
-    <div class="btnrow">
-      <button class="action primary" id="go">🎬 Generate Video</button>
-    </div>
-    <div class="hint">Rendering takes ~1–3 min. Keep this tab open. Videos save to the <code>out/</code> folder.</div>
-
-    <div id="progress">
+    <!-- PROGRESS -->
+    <div class="card" id="progress">
+      <h2>Progress</h2>
       <div class="status" id="status"></div>
       <div id="log"></div>
       <div id="result"></div>
@@ -114,125 +138,109 @@
 
   <div class="card">
     <h2>Your videos</h2>
-    <div id="gallery"><div class="hint">No videos yet — generate your first one!</div></div>
+    <div id="gallery"><div class="hint">No videos yet — make your first one!</div></div>
   </div>
 </div>
 
 <script>
 const $ = (s) => document.querySelector(s);
-let CFG = { voices:[], aspects:[], qualities:[] };
-
 function opt(v,l){ const o=document.createElement('option'); o.value=v; o.textContent=l; return o; }
 
 async function loadConfig(){
-  CFG = await (await fetch('/api/config')).json();
-  CFG.voices.forEach(v => $('#voice').appendChild(opt(v.id, v.label)));
-  CFG.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
-  CFG.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
-  $('#voice').value = 'en-US-AriaNeural';
-  $('#quality').value = '1080';
+  const c = await (await fetch('/api/config')).json();
+  c.voices.forEach(v => $('#voice').appendChild(opt(v.id, v.label)));
+  c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
+  c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
+  c.durations.forEach(d => $('#duration').appendChild(opt(d.id, d.label)));
+  for(let i=1;i<=10;i++) $('#count').appendChild(opt(i, i + (i===1?' video':' videos')));
+  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium';
 }
 
 function sceneRow(text='', query=''){
   const div = document.createElement('div');
-  div.className = 'scene';
+  div.className='scene';
   div.innerHTML = `<span class="num"></span>
     <textarea placeholder="Narration line...">${text}</textarea>
     <input class="q" placeholder="Pexels search term" value="${query.replace(/"/g,'&quot;')}" />
     <button class="del" title="remove">×</button>`;
   div.querySelector('.del').onclick = () => { div.remove(); renumber(); };
-  $('#scenes').appendChild(div);
-  renumber();
+  $('#scenes').appendChild(div); renumber();
 }
-function renumber(){ [...document.querySelectorAll('.scene .num')].forEach((n,i)=> n.textContent = (i+1)); }
-
+function renumber(){ [...document.querySelectorAll('.scene .num')].forEach((n,i)=> n.textContent=(i+1)); }
 $('#addScene').onclick = () => sceneRow();
 $('#rate').oninput = (e) => $('#rateval').textContent = (e.target.value>0?'+':'') + e.target.value + '%';
 $('#loadEx').onclick = () => {
   $('#scenes').innerHTML='';
-  $('#title').value = 'Foods Your Heart Loves';
-  $('#desc').value = 'Simple foods that keep your heart strong. #hearthealth #nutrition';
-  $('#tags').value = 'hearthealth, nutrition, wellness, shorts';
+  $('#title').value='Foods Your Heart Loves';
+  $('#desc').value='Simple foods that keep your heart strong. #hearthealth #nutrition';
+  $('#tags').value='hearthealth, nutrition, wellness, shorts';
   [['Your heart beats 100,000 times a day. Feed it well.','healthy food heart shape'],
-   ['Fatty fish like salmon protect your arteries with omega threes.','salmon fillet cooking'],
+   ['Fatty fish like salmon protect your arteries.','salmon fillet cooking'],
    ['Berries fight the inflammation that damages your heart.','fresh berries bowl'],
    ['Leafy greens lower your blood pressure naturally.','fresh spinach leaves'],
-   ['A handful of nuts a day keeps cholesterol in check.','nuts almonds walnuts'],
-   ['Love your heart, and it will beat strong for life.','person running sunrise health']
+   ['Love your heart, and it beats strong for life.','person running sunrise']
   ].forEach(([t,q]) => sceneRow(t,q));
 };
 
 async function refreshGallery(){
   const list = await (await fetch('/api/videos')).json();
   const g = $('#gallery');
-  if(!list.length){ g.innerHTML = '<div class="hint">No videos yet — generate your first one!</div>'; return; }
-  g.innerHTML = '';
+  if(!list.length){ g.innerHTML='<div class="hint">No videos yet — make your first one!</div>'; return; }
+  g.innerHTML='';
   list.forEach(v => {
-    const mb = (v.size/1048576).toFixed(1);
-    const el = document.createElement('div');
-    el.className='vid';
-    el.innerHTML = `<div class="t">${v.file.replace('.mp4','')}</div>
-      <div class="m">${mb} MB</div>
+    const mb=(v.size/1048576).toFixed(1);
+    const el=document.createElement('div'); el.className='vid';
+    el.innerHTML=`<div class="t">${v.file.replace('.mp4','')}</div><div class="m">${mb} MB</div>
       <video controls preload="none" src="/out/${encodeURIComponent(v.file)}"></video>
       <div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div>`;
     g.appendChild(el);
   });
 }
 
-let polling = null;
+const fmt = () => ({ voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%' });
+let polling=null;
+function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; $('#goAI').disabled=true; $('#goManual').disabled=true; $('#progress').scrollIntoView({behavior:'smooth'}); }
+function endProgress(){ $('#goAI').disabled=false; $('#goManual').disabled=false; }
+
 async function poll(id){
   const s = await (await fetch('/api/status/'+id)).json();
-  $('#log').textContent = (s.log||[]).join('\n');
-  $('#log').scrollTop = $('#log').scrollHeight;
+  $('#log').textContent=(s.log||[]).join('\n'); $('#log').scrollTop=$('#log').scrollHeight;
   if(s.status==='running'){
-    $('#status').innerHTML = `<span class="spin"></span> Rendering <b>${s.title}</b> · ${s.dims} …`;
+    const of = s.total>1 ? ` (video ${s.current} of ${s.total})` : '';
+    $('#status').innerHTML=`<span class="spin"></span> Working${of} — <b>${s.title||'…'}</b>`;
   } else {
-    clearInterval(polling); polling=null;
-    $('#go').disabled = false;
+    clearInterval(polling); polling=null; endProgress();
     if(s.status==='done'){
-      $('#status').innerHTML = `<span class="ok">✅ Done — ${s.title} (${s.dims})</span>`;
-      $('#result').innerHTML = `<video controls autoplay muted src="/out/${encodeURIComponent(s.file)}"></video>
-        <div style="margin-top:8px"><a href="/out/${encodeURIComponent(s.file)}" download style="color:var(--accent2)">⬇ Download ${s.file}</a></div>`;
+      $('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s) rendered</span>`;
+      $('#result').innerHTML=(s.files||[]).map(f=>`<video controls src="/out/${encodeURIComponent(f)}"></video>
+        <div style="margin:4px 0 12px"><a href="/out/${encodeURIComponent(f)}" download>⬇ ${f}</a></div>`).join('');
       refreshGallery();
     } else {
-      $('#status').innerHTML = `<span class="err">❌ Render failed — check the log above.</span>`;
+      $('#status').innerHTML=`<span class="err">❌ Failed — see the log above.</span>`;
+      if((s.files||[]).length){ refreshGallery(); }
     }
   }
 }
+function run(url, body){
+  startProgress();
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(async r=>{ if(!r.ok){ const e=await r.json(); throw new Error(e.error||'Error'); } return r.json(); })
+    .then(({jobId})=>{ polling=setInterval(()=>poll(jobId),1500); poll(jobId); })
+    .catch(e=>{ $('#status').innerHTML=`<span class="err">${e.message}</span>`; endProgress(); });
+}
 
-$('#go').onclick = async () => {
-  const scenes = [...document.querySelectorAll('.scene')].map(d => ({
-    text: d.querySelector('textarea').value.trim(),
-    query: d.querySelector('.q').value.trim()
-  })).filter(s => s.text && s.query);
-  if(!$('#title').value.trim() || scenes.length < 2){
-    alert('Add a title and at least 2 scenes (each needs narration + a search term).'); return;
-  }
-  const body = {
-    title: $('#title').value.trim(),
-    description: $('#desc').value.trim(),
-    tags: $('#tags').value,
-    voice: $('#voice').value,
-    aspect: $('#aspect').value,
-    quality: $('#quality').value,
-    rate: $('#rate').value + '%',
-    scenes
-  };
-  $('#go').disabled = true;
-  $('#progress').style.display='block';
-  $('#result').innerHTML='';
-  $('#status').innerHTML = '<span class="spin"></span> Starting…';
-  $('#log').textContent='';
-  const r = await fetch('/api/render', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  if(!r.ok){ const e = await r.json(); $('#status').innerHTML = `<span class="err">${e.error||'Error'}</span>`; $('#go').disabled=false; return; }
-  const { jobId } = await r.json();
-  polling = setInterval(()=>poll(jobId), 1500);
-  poll(jobId);
+$('#goAI').onclick = () => {
+  const topic = $('#topic').value.trim();
+  if(!topic){ alert('Enter a topic first.'); return; }
+  run('/api/generate', { topic, count:$('#count').value, duration:$('#duration').value, ...fmt() });
+};
+$('#goManual').onclick = () => {
+  const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(), query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);
+  if(!$('#title').value.trim()||scenes.length<2){ alert('Add a title and at least 2 scenes.'); return; }
+  run('/api/render', { title:$('#title').value.trim(), description:$('#desc').value.trim(), tags:$('#tags').value, scenes, ...fmt() });
 };
 
-loadConfig();
-refreshGallery();
-sceneRow(); sceneRow();
+loadConfig(); refreshGallery(); sceneRow(); sceneRow();
 </script>
 </body>
 </html>

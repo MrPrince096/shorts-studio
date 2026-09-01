@@ -11,6 +11,7 @@ Built with **edge-tts** (voiceover) + **Pexels** (stock footage) + **Remotion** 
 ## ✨ Features
 
 - 🖥️ **Desktop app** — a clean local web UI (opens in your browser, runs on your Mac)
+- ✨ **Quick Create** — just type a topic + how many videos + duration; AI writes the scripts and renders them (free Gemini API)
 - 🎙️ **9 voices** — female & male, US / UK / Indian / Australian accents (edge-tts)
 - 📐 **Any format** — 9:16 (Shorts/Reels), 16:9 (YouTube), 1:1 (Instagram), 4:5 (portrait)
 - 🖼️ **Any resolution** — 720p, 1080p, 2K
@@ -31,7 +32,8 @@ npm start                     # opens http://localhost:4321
 ```
 
 Get a free Pexels API key at <https://www.pexels.com/api/> and paste it into `.env`.
-You also need **ffmpeg** (`brew install ffmpeg`) and **Node 18+**.
+For **Quick Create** (AI writes scripts from a topic), also add a free Gemini key from
+<https://aistudio.google.com/app/apikey>. You also need **ffmpeg** (`brew install ffmpeg`) and **Node 18+**.
 
 Then just fill the form and click **Generate Video**. Done videos land in `out/`.
 
