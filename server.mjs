@@ -2,7 +2,7 @@
 // Run: npm start   (opens http://localhost:4321)
 import express from "express";
 import { spawn } from "node:child_process";
-import { writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
@@ -45,6 +45,50 @@ const DURATIONS = [
   { id: "medium", label: "Medium — ~35s (7 scenes)" },
   { id: "long", label: "Long — ~50s (9 scenes)" },
 ];
+const GENRES = [
+  "Motivation", "Discipline", "Stoicism & Philosophy", "Success & Money Mindset",
+  "Deep Thoughts", "Health & Nutrition", "Foods for the Body", "Fitness & Muscle",
+  "Psychology Facts", "Did You Know / Fun Facts", "Science", "Space & Universe",
+  "History", "Nature & Wildlife", "Technology & AI", "Productivity",
+  "Relationships & Love", "Self Improvement", "Mystery & Unsolved", "Travel & Places",
+].map((g) => ({ id: g, label: g }));
+const COUNTRIES = [
+  "India", "United States", "Japan", "China", "United Kingdom", "France", "Germany",
+  "Italy", "Spain", "Russia", "Canada", "Australia", "Brazil", "Mexico", "Argentina",
+  "Egypt", "South Africa", "Nigeria", "Kenya", "Morocco", "Saudi Arabia", "UAE",
+  "Turkey", "Greece", "Netherlands", "Sweden", "Norway", "Switzerland", "Portugal",
+  "Ireland", "Poland", "Indonesia", "Thailand", "Vietnam", "Philippines", "Malaysia",
+  "Singapore", "South Korea", "Nepal", "Sri Lanka", "Bangladesh", "Pakistan", "Iran",
+  "Israel", "New Zealand", "Peru", "Colombia", "Chile", "Iceland",
+].map((c) => ({ id: c, label: c }));
+
+// ---- .env helpers for the Settings panel ----
+const ENV_PATH = join(ROOT, ".env");
+function readEnvRaw() {
+  return existsSync(ENV_PATH) ? readFileSync(ENV_PATH, "utf8") : "";
+}
+function getEnvValue(key) {
+  for (const line of readEnvRaw().split("\n")) {
+    const m = line.match(new RegExp(`^\\s*${key}\\s*=\\s*(.*)\\s*$`));
+    if (m) return m[1].replace(/^["']|["']$/g, "").trim();
+  }
+  return "";
+}
+function setEnvValue(key, value) {
+  const lines = readEnvRaw().split("\n");
+  let found = false;
+  const out = lines.map((l) => {
+    if (new RegExp(`^\\s*${key}\\s*=`).test(l)) { found = true; return `${key}=${value}`; }
+    return l;
+  });
+  if (!found) out.push(`${key}=${value}`);
+  writeFileSync(ENV_PATH, out.filter((l, i) => !(l === "" && i === out.length - 1)).join("\n") + "\n");
+  process.env[key] = value; // live for this process
+}
+function maskKey(v) {
+  if (!v) return "";
+  return v.length <= 4 ? "••••" : "••••••" + v.slice(-4);
+}
 
 function dims(aspect, quality) {
   const [aw, ah] = String(aspect).split(":").map(Number);
@@ -101,8 +145,23 @@ async function runAll(configs, job) {
 }
 
 app.get("/api/config", (_req, res) =>
-  res.json({ voices: VOICES, aspects: ASPECTS, qualities: QUALITIES, durations: DURATIONS })
+  res.json({ voices: VOICES, aspects: ASPECTS, qualities: QUALITIES, durations: DURATIONS, genres: GENRES, countries: COUNTRIES })
 );
+
+// ---- Settings: API keys ----
+app.get("/api/settings", (_req, res) => {
+  res.json({
+    pexels: { set: !!getEnvValue("PEXELS_API_KEY"), masked: maskKey(getEnvValue("PEXELS_API_KEY")) },
+    gemini: { set: !!getEnvValue("GEMINI_API_KEY"), masked: maskKey(getEnvValue("GEMINI_API_KEY")) },
+  });
+});
+app.post("/api/settings", (req, res) => {
+  const b = req.body || {};
+  const saved = [];
+  if (typeof b.pexels === "string" && b.pexels.trim()) { setEnvValue("PEXELS_API_KEY", b.pexels.trim()); saved.push("Pexels"); }
+  if (typeof b.gemini === "string" && b.gemini.trim()) { setEnvValue("GEMINI_API_KEY", b.gemini.trim()); saved.push("Gemini"); }
+  res.json({ ok: true, saved });
+});
 
 app.get("/api/videos", (_req, res) => {
   const list = readdirSync(OUT)
@@ -116,7 +175,12 @@ app.get("/api/videos", (_req, res) => {
 app.post("/api/generate", async (req, res) => {
   if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
   const b = req.body || {};
-  if (!b.topic || !String(b.topic).trim()) return res.status(400).json({ error: "Enter a topic." });
+  const topic = String(b.topic || "").trim();
+  const genre = String(b.genre || "").trim();
+  const country = String(b.country || "").trim();
+  const random = !!b.random;
+  if (!topic && !genre && !country && !random)
+    return res.status(400).json({ error: "Pick a topic, a genre, a country, or turn on Random." });
   const count = Math.min(Math.max(parseInt(b.count) || 1, 1), 10);
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
 
@@ -126,9 +190,10 @@ app.post("/api/generate", async (req, res) => {
 
   (async () => {
     try {
-      pushLog(job, `🤖 Writing ${count} script(s) about "${b.topic}" with AI…`);
+      const what = random ? "random topics" : (topic || [genre, country].filter(Boolean).join(" / ") || "your idea");
+      pushLog(job, `🤖 Writing ${count} script(s) — ${what} …`);
       const configs = await generateScripts({
-        topic: String(b.topic).trim(),
+        topic, genre, country, random,
         count,
         duration: b.duration || "medium",
         voice: b.voice || "en-US-AriaNeural",

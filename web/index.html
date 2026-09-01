@@ -54,22 +54,43 @@
   .hint a { color:var(--accent2); }
   .err { color:var(--err); } .ok { color:var(--ok); }
   .big { font-size:16px; padding:13px 14px; }
+  .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center; }
+  .overlay.open { display:flex; }
+  .modal { width:min(520px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px; }
+  .modal h2 { margin-top:0; }
+  .keystate { font-size:12px; margin:4px 0 0; }
+  .modal .close { float:right; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; }
 </style>
 </head>
 <body>
 <header>
   <span class="dot"></span>
   <h1>Shorts Studio</h1>
-  <span style="color:var(--muted);font-size:13px;margin-left:auto">free faceless video generator · AI script + Pexels + Remotion</span>
+  <span style="color:var(--muted);font-size:13px;margin-left:auto;margin-right:14px">free faceless video generator</span>
+  <button class="action ghost" id="openSettings">⚙️ Settings</button>
 </header>
 
 <div class="wrap">
   <div>
     <!-- QUICK CREATE (AI) -->
     <div class="card">
-      <h2>✨ Quick Create — just give a topic</h2>
-      <label>Topic / idea</label>
-      <input id="topic" class="big" placeholder="e.g. foods good for the heart · facts about Japan · morning habits" />
+      <h2>✨ Quick Create — topic, genre, country, or random</h2>
+      <label>Topic / idea <span style="color:var(--muted)">(optional if you pick a genre or country)</span></label>
+      <div style="display:flex;gap:8px">
+        <input id="topic" class="big" placeholder="e.g. foods good for the heart · morning habits" />
+        <button class="action ghost" id="surprise" title="Random topic">🎲</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Genre</label>
+          <select id="genre"></select>
+        </div>
+        <div>
+          <label>Country</label>
+          <select id="country"></select>
+        </div>
+      </div>
 
       <div class="row">
         <div>
@@ -101,9 +122,8 @@
       <div class="btnrow">
         <button class="action primary big" id="goAI">✨ Make Videos</button>
       </div>
-      <div class="hint">The AI writes the script + picks the footage for each video, then renders them.
-        Needs a free Gemini key in <code>.env</code> — <a href="https://aistudio.google.com/app/apikey" target="_blank">get one free here</a>.
-        Each video takes ~1–3 min.</div>
+      <div class="hint">Fill a topic, pick a <b>genre</b> or <b>country</b>, hit 🎲 for a random idea — or leave it all blank for a total surprise.
+        The AI writes each script + picks the footage, then renders. Add your free Gemini key in <b>⚙️ Settings</b> first. ~1–3 min per video.</div>
     </div>
 
     <!-- ADVANCED: manual scenes -->
@@ -142,6 +162,29 @@
   </div>
 </div>
 
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <button class="close" id="closeSettings">×</button>
+    <h2>⚙️ API Keys</h2>
+    <p class="hint" style="margin-top:0">Stored locally in your <code>.env</code> file. Never leaves your machine.</p>
+
+    <label>Pexels API key <span style="color:var(--muted)">(required — stock footage)</span></label>
+    <input id="pexelsKey" type="password" placeholder="paste key…" />
+    <div class="keystate" id="pexelsState"></div>
+    <div class="hint"><a href="https://www.pexels.com/api/" target="_blank">Get a free Pexels key →</a></div>
+
+    <label>Gemini API key <span style="color:var(--muted)">(for AI script writing)</span></label>
+    <input id="geminiKey" type="password" placeholder="paste key…" />
+    <div class="keystate" id="geminiState"></div>
+    <div class="hint"><a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free Gemini key →</a></div>
+
+    <div class="btnrow">
+      <button class="action primary" id="saveSettings">Save keys</button>
+      <span id="saveMsg" style="align-self:center;font-size:13px"></span>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = (s) => document.querySelector(s);
 function opt(v,l){ const o=document.createElement('option'); o.value=v; o.textContent=l; return o; }
@@ -152,9 +195,40 @@ async function loadConfig(){
   c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
   c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
   c.durations.forEach(d => $('#duration').appendChild(opt(d.id, d.label)));
+  $('#genre').appendChild(opt('', '— any / none —'));
+  (c.genres||[]).forEach(g => $('#genre').appendChild(opt(g.id, g.label)));
+  $('#country').appendChild(opt('', '— any / none —'));
+  (c.countries||[]).forEach(x => $('#country').appendChild(opt(x.id, x.label)));
   for(let i=1;i<=10;i++) $('#count').appendChild(opt(i, i + (i===1?' video':' videos')));
   $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium';
 }
+
+// ---- Settings modal ----
+async function loadSettings(){
+  const s = await (await fetch('/api/settings')).json();
+  $('#pexelsState').innerHTML = s.pexels.set ? `<span class="ok">✔ set (${s.pexels.masked})</span>` : `<span class="err">✘ not set</span>`;
+  $('#geminiState').innerHTML = s.gemini.set ? `<span class="ok">✔ set (${s.gemini.masked})</span>` : `<span class="err">✘ not set — needed for AI topics</span>`;
+}
+$('#openSettings').onclick = () => { loadSettings(); $('#settingsOverlay').classList.add('open'); };
+$('#closeSettings').onclick = () => $('#settingsOverlay').classList.remove('open');
+$('#settingsOverlay').onclick = (e) => { if(e.target.id==='settingsOverlay') $('#settingsOverlay').classList.remove('open'); };
+$('#saveSettings').onclick = async () => {
+  const body = { pexels: $('#pexelsKey').value.trim(), gemini: $('#geminiKey').value.trim() };
+  const r = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ${r.saved.join(' & ')} ✓</span>` : 'Nothing to save';
+  $('#pexelsKey').value=''; $('#geminiKey').value=''; loadSettings();
+};
+
+// ---- 🎲 random topic ----
+const IDEAS = [
+  'foods that boost your brain','habits of highly successful people','why you procrastinate',
+  'the psychology of first impressions','how sleep repairs your body','the power of walking daily',
+  'facts about the human heart','how to build unbreakable discipline','the science of happiness',
+  'why the ocean is still a mystery','morning routines that change your life','how money changes people',
+  'the truth about motivation','foods that fight inflammation','how to stop overthinking',
+  'the most mysterious places on earth','how your gut controls your mood','why reading rewires your brain'
+];
+$('#surprise').onclick = (e) => { e.preventDefault(); $('#topic').value = IDEAS[Math.floor(Math.random()*IDEAS.length)]; };
 
 function sceneRow(text='', query=''){
   const div = document.createElement('div');
@@ -231,8 +305,10 @@ function run(url, body){
 
 $('#goAI').onclick = () => {
   const topic = $('#topic').value.trim();
-  if(!topic){ alert('Enter a topic first.'); return; }
-  run('/api/generate', { topic, count:$('#count').value, duration:$('#duration').value, ...fmt() });
+  const genre = $('#genre').value;
+  const country = $('#country').value;
+  const random = !topic && !genre && !country; // nothing chosen = fully random
+  run('/api/generate', { topic, genre, country, random, count:$('#count').value, duration:$('#duration').value, ...fmt() });
 };
 $('#goManual').onclick = () => {
   const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(), query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);

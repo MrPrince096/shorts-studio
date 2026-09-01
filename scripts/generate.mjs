@@ -21,13 +21,29 @@ function getKey() {
 const SCENES_FOR = { short: 5, medium: 7, long: 9 };
 const MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
 
-export async function generateScripts({ topic, count = 1, duration = "medium", voice, rate = "0%", width, height }) {
+function buildSubject({ topic, genre, country, random, count }) {
+  if (random) {
+    return `on ${count} completely different, surprising, highly shareable topics that YOU invent` +
+      (genre ? ` within the "${genre}" genre` : "") +
+      (country ? `, all related to ${country}` : "");
+  }
+  const bits = [];
+  if (topic) bits.push(`about "${topic}"`);
+  if (country && !topic) bits.push(`about the country ${country} — its culture, food, places, people, history or what makes it unique`);
+  else if (country) bits.push(`connected to ${country}`);
+  if (genre) bits.push(`in the "${genre}" style/genre`);
+  if (!bits.length) return `on ${count} highly engaging, viral-worthy topics of your choice`;
+  return bits.join(", ");
+}
+
+export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height }) {
   const key = getKey();
   if (!key) throw new Error("NO_GEMINI_KEY");
   const nScenes = SCENES_FOR[duration] || 7;
+  const subject = buildSubject({ topic, genre, country, random, count });
 
   const prompt = `You are an expert faceless YouTube Shorts scriptwriter.
-Create ${count} DISTINCT short-video script(s) about: "${topic}".
+Create ${count} DISTINCT short-video script(s) ${subject}.
 
 For EACH video:
 - EXACTLY ${nScenes} scenes.
