@@ -154,7 +154,9 @@ function falAspect() {
 async function falVideo(scene, outFile) {
   const FAL_KEY = process.env.FAL_KEY;
   const model = config.videoModel || "fal-ai/bytedance/seedance/v1/lite/text-to-video";
-  const prompt = `${scene.query}. ${scene.text} Cinematic, high quality, smooth natural motion.`;
+  const base = scene.imagePrompt || scene.query;
+  const style = config.imageStyle || "cinematic, high quality";
+  const prompt = `${base}. ${style}, smooth natural motion.`;
   const auth = { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" };
   const submit = await fetch(`https://queue.fal.run/${model}`, {
     method: "POST",
@@ -183,7 +185,9 @@ async function falVideo(scene, outFile) {
 
 // --- AI images via Pollinations.ai (free, no key) ---
 async function pollImage(scene, outFile) {
-  const prompt = `${scene.query}. Cinematic, highly detailed, dramatic lighting, digital painting, tasteful, safe for work.`;
+  const base = scene.imagePrompt || scene.query;
+  const style = config.imageStyle || "cinematic, highly detailed, dramatic lighting, digital painting";
+  const prompt = `${base}. ${style}. Tasteful, safe for work.`;
   const seed = Math.floor(Math.random() * 1e6);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${OUT_W}&height=${OUT_H}&nologo=true&model=flux&seed=${seed}`;
   for (let attempt = 0; attempt < 3; attempt++) {

@@ -143,14 +143,17 @@ Create ${count} DISTINCT short-video script(s) ${subject}.
 
 For EACH video:
 - EXACTLY ${nScenes} scenes.
-- Each scene has "text" (ONE punchy spoken narration sentence, about 8 to 16 words) and "query" (a 2 to 4 word ENGLISH stock-footage / visual search term that literally matches that sentence's visual).
+- Each scene has THREE fields:
+  - "text": ONE punchy spoken narration sentence (about 8 to 16 words).
+  - "query": a 2 to 4 word ENGLISH stock-footage search term matching the visual (for stock libraries).
+  - "imagePrompt": a rich 15-25 word ENGLISH description of the exact scene for an AI image generator — NAME the specific people/characters and describe their appearance, clothing, the action, the setting and mood. Be concrete and accurate (e.g. "Ravana, a fearsome ten-headed demon king in golden armor, seizing princess Sita beside a forest hut").
 - Scene 1 is a strong scroll-stopping hook. The final scene is a memorable closing line.
 - Keep it factual, vivid and positive. Do NOT put hashtags inside "text".
 - Provide "title" (3 to 6 words), "description" (one line ending with 2 to 4 hashtags), and 4 to 6 "tags".${langBlock}
 ${count > 1 ? `Make the ${count} videos cover clearly different angles so they do not repeat.` : ""}
 
 Return ONLY valid JSON, no markdown, of exactly this shape:
-{"videos":[{"title":"","slug":"","description":"","tags":["",""],"scenes":[{"text":"","query":""}]}]}`;
+{"videos":[{"title":"","slug":"","description":"","tags":["",""],"scenes":[{"text":"","query":"","imagePrompt":""}]}]}`;
 
   let raw;
   try {
@@ -176,7 +179,7 @@ Return ONLY valid JSON, no markdown, of exactly this shape:
       font: font || "Arial Black", fontCss: fontCss || "", rtl: !!rtl,
       scenes: (v.scenes || [])
         .filter((s) => s && s.text && s.query)
-        .map((s) => ({ text: String(s.text), query: String(s.query) })),
+        .map((s) => ({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || "") })),
     }))
     .filter((v) => v.scenes.length >= 2);
   if (!videos.length) throw new Error("The LLM returned no usable scripts. Try a clearer topic.");

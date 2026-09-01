@@ -37,14 +37,14 @@ Story so far (already shown to viewers — do NOT repeat it, continue smoothly):
 Write EXACTLY ${nScenes} scenes for THIS episode only.
 - Scene 1 briefly reconnects to where we left off, then moves the story forward.
 ${isLast ? "- This is the FINAL episode: give the story a satisfying conclusion." : "- End on a mini-cliffhanger / hook that makes viewers want the next part."}
-- Each scene: "text" (one spoken sentence, 8-16 words) + "query" (2-4 word ENGLISH visual search term).
+- Each scene has: "text" (one spoken sentence, 8-16 words), "query" (2-4 word ENGLISH visual search term), and "imagePrompt" (a rich 15-25 word ENGLISH description of the exact scene — NAME the characters and describe their appearance, clothing, action, setting and mood; be concrete and accurate).
 ${langBlock}
 - Also give an English "recap": ONE line summarizing what happened in THIS episode (for continuity).
 - Give a "title" (short, in the narration language) and 4-6 "tags".
-Return ONLY valid JSON: {"title":"","recap":"","tags":["",""],"scenes":[{"text":"","query":""}]}`;
+Return ONLY valid JSON: {"title":"","recap":"","tags":["",""],"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
 
   const v = parseLLMJson(await callLLM(prompt));
-  const scenes = (v.scenes || []).filter((s) => s && s.text && s.query).map((s) => ({ text: String(s.text), query: String(s.query) }));
+  const scenes = (v.scenes || []).filter((s) => s && s.text && s.query).map((s) => ({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || "") }));
   if (scenes.length < 2) throw new Error(`Episode ${part}: model returned too few scenes.`);
   const partLabel = `Part ${part}`;
   const config = {
@@ -55,6 +55,7 @@ Return ONLY valid JSON: {"title":"","recap":"","tags":["",""],"scenes":[{"text":
     voice: series.voice, rate: series.rate || "0%", music: "",
     width: series.width, height: series.height,
     source: series.source || "pexels", videoModel: series.videoModel || "",
+    imageStyle: series.imageStyle || "",
     font: series.font || "Arial Black", fontCss: series.fontCss || "", rtl: !!series.rtl,
     scenes,
   };

@@ -81,6 +81,19 @@ const FAL_MODELS = [
   { id: "fal-ai/veo3", label: "Veo 3 (best, priciest)" },
 ];
 
+// art styles for AI images / video (the id IS the style phrase appended to the prompt)
+const IMAGE_STYLES = [
+  { id: "cinematic film still, dramatic lighting, highly detailed, 8k", label: "Cinematic (default)" },
+  { id: "traditional Indian mythological painting, Raja Ravi Varma style, ornate, divine, highly detailed", label: "Indian mythological art" },
+  { id: "photorealistic, natural lighting, ultra detailed, sharp focus", label: "Realistic photo" },
+  { id: "epic fantasy digital painting, dramatic, artstation, highly detailed", label: "Epic fantasy" },
+  { id: "classical oil painting, rich colors, textured brushstrokes", label: "Oil painting" },
+  { id: "vibrant anime style, detailed, studio quality", label: "Anime" },
+  { id: "3D render, Pixar animation style, soft lighting", label: "3D animation" },
+  { id: "bold comic book art, ink outlines, dynamic, vivid", label: "Comic book" },
+  { id: "soft vintage watercolor painting, artistic", label: "Watercolor" },
+];
+
 // language -> label, caption font (Google Noto for the script), rtl, and voices
 const LANGUAGES = [
   { id: "en", label: "English", voices: VOICES },
@@ -253,7 +266,7 @@ app.get("/api/config", (_req, res) =>
   res.json({
     voices: VOICES, aspects: ASPECTS, qualities: QUALITIES, durations: DURATIONS,
     genres: GENRES, countries: COUNTRIES, llmProviders: LLM_PROVIDERS,
-    videoSources: VIDEO_SOURCES, falModels: FAL_MODELS,
+    videoSources: VIDEO_SOURCES, falModels: FAL_MODELS, imageStyles: IMAGE_STYLES,
     languages: LANGUAGES.map((l) => ({ id: l.id, label: l.label, voices: l.voices })),
   })
 );
@@ -327,6 +340,7 @@ app.post("/api/generate", async (req, res) => {
         videoModel: b.videoModel || "",
         language: lang.label, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
       });
+      configs.forEach((c) => (c.imageStyle = b.imageStyle || ""));
       job.total = configs.length;
       pushLog(job, `✅ ${configs.length} script(s) ready. Rendering…`);
       await runAll(configs, job);
@@ -361,6 +375,7 @@ app.post("/api/render", (req, res) => {
     music: "", width, height,
     source: b.source || "pexels",
     videoModel: b.videoModel || "",
+    imageStyle: b.imageStyle || "",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };
@@ -402,7 +417,7 @@ app.post("/api/series/start", (req, res) => {
         seriesTitle: o.seriesTitle, slug: o.slug, topic: String(b.topic).trim(),
         language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%",
         aspect: b.aspect || "9:16", quality: b.quality || "1080", duration: b.duration || "medium",
-        source: b.source || "pexels", videoModel: b.videoModel || "",
+        source: b.source || "pexels", videoModel: b.videoModel || "", imageStyle: b.imageStyle || "",
         width, height, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         outline: o.outline, total, done: 0, files: [], recaps: [],
       };

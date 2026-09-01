@@ -127,6 +127,10 @@
           <label>Visual source</label>
           <select id="source"></select>
         </div>
+        <div id="styleBox" style="display:none">
+          <label>Image style 🎨</label>
+          <select id="imageStyle"></select>
+        </div>
         <div id="falModelBox" style="display:none">
           <label>AI video model</label>
           <select id="videoModel"></select>
@@ -272,11 +276,16 @@ async function loadConfig(){
   for(let i=1;i<=10;i++) $('#count').appendChild(opt(i, i + (i===1?' video':' videos')));
   (c.videoSources||[]).forEach(s => $('#source').appendChild(opt(s.id, s.label)));
   (c.falModels||[]).forEach(m => $('#videoModel').appendChild(opt(m.id, m.label)));
+  (c.imageStyles||[]).forEach(s => $('#imageStyle').appendChild(opt(s.id, s.label)));
   (c.llmProviders||[]).forEach(p => $('#llmProvider').appendChild(opt(p.id, p.label)));
   [3,5,10,15,20,30,50].forEach(n => $('#seriesTotal').appendChild(opt(n, n+' parts')));
   for(let i=1;i<=10;i++) $('#seriesBatch').appendChild(opt(i, i+(i===1?' part now':' parts now')));
   $('#seriesTotal').value='10'; $('#seriesBatch').value='3';
-  $('#source').onchange = () => { $('#falModelBox').style.display = $('#source').value==='fal' ? 'block':'none'; };
+  $('#source').onchange = () => {
+    const s = $('#source').value;
+    $('#falModelBox').style.display = s==='fal' ? 'block':'none';
+    $('#styleBox').style.display = (s==='image'||s==='fal') ? 'block':'none';
+  };
   $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#source').value='pexels';
 }
 
@@ -370,7 +379,7 @@ async function refreshGallery(){
   });
 }
 
-const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value });
+const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value });
 let polling=null;
 const ACT = ['#goAI','#goManual','#goSeries'];
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
