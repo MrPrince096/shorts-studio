@@ -71,7 +71,8 @@ const LLM_PROVIDERS = [
 const VIDEO_SOURCES = [
   { id: "pexels", label: "Pexels stock footage — free, unlimited" },
   { id: "image", label: "AI images: Pollinations — free, no key" },
-  { id: "hf", label: "AI images: Hugging Face FLUX — free (needs free token)" },
+  { id: "hf", label: "AI images: Hugging Face FLUX — free credits, then paid" },
+  { id: "local", label: "AI images: Local server — free & unlimited (you run it)" },
   { id: "fal-image", label: "AI images: fal.ai FLUX — paid, best quality" },
   { id: "fal", label: "AI video: fal.ai — paid (Seedance / Veo / Kling)" },
 ];
@@ -281,6 +282,7 @@ app.get("/api/settings", (_req, res) => {
     openaiModel: getEnvValue("OPENAI_MODEL") || "gpt-4o-mini",
     ollamaUrl: getEnvValue("OLLAMA_URL") || "http://localhost:11434",
     ollamaModel: getEnvValue("OLLAMA_MODEL") || "llama3.1",
+    localImageUrl: getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate",
     keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN") },
   });
 });
@@ -299,6 +301,7 @@ app.post("/api/settings", (req, res) => {
   setIf("ollamaModel", "OLLAMA_MODEL", "Ollama model");
   setIf("fal", "FAL_KEY", "fal.ai key");
   setIf("hf", "HF_TOKEN", "Hugging Face token");
+  setIf("localImageUrl", "LOCAL_IMAGE_URL", "Local image URL");
   res.json({ ok: true, saved });
 });
 

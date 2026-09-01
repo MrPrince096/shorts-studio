@@ -247,6 +247,10 @@
     <div class="keystate" id="falState"></div>
     <div class="hint">Paid, per-generation. <a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
 
+    <label>Local image server URL <span style="color:var(--muted)">(free & unlimited — you run it)</span></label>
+    <input id="localUrl" placeholder="http://localhost:7801/generate" />
+    <div class="hint">Run FLUX/SDXL on your own Mac for free unlimited images. Ask Claude to set up the local server.</div>
+
     <div class="btnrow">
       <button class="action primary" id="saveSettings">Save</button>
       <span id="saveMsg" style="align-self:center;font-size:13px"></span>
@@ -289,7 +293,7 @@ async function loadConfig(){
   $('#source').onchange = () => {
     const s = $('#source').value;
     $('#falModelBox').style.display = s==='fal' ? 'block':'none';
-    $('#styleBox').style.display = ['image','hf','fal-image','fal'].includes(s) ? 'block':'none';
+    $('#styleBox').style.display = ['image','hf','local','fal-image','fal'].includes(s) ? 'block':'none';
   };
   $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#source').value='pexels';
 }
@@ -308,6 +312,7 @@ async function loadSettings(){
   $('#openaiModel').value = s.openaiModel || '';
   $('#ollamaUrl').value = s.ollamaUrl || '';
   $('#ollamaModel').value = s.ollamaModel || '';
+  $('#localUrl').value = s.localImageUrl || '';
   $('#pexelsState').innerHTML = stateHtml(s.keys.pexels);
   $('#geminiState').innerHTML = stateHtml(s.keys.gemini, 'needed for AI topics');
   $('#openaiState').innerHTML = stateHtml(s.keys.openai);
@@ -326,6 +331,7 @@ $('#saveSettings').onclick = async () => {
     openai: $('#openaiKey').value.trim(), openaiModel: $('#openaiModel').value.trim(),
     ollamaUrl: $('#ollamaUrl').value.trim(), ollamaModel: $('#ollamaModel').value.trim(),
     fal: $('#falKey').value.trim(), hf: $('#hfKey').value.trim(),
+    localImageUrl: $('#localUrl').value.trim(),
   };
   const r = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ✓</span>` : 'Nothing to save';

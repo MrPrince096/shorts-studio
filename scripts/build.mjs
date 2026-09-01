@@ -224,6 +224,26 @@ async function hfImage(scene, outFile) {
   throw new Error("HF image failed after retries");
 }
 
+// AI IMAGE via a LOCAL generator (free, unlimited) — you run an image server on your Mac
+async function localImage(scene, outFile) {
+  const url = process.env.LOCAL_IMAGE_URL || "http://localhost:7801/generate";
+  const prompt = visualPrompt(scene, "cinematic, highly detailed");
+  let r;
+  try {
+    r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, width: OUT_W, height: OUT_H }) });
+  } catch (e) { throw new Error(`Local image server not reachable at ${url} — is it running? (${e.message})`); }
+  if (!r.ok) throw new Error(`Local ${r.status}: ${(await r.text()).slice(0, 140)}`);
+  const ct = r.headers.get("content-type") || "";
+  if (ct.startsWith("image/")) { writeFileSync(outFile, Buffer.from(await r.arrayBuffer())); return { w: OUT_W, h: OUT_H }; }
+  const j = await r.json();
+  const cand = j.image || j.url || (Array.isArray(j.images) ? j.images[0] : null);
+  if (!cand) throw new Error("Local server: no image in response");
+  if (/^https?:/.test(cand)) { await download(cand, outFile); return { w: OUT_W, h: OUT_H }; }
+  writeFileSync(outFile, Buffer.from(String(cand).replace(/^data:image\/\w+;base64,/, ""), "base64"));
+  return { w: OUT_W, h: OUT_H };
+}
+
 // --- AI images via Pollinations.ai (free, no key) ---
 async function pollImage(scene, outFile) {
   const prompt = visualPrompt(scene, "cinematic, highly detailed, dramatic lighting, digital painting");
@@ -249,12 +269,13 @@ const GEN = {
   pexels: (s, f) => pexelsVideo(s.query, f),
   image: pollImage,
   hf: hfImage,
+  local: localImage,
   "fal-image": falImage,
   fal: falVideo,
 };
-const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", "fal-image": "🎨 fal image", fal: "🤖 fal video" };
+const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video" };
 const genFn = GEN[src] || GEN.pexels;
-const isImageSrc = src === "image" || src === "hf" || src === "fal-image";
+const isImageSrc = src === "image" || src === "hf" || src === "local" || src === "fal-image";
 // key checks
 if ((src === "fal" || src === "fal-image") && !process.env.FAL_KEY) {
   console.error("❌ This source needs a fal.ai key (FAL_KEY). Add it in Settings.");
