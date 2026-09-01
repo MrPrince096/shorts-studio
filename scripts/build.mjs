@@ -192,27 +192,33 @@ async function falImage(scene, outFile) {
   await download(url, outFile);
   return { w: OUT_W, h: OUT_H };
 }
-// AI IMAGE via Hugging Face (FLUX.1-schnell) — free with a free token
+// AI IMAGE via Hugging Face Inference Providers (FLUX through fal) — free monthly credits
 async function hfImage(scene, outFile) {
   const token = process.env.HF_TOKEN;
-  const model = config.hfModel || "black-forest-labs/FLUX.1-schnell";
+  const model = config.hfModel || "fal-ai/flux/schnell";
   const prompt = visualPrompt(scene, "cinematic, highly detailed, dramatic lighting");
-  for (let a = 0; a < 5; a++) {
-    const r = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+  // fal caps the long side; scale request down to <=1440 (composition covers the rest)
+  const scale = Math.min(1, 1440 / Math.max(OUT_W, OUT_H));
+  const w = Math.round((OUT_W * scale) / 8) * 8;
+  const h = Math.round((OUT_H * scale) / 8) * 8;
+  for (let a = 0; a < 4; a++) {
+    const r = await fetch(`https://router.huggingface.co/fal-ai/${model}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ inputs: prompt, parameters: { width: OUT_W, height: OUT_H } }),
+      body: JSON.stringify({ prompt, image_size: { width: w, height: h }, num_images: 1 }),
     });
-    if (r.status === 503) { await sleep(8000); continue; } // model warming up
-    const ct = r.headers.get("content-type") || "";
-    if (!r.ok || ct.includes("application/json")) {
+    if (!r.ok) {
       const t = await r.text();
-      if (a < 4) { await sleep(5000); continue; }
-      throw new Error(`HF ${r.status}: ${t.slice(0, 140)}`);
+      if (r.status === 402) throw new Error("HF free credits used up for this month. Switch source to Pollinations (free) or fal.ai/HF-PRO (paid).");
+      if (r.status === 401 || r.status === 403) throw new Error("HF token rejected — check it in Settings (needs Inference permission).");
+      if ((r.status === 503 || r.status === 429) && a < 3) { await sleep(7000); continue; }
+      if (a < 3) { await sleep(4000); continue; }
+      throw new Error(`HF ${r.status}: ${t.slice(0, 160)}`);
     }
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length < 2000) { if (a < 4) { await sleep(4000); continue; } throw new Error("HF empty image"); }
-    writeFileSync(outFile, buf);
+    const j = await r.json();
+    const url = j?.images?.[0]?.url || j?.image?.url || j?.url;
+    if (!url) { if (a < 3) { await sleep(4000); continue; } throw new Error("HF: no image URL in response"); }
+    await download(url, outFile);
     return { w: OUT_W, h: OUT_H };
   }
   throw new Error("HF image failed after retries");
