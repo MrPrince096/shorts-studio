@@ -1,0 +1,16 @@
+{
+  "title": "Spiritual India",
+  "description": "The birthplace of yoga and meditation — where the Ganges glows with a thousand lamps and silence speaks the loudest. #india #spirituality #yoga #varanasi",
+  "tags": ["india", "spirituality", "yoga", "varanasi", "meditation", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "-4%",
+  "music": "",
+  "scenes": [
+    { "text": "India is where the world learned to look inward.", "query": "yoga meditation sunrise silhouette" },
+    { "text": "The birthplace of yoga and meditation.", "query": "yoga pose sunrise nature" },
+    { "text": "Where the sacred Ganges glows with a thousand floating lamps.", "query": "varanasi ganges river lamps" },
+    { "text": "Where temple bells and chants fill the morning air.", "query": "indian temple bells prayer" },
+    { "text": "Where millions seek peace, not in noise, but in silence.", "query": "meditation temple incense" },
+    { "text": "In India, spirituality isn't a religion. It's a way of life.", "query": "varanasi ganga aarti fire" }
+  ]
+}

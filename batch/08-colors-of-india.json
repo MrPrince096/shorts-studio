@@ -1,0 +1,16 @@
+{
+  "title": "The Colors of India",
+  "description": "India is the most colorful country on Earth — from spice markets to silk saris to color-drenched festivals. #india #colors #culture #incredibleindia",
+  "tags": ["india", "colors", "culture", "incredibleindia", "photography", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "India might be the most colorful country on Earth.", "query": "india colorful market street" },
+    { "text": "Markets overflowing with mountains of spices.", "query": "indian spices market colorful" },
+    { "text": "Silk saris in every shade you can imagine.", "query": "colorful indian sari fabric" },
+    { "text": "Trucks, walls, and streets painted like living art.", "query": "colorful india street art" },
+    { "text": "And festivals where the very air turns to color.", "query": "holi festival color powder" },
+    { "text": "In India, color isn't decoration. It's a language.", "query": "colorful indian textiles market" }
+  ]
+}

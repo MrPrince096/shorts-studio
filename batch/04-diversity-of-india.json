@@ -1,0 +1,16 @@
+{
+  "title": "The Diversity of India",
+  "description": "One country, a thousand worlds — 700 languages, every major religion, and a new culture every few hundred kilometres. #india #diversity #culture #incredibleindia",
+  "tags": ["india", "diversity", "culture", "incredibleindia", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "India isn't one country. It's a thousand worlds in one.", "query": "india map crowd diverse" },
+    { "text": "Travel a few hundred kilometres and the language changes completely.", "query": "indian people portrait diverse" },
+    { "text": "So does the food, the clothing, and even the gods people pray to.", "query": "indian temple colorful architecture" },
+    { "text": "Every major religion on Earth lives here, side by side.", "query": "india temple mosque church" },
+    { "text": "28 states, hundreds of festivals, countless traditions.", "query": "india culture dance colorful" },
+    { "text": "And somehow, it all becomes one India.", "query": "indian flag people crowd" }
+  ]
+}

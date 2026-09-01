@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# secrets — NEVER commit these
+.env
+token.json
+client_secret.json
+
+# generated / runtime
+out/
+logs/
+scenes.json
+queue/done/
+public/*.mp4
+public/voiceover.mp3
+public/subs.vtt
+public/props.json
+
+# os
+.DS_Store

@@ -1,0 +1,16 @@
+{
+  "title": "Indian Hospitality",
+  "description": "In India, the guest is treated as God — Atithi Devo Bhava. Warmth, food, and family that make strangers feel at home. #india #hospitality #culture #atithidevobhava",
+  "tags": ["india", "hospitality", "culture", "family", "incredibleindia", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "In India, there's an ancient saying. The guest is God.", "query": "indian family home welcome" },
+    { "text": "Atithi Devo Bhava. A stranger is never turned away.", "query": "indian people smiling welcome" },
+    { "text": "You'll be offered chai before you even sit down.", "query": "serving chai tea hands" },
+    { "text": "Fed until you simply cannot eat another bite.", "query": "indian family eating together food" },
+    { "text": "Treated not like a visitor, but like family.", "query": "indian family together home" },
+    { "text": "That warmth is the real heart of India.", "query": "indian people happy community" }
+  ]
+}

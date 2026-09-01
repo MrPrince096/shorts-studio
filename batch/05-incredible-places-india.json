@@ -1,0 +1,16 @@
+{
+  "title": "Incredible Places in India",
+  "description": "From the Taj Mahal to the Himalayas, Kerala's backwaters to Rajasthan's deserts — India's landscapes will leave you speechless. #india #travel #tajmahal #incredibleindia",
+  "tags": ["india", "travel", "tajmahal", "incredibleindia", "wanderlust", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "India holds some of the most breathtaking places on Earth.", "query": "taj mahal sunrise" },
+    { "text": "The Taj Mahal, a monument built entirely out of love.", "query": "taj mahal india white marble" },
+    { "text": "The mighty Himalayas, crowned in eternal snow.", "query": "himalayas mountains snow" },
+    { "text": "The calm green backwaters of Kerala.", "query": "kerala backwaters boat palm" },
+    { "text": "And the golden deserts of Rajasthan.", "query": "rajasthan desert camel sand" },
+    { "text": "One country, and every landscape you could ever dream of.", "query": "goa beach sunset india" }
+  ]
+}

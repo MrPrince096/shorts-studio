@@ -1,0 +1,16 @@
+{
+  "title": "Indian Street Food",
+  "description": "India's streets are the greatest food adventure on Earth — pav bhaji, samosas, pani puri and endless masala chai. #indianfood #streetfood #india #foodie",
+  "tags": ["indianfood", "streetfood", "india", "foodie", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "India's streets are the greatest food adventure on Earth.", "query": "indian street food market cooking" },
+    { "text": "Sizzling pav bhaji on a hot iron griddle.", "query": "indian food cooking griddle" },
+    { "text": "Crispy golden samosas straight from the pan.", "query": "samosa frying oil" },
+    { "text": "Pani puri that explodes with flavor in a single bite.", "query": "indian street food snack" },
+    { "text": "And sweet, milky masala chai on every corner.", "query": "masala chai tea pouring" },
+    { "text": "In India, the best food isn't in restaurants. It's on the streets.", "query": "indian street food vendor night" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "title": "Festivals of India",
+  "description": "Nobody celebrates like India — Holi's colors, Diwali's million lamps, and streets full of music and joy. #festival #holi #diwali #india",
+  "tags": ["festival", "holi", "diwali", "india", "incredibleindia", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "Nobody on Earth celebrates like India.", "query": "indian festival celebration crowd" },
+    { "text": "Holi, where an entire country throws color into the sky.", "query": "holi festival colors powder" },
+    { "text": "Diwali, when millions of lamps turn the night into gold.", "query": "diwali lamps lights night" },
+    { "text": "Streets that overflow with music, dance, and fireworks.", "query": "fireworks celebration night sky" },
+    { "text": "Every festival is a reason to gather, share, and glow.", "query": "indian people celebration lights" },
+    { "text": "In India, joy is never celebrated quietly.", "query": "holi color festival people" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "title": "The Wildlife of India",
+  "description": "Home to the Bengal tiger, wild elephants, dancing peacocks and the last Asiatic lions — India's wildlife is unmatched. #india #wildlife #tiger #nature",
+  "tags": ["india", "wildlife", "tiger", "nature", "animals", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "India is home to some of the rarest wildlife on Earth.", "query": "india forest jungle nature" },
+    { "text": "The majestic Bengal tiger, found almost nowhere else.", "query": "bengal tiger wild" },
+    { "text": "Wild elephants roaming ancient forests.", "query": "elephant forest wild" },
+    { "text": "The dancing peacock, India's national bird.", "query": "peacock feathers dancing" },
+    { "text": "And the Asiatic lion, living only in one corner of India.", "query": "lion wildlife nature" },
+    { "text": "A single country, guarding some of nature's greatest treasures.", "query": "india wildlife nature landscape" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "title": "Foods Your Heart Loves",
+  "description": "Simple foods that keep your heart strong. #hearthealth #nutrition #wellness",
+  "tags": ["hearthealth", "nutrition", "wellness", "shorts"],
+  "voice": "en-US-AriaNeural",
+  "rate": "0%",
+  "width": 1080,
+  "height": 1920,
+  "scenes": [
+    { "text": "Your heart beats 100,000 times a day. Feed it well.", "query": "healthy food heart shape" },
+    { "text": "Fatty fish like salmon protect your arteries with omega threes.", "query": "salmon fillet cooking" },
+    { "text": "Berries fight the inflammation that damages your heart.", "query": "fresh berries bowl" },
+    { "text": "Leafy greens lower your blood pressure naturally.", "query": "fresh spinach leaves" },
+    { "text": "A handful of nuts a day keeps cholesterol in check.", "query": "nuts almonds walnuts" },
+    { "text": "Love your heart, and it will beat strong for life.", "query": "person running sunrise health" }
+  ]
+}

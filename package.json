@@ -1,0 +1,28 @@
+{
+  "name": "shorts-engine",
+  "version": "1.0.0",
+  "description": "Free faceless Shorts/Reels engine: edge-tts voiceover + Pexels stock + Remotion render",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "app": "node server.mjs",
+    "build": "node scripts/build.mjs",
+    "studio": "remotion studio",
+    "render": "remotion render Short out/video.mp4 --props=public/props.json",
+    "make": "node scripts/make.mjs",
+    "batch": "node scripts/batch.mjs"
+  },
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "@remotion/cli": "4.0.392",
+    "express": "^4.22.2",
+    "googleapis": "^173.0.0",
+    "open": "^11.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.392"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0"
+  }
+}

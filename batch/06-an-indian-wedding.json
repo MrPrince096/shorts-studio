@@ -1,0 +1,16 @@
+{
+  "title": "An Indian Wedding",
+  "description": "An Indian wedding isn't an event — it's a festival that lasts for days, with colors, music, feasts and a thousand smiling guests. #indianwedding #india #culture #wedding",
+  "tags": ["indianwedding", "india", "culture", "wedding", "incredibleindia", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "An Indian wedding isn't an event. It's an entire festival.", "query": "indian wedding ceremony decoration" },
+    { "text": "Celebrations that stretch across three, four, even five days.", "query": "indian wedding lights decoration" },
+    { "text": "A bride draped in gold and the richest colors.", "query": "indian bride jewelry gold" },
+    { "text": "Music, dancing, and joy that never seems to stop.", "query": "indian wedding dance celebration" },
+    { "text": "Feasts with a hundred dishes and a thousand guests.", "query": "indian wedding food feast" },
+    { "text": "In India, two people marry, but two whole worlds unite.", "query": "indian wedding couple ceremony" }
+  ]
+}

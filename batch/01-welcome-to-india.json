@@ -1,0 +1,16 @@
+{
+  "title": "Welcome to India",
+  "description": "India isn't a country you visit — it's a country you feel. A land of 1.4 billion people and 700 languages. #india #incredibleindia #travel #culture",
+  "tags": ["india", "incredibleindia", "travel", "culture", "shorts"],
+  "voice": "en-IN-NeerjaNeural",
+  "rate": "0%",
+  "music": "",
+  "scenes": [
+    { "text": "This is India. A country that overwhelms every sense you have.", "query": "india street busy colorful crowd" },
+    { "text": "Where ancient temples stand beside glass skyscrapers.", "query": "india temple modern city skyline" },
+    { "text": "Where 1.4 billion people speak more than 700 languages.", "query": "india crowd market people" },
+    { "text": "Where chaos and calm somehow live side by side.", "query": "india traffic street rickshaw" },
+    { "text": "And a stranger will welcome you home like family.", "query": "indian family home welcome" },
+    { "text": "India isn't a country you visit. It's a country you feel.", "query": "taj mahal sunrise india" }
+  ]
+}
