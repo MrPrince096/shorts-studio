@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   AbsoluteFill,
   Audio,
+  Img,
   OffthreadVideo,
   Sequence,
   staticFile,
@@ -29,18 +30,11 @@ const SceneClip: React.FC<{ src: string; durationInFrames: number }> = ({ src, d
   const scale = interpolate(frame, [0, durationInFrames], [1.06, 1.2], {
     extrapolateRight: "clamp",
   });
+  const isImage = /\.(jpe?g|png|webp)$/i.test(src);
+  const media = { width: "100%", height: "100%", objectFit: "cover" as const, transform: `scale(${scale})` };
   return (
     <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "black" }}>
-      <OffthreadVideo
-        src={src}
-        muted
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          transform: `scale(${scale})`,
-        }}
-      />
+      {isImage ? <Img src={src} style={media} /> : <OffthreadVideo src={src} muted style={media} />}
     </AbsoluteFill>
   );
 };

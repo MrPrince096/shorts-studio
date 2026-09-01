@@ -181,7 +181,29 @@ async function falVideo(scene, outFile) {
   return { w: OUT_W, h: OUT_H };
 }
 
-const useFal = config.source === "fal";
+// --- AI images via Pollinations.ai (free, no key) ---
+async function pollImage(scene, outFile) {
+  const prompt = `${scene.query}. Cinematic, highly detailed, dramatic lighting, digital painting, tasteful, safe for work.`;
+  const seed = Math.floor(Math.random() * 1e6);
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${OUT_W}&height=${OUT_H}&nologo=true&model=flux&seed=${seed}`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 2000) throw new Error("empty image");
+      writeFileSync(outFile, buf);
+      return { w: OUT_W, h: OUT_H };
+    } catch (e) {
+      if (attempt === 2) throw e;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+}
+
+const src = config.source || "pexels";
+const useFal = src === "fal";
+const useImage = src === "image";
 if (useFal && !process.env.FAL_KEY) {
   console.error("❌ Visual source is 'fal' but FAL_KEY is not set. Add it in Settings.");
   process.exit(1);
@@ -189,11 +211,14 @@ if (useFal && !process.env.FAL_KEY) {
 
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
-  const file = `scene${i}.mp4`;
-  const tag = useFal ? "🤖 AI video" : "🎬 Pexels";
+  const ext = useImage ? "jpg" : "mp4";
+  const file = `scene${i}.${ext}`;
+  const tag = useFal ? "🤖 AI video" : useImage ? "🎨 AI image" : "🎬 Pexels";
   process.stdout.write(`${tag} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
   try {
-    const b = useFal
+    const b = useImage
+      ? await pollImage(config.scenes[i], join(PUBLIC, file))
+      : useFal
       ? await falVideo(config.scenes[i], join(PUBLIC, file))
       : await pexelsVideo(config.scenes[i].query, join(PUBLIC, file));
     console.log(`ok (${b.w}x${b.h})`);

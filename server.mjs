@@ -69,6 +69,7 @@ const LLM_PROVIDERS = [
 ];
 const VIDEO_SOURCES = [
   { id: "pexels", label: "Pexels stock footage — free, unlimited" },
+  { id: "image", label: "AI images (Pollinations) — free (great for story / fantasy)" },
   { id: "fal", label: "AI video via fal.ai — paid (Seedance / Veo / Kling)" },
 ];
 const FAL_MODELS = [

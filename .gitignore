@@ -12,6 +12,7 @@ logs/
 scenes.json
 queue/done/
 public/*.mp4
+public/*.jpg
 public/voiceover.mp3
 public/subs.vtt
 public/props.json
