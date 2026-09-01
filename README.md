@@ -11,7 +11,10 @@ Built with **edge-tts** (voiceover) + **Pexels** (stock footage) + **Remotion** 
 ## ✨ Features
 
 - 🖥️ **Desktop app** — a clean local web UI (opens in your browser, runs on your Mac)
-- ✨ **Quick Create** — just type a topic + how many videos + duration; AI writes the scripts and renders them (free Gemini API)
+- ✨ **Quick Create** — type a topic (or pick a genre/country, or go random); AI writes the scripts and renders them
+- 🧠 **Pluggable script AI** — Gemini (free), OpenAI/GPT, or Ollama (local & offline) — switch in Settings
+- 🎥 **Pluggable footage** — free Pexels stock, or AI video via fal.ai (Seedance / Veo / Kling)
+- ⚙️ **In-app Settings** — manage all API keys from the UI (saved to `.env`, never leaves your machine)
 - 🎙️ **9 voices** — female & male, US / UK / Indian / Australian accents (edge-tts)
 - 📐 **Any format** — 9:16 (Shorts/Reels), 16:9 (YouTube), 1:1 (Instagram), 4:5 (portrait)
 - 🖼️ **Any resolution** — 720p, 1080p, 2K

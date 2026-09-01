@@ -116,6 +116,17 @@
           <select id="quality"></select>
         </div>
       </div>
+      <div class="row">
+        <div>
+          <label>Visual source</label>
+          <select id="source"></select>
+        </div>
+        <div id="falModelBox" style="display:none">
+          <label>AI video model</label>
+          <select id="videoModel"></select>
+        </div>
+      </div>
+
       <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
       <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
 
@@ -163,23 +174,52 @@
 </div>
 
 <div class="overlay" id="settingsOverlay">
-  <div class="modal">
+  <div class="modal" style="max-height:88vh;overflow:auto">
     <button class="close" id="closeSettings">×</button>
-    <h2>⚙️ API Keys</h2>
+    <h2>⚙️ Settings</h2>
     <p class="hint" style="margin-top:0">Stored locally in your <code>.env</code> file. Never leaves your machine.</p>
 
-    <label>Pexels API key <span style="color:var(--muted)">(required — stock footage)</span></label>
+    <label>Footage source — Pexels key <span style="color:var(--muted)">(required)</span></label>
     <input id="pexelsKey" type="password" placeholder="paste key…" />
     <div class="keystate" id="pexelsState"></div>
     <div class="hint"><a href="https://www.pexels.com/api/" target="_blank">Get a free Pexels key →</a></div>
 
-    <label>Gemini API key <span style="color:var(--muted)">(for AI script writing)</span></label>
-    <input id="geminiKey" type="password" placeholder="paste key…" />
-    <div class="keystate" id="geminiState"></div>
-    <div class="hint"><a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free Gemini key →</a></div>
+    <hr style="border-color:var(--line);margin:18px 0" />
+    <h2 style="margin-bottom:8px">🧠 Script AI (LLM)</h2>
+    <label>Which AI writes the scripts</label>
+    <select id="llmProvider"></select>
+
+    <div id="geminiBox">
+      <label>Gemini API key</label>
+      <input id="geminiKey" type="password" placeholder="paste key…" />
+      <div class="keystate" id="geminiState"></div>
+      <div class="hint"><a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free Gemini key →</a></div>
+    </div>
+    <div id="openaiBox">
+      <label>OpenAI API key</label>
+      <input id="openaiKey" type="password" placeholder="sk-…" />
+      <div class="keystate" id="openaiState"></div>
+      <label>OpenAI model</label>
+      <input id="openaiModel" placeholder="gpt-4o-mini" />
+      <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Get an OpenAI key →</a></div>
+    </div>
+    <div id="ollamaBox">
+      <label>Ollama URL (local, offline)</label>
+      <input id="ollamaUrl" placeholder="http://localhost:11434" />
+      <label>Ollama model</label>
+      <input id="ollamaModel" placeholder="llama3.1" />
+      <div class="hint">Runs fully offline. <a href="https://ollama.com" target="_blank">Install Ollama →</a> then <code>ollama pull llama3.1</code></div>
+    </div>
+
+    <hr style="border-color:var(--line);margin:18px 0" />
+    <h2 style="margin-bottom:8px">🎥 AI video (optional)</h2>
+    <label>fal.ai API key <span style="color:var(--muted)">(for Seedance / Veo / Kling backgrounds)</span></label>
+    <input id="falKey" type="password" placeholder="paste key…" />
+    <div class="keystate" id="falState"></div>
+    <div class="hint">Paid, per-clip. <a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
 
     <div class="btnrow">
-      <button class="action primary" id="saveSettings">Save keys</button>
+      <button class="action primary" id="saveSettings">Save</button>
       <span id="saveMsg" style="align-self:center;font-size:13px"></span>
     </div>
   </div>
@@ -200,23 +240,49 @@ async function loadConfig(){
   $('#country').appendChild(opt('', '— any / none —'));
   (c.countries||[]).forEach(x => $('#country').appendChild(opt(x.id, x.label)));
   for(let i=1;i<=10;i++) $('#count').appendChild(opt(i, i + (i===1?' video':' videos')));
-  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium';
+  (c.videoSources||[]).forEach(s => $('#source').appendChild(opt(s.id, s.label)));
+  (c.falModels||[]).forEach(m => $('#videoModel').appendChild(opt(m.id, m.label)));
+  (c.llmProviders||[]).forEach(p => $('#llmProvider').appendChild(opt(p.id, p.label)));
+  $('#source').onchange = () => { $('#falModelBox').style.display = $('#source').value==='fal' ? 'block':'none'; };
+  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#source').value='pexels';
 }
 
 // ---- Settings modal ----
+const stateHtml = (k, note) => k.set ? `<span class="ok">✔ set (${k.masked})</span>` : `<span class="err">✘ not set${note?' — '+note:''}</span>`;
+function toggleLlmBoxes(){
+  const p = $('#llmProvider').value;
+  $('#geminiBox').style.display = p==='gemini'?'block':'none';
+  $('#openaiBox').style.display = p==='openai'?'block':'none';
+  $('#ollamaBox').style.display = p==='ollama'?'block':'none';
+}
 async function loadSettings(){
   const s = await (await fetch('/api/settings')).json();
-  $('#pexelsState').innerHTML = s.pexels.set ? `<span class="ok">✔ set (${s.pexels.masked})</span>` : `<span class="err">✘ not set</span>`;
-  $('#geminiState').innerHTML = s.gemini.set ? `<span class="ok">✔ set (${s.gemini.masked})</span>` : `<span class="err">✘ not set — needed for AI topics</span>`;
+  $('#llmProvider').value = s.llmProvider || 'gemini';
+  $('#openaiModel').value = s.openaiModel || '';
+  $('#ollamaUrl').value = s.ollamaUrl || '';
+  $('#ollamaModel').value = s.ollamaModel || '';
+  $('#pexelsState').innerHTML = stateHtml(s.keys.pexels);
+  $('#geminiState').innerHTML = stateHtml(s.keys.gemini, 'needed for AI topics');
+  $('#openaiState').innerHTML = stateHtml(s.keys.openai);
+  $('#falState').innerHTML = stateHtml(s.keys.fal, 'needed for AI video');
+  toggleLlmBoxes();
 }
+$('#llmProvider') && ($('#llmProvider').onchange = toggleLlmBoxes);
 $('#openSettings').onclick = () => { loadSettings(); $('#settingsOverlay').classList.add('open'); };
 $('#closeSettings').onclick = () => $('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick = (e) => { if(e.target.id==='settingsOverlay') $('#settingsOverlay').classList.remove('open'); };
 $('#saveSettings').onclick = async () => {
-  const body = { pexels: $('#pexelsKey').value.trim(), gemini: $('#geminiKey').value.trim() };
+  const body = {
+    llmProvider: $('#llmProvider').value,
+    pexels: $('#pexelsKey').value.trim(), gemini: $('#geminiKey').value.trim(),
+    openai: $('#openaiKey').value.trim(), openaiModel: $('#openaiModel').value.trim(),
+    ollamaUrl: $('#ollamaUrl').value.trim(), ollamaModel: $('#ollamaModel').value.trim(),
+    fal: $('#falKey').value.trim(),
+  };
   const r = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-  $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ${r.saved.join(' & ')} ✓</span>` : 'Nothing to save';
-  $('#pexelsKey').value=''; $('#geminiKey').value=''; loadSettings();
+  $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ✓</span>` : 'Nothing to save';
+  ['pexelsKey','geminiKey','openaiKey','falKey'].forEach(id=>$('#'+id).value='');
+  loadSettings();
 };
 
 // ---- 🎲 random topic ----
@@ -271,7 +337,7 @@ async function refreshGallery(){
   });
 }
 
-const fmt = () => ({ voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%' });
+const fmt = () => ({ voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value });
 let polling=null;
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; $('#goAI').disabled=true; $('#goManual').disabled=true; $('#progress').scrollIntoView({behavior:'smooth'}); }
 function endProgress(){ $('#goAI').disabled=false; $('#goManual').disabled=false; }

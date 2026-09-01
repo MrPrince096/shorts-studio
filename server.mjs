@@ -62,6 +62,23 @@ const COUNTRIES = [
   "Israel", "New Zealand", "Peru", "Colombia", "Chile", "Iceland",
 ].map((c) => ({ id: c, label: c }));
 
+const LLM_PROVIDERS = [
+  { id: "gemini", label: "Gemini (Google) — free" },
+  { id: "openai", label: "OpenAI (GPT)" },
+  { id: "ollama", label: "Ollama (local / offline)" },
+];
+const VIDEO_SOURCES = [
+  { id: "pexels", label: "Pexels stock footage — free, unlimited" },
+  { id: "fal", label: "AI video via fal.ai — paid (Seedance / Veo / Kling)" },
+];
+const FAL_MODELS = [
+  { id: "fal-ai/bytedance/seedance/v1/lite/text-to-video", label: "Seedance 1.0 Lite (cheapest)" },
+  { id: "fal-ai/bytedance/seedance/v1/pro/text-to-video", label: "Seedance 1.0 Pro" },
+  { id: "fal-ai/kling-video/v1.6/standard/text-to-video", label: "Kling 1.6" },
+  { id: "fal-ai/veo3/fast", label: "Veo 3 Fast" },
+  { id: "fal-ai/veo3", label: "Veo 3 (best, priciest)" },
+];
+
 // ---- .env helpers for the Settings panel ----
 const ENV_PATH = join(ROOT, ".env");
 function readEnvRaw() {
@@ -145,21 +162,38 @@ async function runAll(configs, job) {
 }
 
 app.get("/api/config", (_req, res) =>
-  res.json({ voices: VOICES, aspects: ASPECTS, qualities: QUALITIES, durations: DURATIONS, genres: GENRES, countries: COUNTRIES })
+  res.json({
+    voices: VOICES, aspects: ASPECTS, qualities: QUALITIES, durations: DURATIONS,
+    genres: GENRES, countries: COUNTRIES, llmProviders: LLM_PROVIDERS,
+    videoSources: VIDEO_SOURCES, falModels: FAL_MODELS,
+  })
 );
 
-// ---- Settings: API keys ----
+// ---- Settings: providers + API keys ----
+const km = (k) => ({ set: !!getEnvValue(k), masked: maskKey(getEnvValue(k)) });
 app.get("/api/settings", (_req, res) => {
   res.json({
-    pexels: { set: !!getEnvValue("PEXELS_API_KEY"), masked: maskKey(getEnvValue("PEXELS_API_KEY")) },
-    gemini: { set: !!getEnvValue("GEMINI_API_KEY"), masked: maskKey(getEnvValue("GEMINI_API_KEY")) },
+    llmProvider: getEnvValue("LLM_PROVIDER") || "gemini",
+    openaiModel: getEnvValue("OPENAI_MODEL") || "gpt-4o-mini",
+    ollamaUrl: getEnvValue("OLLAMA_URL") || "http://localhost:11434",
+    ollamaModel: getEnvValue("OLLAMA_MODEL") || "llama3.1",
+    keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY") },
   });
 });
 app.post("/api/settings", (req, res) => {
   const b = req.body || {};
   const saved = [];
-  if (typeof b.pexels === "string" && b.pexels.trim()) { setEnvValue("PEXELS_API_KEY", b.pexels.trim()); saved.push("Pexels"); }
-  if (typeof b.gemini === "string" && b.gemini.trim()) { setEnvValue("GEMINI_API_KEY", b.gemini.trim()); saved.push("Gemini"); }
+  const setIf = (field, envKey, label) => {
+    if (typeof b[field] === "string" && b[field].trim()) { setEnvValue(envKey, b[field].trim()); saved.push(label); }
+  };
+  if (b.llmProvider) { setEnvValue("LLM_PROVIDER", String(b.llmProvider)); saved.push("LLM provider"); }
+  setIf("pexels", "PEXELS_API_KEY", "Pexels key");
+  setIf("gemini", "GEMINI_API_KEY", "Gemini key");
+  setIf("openai", "OPENAI_API_KEY", "OpenAI key");
+  setIf("openaiModel", "OPENAI_MODEL", "OpenAI model");
+  setIf("ollamaUrl", "OLLAMA_URL", "Ollama URL");
+  setIf("ollamaModel", "OLLAMA_MODEL", "Ollama model");
+  setIf("fal", "FAL_KEY", "fal.ai key");
   res.json({ ok: true, saved });
 });
 
@@ -199,6 +233,8 @@ app.post("/api/generate", async (req, res) => {
         voice: b.voice || "en-US-AriaNeural",
         rate: b.rate || "0%",
         width, height,
+        source: b.source || "pexels",
+        videoModel: b.videoModel || "",
       });
       job.total = configs.length;
       pushLog(job, `✅ ${configs.length} script(s) ready. Rendering…`);
@@ -231,6 +267,8 @@ app.post("/api/render", (req, res) => {
     voice: b.voice || "en-US-AriaNeural",
     rate: b.rate || "0%",
     music: "", width, height,
+    source: b.source || "pexels",
+    videoModel: b.videoModel || "",
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };
   busy = true;

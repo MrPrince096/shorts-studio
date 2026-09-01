@@ -145,12 +145,57 @@ async function pexelsVideo(query, outFile) {
   return best;
 }
 
+// --- AI video via fal.ai (Seedance / Veo / Kling / animated models) ---
+function falAspect() {
+  if (OUT_W > OUT_H) return "16:9";
+  if (OUT_W < OUT_H) return OUT_H / OUT_W >= 1.5 ? "9:16" : "3:4";
+  return "1:1";
+}
+async function falVideo(scene, outFile) {
+  const FAL_KEY = process.env.FAL_KEY;
+  const model = config.videoModel || "fal-ai/bytedance/seedance/v1/lite/text-to-video";
+  const prompt = `${scene.query}. ${scene.text} Cinematic, high quality, smooth natural motion.`;
+  const auth = { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" };
+  const submit = await fetch(`https://queue.fal.run/${model}`, {
+    method: "POST",
+    headers: auth,
+    body: JSON.stringify({ prompt, aspect_ratio: falAspect(), duration: "5" }),
+  });
+  if (!submit.ok) throw new Error(`fal submit ${submit.status}: ${(await submit.text()).slice(0, 160)}`);
+  const j = await submit.json();
+  const reqId = j.request_id;
+  const statusUrl = j.status_url || `https://queue.fal.run/${model}/requests/${reqId}/status`;
+  const respUrl = j.response_url || `https://queue.fal.run/${model}/requests/${reqId}`;
+  const t0 = Date.now();
+  while (Date.now() - t0 < 6 * 60 * 1000) {
+    await new Promise((r) => setTimeout(r, 4000));
+    const sd = await (await fetch(statusUrl, { headers: auth })).json();
+    if (sd.status === "COMPLETED") break;
+    if (sd.status === "FAILED" || sd.status === "ERROR") throw new Error("fal generation failed");
+  }
+  const rd = await (await fetch(respUrl, { headers: auth })).json();
+  const url = rd?.video?.url || rd?.output?.url || rd?.videos?.[0]?.url || rd?.url ||
+    (typeof rd?.video === "string" ? rd.video : null);
+  if (!url) throw new Error("fal: no video URL in response");
+  writeFileSync(outFile, Buffer.from(await (await fetch(url)).arrayBuffer()));
+  return { w: OUT_W, h: OUT_H };
+}
+
+const useFal = config.source === "fal";
+if (useFal && !process.env.FAL_KEY) {
+  console.error("❌ Visual source is 'fal' but FAL_KEY is not set. Add it in Settings.");
+  process.exit(1);
+}
+
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
   const file = `scene${i}.mp4`;
-  process.stdout.write(`🎬 Pexels [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
+  const tag = useFal ? "🤖 AI video" : "🎬 Pexels";
+  process.stdout.write(`${tag} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
   try {
-    const b = await pexelsVideo(config.scenes[i].query, join(PUBLIC, file));
+    const b = useFal
+      ? await falVideo(config.scenes[i], join(PUBLIC, file))
+      : await pexelsVideo(config.scenes[i].query, join(PUBLIC, file));
     console.log(`ok (${b.w}x${b.h})`);
   } catch (e) {
     console.log("FAILED:", e.message);
