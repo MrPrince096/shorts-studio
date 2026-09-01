@@ -236,11 +236,16 @@
     </div>
 
     <hr style="border-color:var(--line);margin:18px 0" />
-    <h2 style="margin-bottom:8px">🎥 AI video (optional)</h2>
-    <label>fal.ai API key <span style="color:var(--muted)">(for Seedance / Veo / Kling backgrounds)</span></label>
+    <h2 style="margin-bottom:8px">🎨 AI visuals (optional)</h2>
+    <label>Hugging Face token <span style="color:var(--muted)">(free — better AI images via FLUX)</span></label>
+    <input id="hfKey" type="password" placeholder="hf_…" />
+    <div class="keystate" id="hfState"></div>
+    <div class="hint">Free, rate-limited. <a href="https://huggingface.co/settings/tokens" target="_blank">Get a free HF token →</a> (create a "Read" token)</div>
+
+    <label>fal.ai API key <span style="color:var(--muted)">(paid — best images + video)</span></label>
     <input id="falKey" type="password" placeholder="paste key…" />
     <div class="keystate" id="falState"></div>
-    <div class="hint">Paid, per-clip. <a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
+    <div class="hint">Paid, per-generation. <a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
 
     <div class="btnrow">
       <button class="action primary" id="saveSettings">Save</button>
@@ -284,7 +289,7 @@ async function loadConfig(){
   $('#source').onchange = () => {
     const s = $('#source').value;
     $('#falModelBox').style.display = s==='fal' ? 'block':'none';
-    $('#styleBox').style.display = (s==='image'||s==='fal') ? 'block':'none';
+    $('#styleBox').style.display = ['image','hf','fal-image','fal'].includes(s) ? 'block':'none';
   };
   $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#source').value='pexels';
 }
@@ -306,7 +311,8 @@ async function loadSettings(){
   $('#pexelsState').innerHTML = stateHtml(s.keys.pexels);
   $('#geminiState').innerHTML = stateHtml(s.keys.gemini, 'needed for AI topics');
   $('#openaiState').innerHTML = stateHtml(s.keys.openai);
-  $('#falState').innerHTML = stateHtml(s.keys.fal, 'needed for AI video');
+  $('#hfState').innerHTML = stateHtml(s.keys.hf, 'needed for HF images');
+  $('#falState').innerHTML = stateHtml(s.keys.fal, 'needed for fal images/video');
   toggleLlmBoxes();
 }
 $('#llmProvider') && ($('#llmProvider').onchange = toggleLlmBoxes);
@@ -319,11 +325,11 @@ $('#saveSettings').onclick = async () => {
     pexels: $('#pexelsKey').value.trim(), gemini: $('#geminiKey').value.trim(),
     openai: $('#openaiKey').value.trim(), openaiModel: $('#openaiModel').value.trim(),
     ollamaUrl: $('#ollamaUrl').value.trim(), ollamaModel: $('#ollamaModel').value.trim(),
-    fal: $('#falKey').value.trim(),
+    fal: $('#falKey').value.trim(), hf: $('#hfKey').value.trim(),
   };
   const r = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ✓</span>` : 'Nothing to save';
-  ['pexelsKey','geminiKey','openaiKey','falKey'].forEach(id=>$('#'+id).value='');
+  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey'].forEach(id=>$('#'+id).value='');
   loadSettings();
 };
 

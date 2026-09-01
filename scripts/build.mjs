@@ -145,49 +145,82 @@ async function pexelsVideo(query, outFile) {
   return best;
 }
 
-// --- AI video via fal.ai (Seedance / Veo / Kling / animated models) ---
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const visualPrompt = (scene, dflt) =>
+  `${scene.imagePrompt || scene.query}. ${config.imageStyle || dflt}. Tasteful, safe for work.`;
+
+// --- fal.ai shared queue runner ---
 function falAspect() {
   if (OUT_W > OUT_H) return "16:9";
   if (OUT_W < OUT_H) return OUT_H / OUT_W >= 1.5 ? "9:16" : "3:4";
   return "1:1";
 }
-async function falVideo(scene, outFile) {
-  const FAL_KEY = process.env.FAL_KEY;
-  const model = config.videoModel || "fal-ai/bytedance/seedance/v1/lite/text-to-video";
-  const base = scene.imagePrompt || scene.query;
-  const style = config.imageStyle || "cinematic, high quality";
-  const prompt = `${base}. ${style}, smooth natural motion.`;
-  const auth = { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" };
-  const submit = await fetch(`https://queue.fal.run/${model}`, {
-    method: "POST",
-    headers: auth,
-    body: JSON.stringify({ prompt, aspect_ratio: falAspect(), duration: "5" }),
-  });
+async function falRun(model, body) {
+  const auth = { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
+  const submit = await fetch(`https://queue.fal.run/${model}`, { method: "POST", headers: auth, body: JSON.stringify(body) });
   if (!submit.ok) throw new Error(`fal submit ${submit.status}: ${(await submit.text()).slice(0, 160)}`);
   const j = await submit.json();
-  const reqId = j.request_id;
-  const statusUrl = j.status_url || `https://queue.fal.run/${model}/requests/${reqId}/status`;
-  const respUrl = j.response_url || `https://queue.fal.run/${model}/requests/${reqId}`;
+  const statusUrl = j.status_url || `https://queue.fal.run/${model}/requests/${j.request_id}/status`;
+  const respUrl = j.response_url || `https://queue.fal.run/${model}/requests/${j.request_id}`;
   const t0 = Date.now();
   while (Date.now() - t0 < 6 * 60 * 1000) {
-    await new Promise((r) => setTimeout(r, 4000));
+    await sleep(4000);
     const sd = await (await fetch(statusUrl, { headers: auth })).json();
     if (sd.status === "COMPLETED") break;
     if (sd.status === "FAILED" || sd.status === "ERROR") throw new Error("fal generation failed");
   }
-  const rd = await (await fetch(respUrl, { headers: auth })).json();
-  const url = rd?.video?.url || rd?.output?.url || rd?.videos?.[0]?.url || rd?.url ||
-    (typeof rd?.video === "string" ? rd.video : null);
-  if (!url) throw new Error("fal: no video URL in response");
+  return (await fetch(respUrl, { headers: auth })).json();
+}
+async function download(url, outFile) {
   writeFileSync(outFile, Buffer.from(await (await fetch(url)).arrayBuffer()));
+}
+// AI VIDEO (Seedance / Veo / Kling)
+async function falVideo(scene, outFile) {
+  const model = config.videoModel || "fal-ai/bytedance/seedance/v1/lite/text-to-video";
+  const rd = await falRun(model, { prompt: visualPrompt(scene, "cinematic, high quality") + " smooth natural motion.", aspect_ratio: falAspect(), duration: "5" });
+  const url = rd?.video?.url || rd?.output?.url || rd?.videos?.[0]?.url || rd?.url || (typeof rd?.video === "string" ? rd.video : null);
+  if (!url) throw new Error("fal: no video URL in response");
+  await download(url, outFile);
   return { w: OUT_W, h: OUT_H };
+}
+// AI IMAGE via fal.ai (Flux) — paid, best quality
+async function falImage(scene, outFile) {
+  const model = (config.videoModel && config.videoModel.includes("flux")) ? config.videoModel : "fal-ai/flux/schnell";
+  const rd = await falRun(model, { prompt: visualPrompt(scene, "cinematic, highly detailed"), image_size: { width: OUT_W, height: OUT_H }, num_images: 1 });
+  const url = rd?.images?.[0]?.url || rd?.image?.url || rd?.url;
+  if (!url) throw new Error("fal: no image URL in response");
+  await download(url, outFile);
+  return { w: OUT_W, h: OUT_H };
+}
+// AI IMAGE via Hugging Face (FLUX.1-schnell) — free with a free token
+async function hfImage(scene, outFile) {
+  const token = process.env.HF_TOKEN;
+  const model = config.hfModel || "black-forest-labs/FLUX.1-schnell";
+  const prompt = visualPrompt(scene, "cinematic, highly detailed, dramatic lighting");
+  for (let a = 0; a < 5; a++) {
+    const r = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ inputs: prompt, parameters: { width: OUT_W, height: OUT_H } }),
+    });
+    if (r.status === 503) { await sleep(8000); continue; } // model warming up
+    const ct = r.headers.get("content-type") || "";
+    if (!r.ok || ct.includes("application/json")) {
+      const t = await r.text();
+      if (a < 4) { await sleep(5000); continue; }
+      throw new Error(`HF ${r.status}: ${t.slice(0, 140)}`);
+    }
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 2000) { if (a < 4) { await sleep(4000); continue; } throw new Error("HF empty image"); }
+    writeFileSync(outFile, buf);
+    return { w: OUT_W, h: OUT_H };
+  }
+  throw new Error("HF image failed after retries");
 }
 
 // --- AI images via Pollinations.ai (free, no key) ---
 async function pollImage(scene, outFile) {
-  const base = scene.imagePrompt || scene.query;
-  const style = config.imageStyle || "cinematic, highly detailed, dramatic lighting, digital painting";
-  const prompt = `${base}. ${style}. Tasteful, safe for work.`;
+  const prompt = visualPrompt(scene, "cinematic, highly detailed, dramatic lighting, digital painting");
   const seed = Math.floor(Math.random() * 1e6);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${OUT_W}&height=${OUT_H}&nologo=true&model=flux&seed=${seed}`;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -206,35 +239,38 @@ async function pollImage(scene, outFile) {
 }
 
 const src = config.source || "pexels";
-const useFal = src === "fal";
-const useImage = src === "image";
-if (useFal && !process.env.FAL_KEY) {
-  console.error("❌ Visual source is 'fal' but FAL_KEY is not set. Add it in Settings.");
+const GEN = {
+  pexels: (s, f) => pexelsVideo(s.query, f),
+  image: pollImage,
+  hf: hfImage,
+  "fal-image": falImage,
+  fal: falVideo,
+};
+const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", "fal-image": "🎨 fal image", fal: "🤖 fal video" };
+const genFn = GEN[src] || GEN.pexels;
+const isImageSrc = src === "image" || src === "hf" || src === "fal-image";
+// key checks
+if ((src === "fal" || src === "fal-image") && !process.env.FAL_KEY) {
+  console.error("❌ This source needs a fal.ai key (FAL_KEY). Add it in Settings.");
+  process.exit(1);
+}
+if (src === "hf" && !process.env.HF_TOKEN) {
+  console.error("❌ Hugging Face source needs a free token (HF_TOKEN). Add it in Settings.");
   process.exit(1);
 }
 
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
-  const ext = useImage ? "jpg" : "mp4";
-  const file = `scene${i}.${ext}`;
-  const tag = useFal ? "🤖 AI video" : useImage ? "🎨 AI image" : "🎬 Pexels";
-  process.stdout.write(`${tag} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
+  const file = `scene${i}.${isImageSrc ? "jpg" : "mp4"}`;
+  process.stdout.write(`${TAG[src] || "🎬"} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
   try {
-    const b = useImage
-      ? await pollImage(config.scenes[i], join(PUBLIC, file))
-      : useFal
-      ? await falVideo(config.scenes[i], join(PUBLIC, file))
-      : await pexelsVideo(config.scenes[i].query, join(PUBLIC, file));
+    const b = await genFn(config.scenes[i], join(PUBLIC, file));
     console.log(`ok (${b.w}x${b.h})`);
   } catch (e) {
     console.log("FAILED:", e.message);
     process.exit(1);
   }
-  sceneOut.push({
-    video: file,
-    start: sceneRanges[i].start,
-    end: sceneRanges[i].end,
-  });
+  sceneOut.push({ video: file, start: sceneRanges[i].start, end: sceneRanges[i].end });
 }
 
 // --- 6. Write props.json ---
