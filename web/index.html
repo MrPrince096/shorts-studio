@@ -104,9 +104,15 @@
       </div>
       <div class="row">
         <div>
+          <label>Language 🌐</label>
+          <select id="language"></select>
+        </div>
+        <div>
           <label>Voice</label>
           <select id="voice"></select>
         </div>
+      </div>
+      <div class="row">
         <div>
           <label>Aspect ratio</label>
           <select id="aspect"></select>
@@ -229,9 +235,19 @@
 const $ = (s) => document.querySelector(s);
 function opt(v,l){ const o=document.createElement('option'); o.value=v; o.textContent=l; return o; }
 
+let LANGS = [];
+function populateVoices(langId){
+  const L = LANGS.find(x => x.id === langId) || LANGS[0];
+  $('#voice').innerHTML = '';
+  (L ? L.voices : []).forEach(v => $('#voice').appendChild(opt(v.id, v.label)));
+}
 async function loadConfig(){
   const c = await (await fetch('/api/config')).json();
-  c.voices.forEach(v => $('#voice').appendChild(opt(v.id, v.label)));
+  LANGS = c.languages || [];
+  LANGS.forEach(l => $('#language').appendChild(opt(l.id, l.label)));
+  $('#language').value = 'en';
+  populateVoices('en');
+  $('#language').onchange = () => populateVoices($('#language').value);
   c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
   c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
   c.durations.forEach(d => $('#duration').appendChild(opt(d.id, d.label)));
@@ -337,7 +353,7 @@ async function refreshGallery(){
   });
 }
 
-const fmt = () => ({ voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value });
+const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value });
 let polling=null;
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; $('#goAI').disabled=true; $('#goManual').disabled=true; $('#progress').scrollIntoView({behavior:'smooth'}); }
 function endProgress(){ $('#goAI').disabled=false; $('#goManual').disabled=false; }

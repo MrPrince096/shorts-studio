@@ -9,6 +9,9 @@ const fallback = {
   audio: "",
   music: "",
   title: "",
+  font: "Arial Black",
+  fontCss: "",
+  rtl: false,
   scenes: [],
   words: [],
 };

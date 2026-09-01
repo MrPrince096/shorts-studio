@@ -119,9 +119,18 @@ function buildSubject({ topic, genre, country, random, count }) {
   return bits.join(", ");
 }
 
-export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel }) {
+export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl }) {
   const nScenes = SCENES_FOR[duration] || 7;
   const subject = buildSubject({ topic, genre, country, random, count });
+  const nonEnglish = language && language.toLowerCase() !== "english";
+
+  const langBlock = nonEnglish
+    ? `\nLANGUAGE RULES (very important):
+- Write EVERY "text" (the spoken narration) in ${language}, using its native script — natural, fluent, native-speaker quality.
+- Write "title" and "description" in ${language} too.
+- BUT keep EVERY "query" in simple ENGLISH (2-4 words) — it is used to search a stock-footage library.
+- Also add an English "slug": 3-5 lowercase ASCII words, hyphenated, describing the video (used for the filename).`
+    : `\n- Also add a short English "slug": 3-5 lowercase ASCII words, hyphenated (used for the filename).`;
 
   const prompt = `You are an expert faceless YouTube Shorts scriptwriter.
 Create ${count} DISTINCT short-video script(s) ${subject}.
@@ -131,11 +140,11 @@ For EACH video:
 - Each scene has "text" (ONE punchy spoken narration sentence, about 8 to 16 words) and "query" (a 2 to 4 word ENGLISH stock-footage / visual search term that literally matches that sentence's visual).
 - Scene 1 is a strong scroll-stopping hook. The final scene is a memorable closing line.
 - Keep it factual, vivid and positive. Do NOT put hashtags inside "text".
-- Provide "title" (3 to 6 words), "description" (one line ending with 2 to 4 hashtags), and 4 to 6 "tags".
+- Provide "title" (3 to 6 words), "description" (one line ending with 2 to 4 hashtags), and 4 to 6 "tags".${langBlock}
 ${count > 1 ? `Make the ${count} videos cover clearly different angles so they do not repeat.` : ""}
 
 Return ONLY valid JSON, no markdown, of exactly this shape:
-{"videos":[{"title":"","description":"","tags":["",""],"scenes":[{"text":"","query":""}]}]}`;
+{"videos":[{"title":"","slug":"","description":"","tags":["",""],"scenes":[{"text":"","query":""}]}]}`;
 
   let raw;
   try {
@@ -152,11 +161,13 @@ Return ONLY valid JSON, no markdown, of exactly this shape:
   const videos = (parsed.videos || parsed.scripts || (Array.isArray(parsed) ? parsed : []))
     .map((v) => ({
       title: v.title || topic || "Short",
+      slug: v.slug || "",
       description: v.description || "",
       tags: Array.isArray(v.tags) ? v.tags : [],
       voice, rate, music: "", width, height,
       source: source || "pexels",
       videoModel: videoModel || "",
+      font: font || "Arial Black", fontCss: fontCss || "", rtl: !!rtl,
       scenes: (v.scenes || [])
         .filter((s) => s && s.text && s.query)
         .map((s) => ({ text: String(s.text), query: String(s.query) })),

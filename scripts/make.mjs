@@ -8,21 +8,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 
 function slug(s) {
-  return (
-    (s || "short")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "short"
-  );
+  return (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
 }
 
 // 1. build assets + props
 execFileSync("node", [join(__dirname, "build.mjs")], { stdio: "inherit", cwd: ROOT });
 
-// 2. derive output filename from the script title
+// 2. derive output filename — prefer the English slug (works for any language title)
 const config = JSON.parse(readFileSync(join(ROOT, "scenes.json"), "utf8"));
-const outPath = `out/${slug(config.title)}.mp4`;
+const name = slug(config.slug) || slug(config.title) || `video-${Date.now()}`;
+const outPath = `out/${name}.mp4`;
 
 // 3. render
 console.log(`\n🎥 Rendering -> ${outPath}`);

@@ -79,6 +79,55 @@ const FAL_MODELS = [
   { id: "fal-ai/veo3", label: "Veo 3 (best, priciest)" },
 ];
 
+// language -> label, caption font (Google Noto for the script), rtl, and voices
+const LANGUAGES = [
+  { id: "en", label: "English", voices: VOICES },
+  { id: "hi", label: "Hindi", font: "Noto Sans Devanagari", voices: [
+    { id: "hi-IN-SwaraNeural", label: "Swara — Female" }, { id: "hi-IN-MadhurNeural", label: "Madhur — Male" }] },
+  { id: "te", label: "Telugu", font: "Noto Sans Telugu", voices: [
+    { id: "te-IN-ShrutiNeural", label: "Shruti — Female" }, { id: "te-IN-MohanNeural", label: "Mohan — Male" }] },
+  { id: "ta", label: "Tamil", font: "Noto Sans Tamil", voices: [
+    { id: "ta-IN-PallaviNeural", label: "Pallavi — Female" }, { id: "ta-IN-ValluvarNeural", label: "Valluvar — Male" }] },
+  { id: "kn", label: "Kannada", font: "Noto Sans Kannada", voices: [
+    { id: "kn-IN-SapnaNeural", label: "Sapna — Female" }, { id: "kn-IN-GaganNeural", label: "Gagan — Male" }] },
+  { id: "ml", label: "Malayalam", font: "Noto Sans Malayalam", voices: [
+    { id: "ml-IN-SobhanaNeural", label: "Sobhana — Female" }, { id: "ml-IN-MidhunNeural", label: "Midhun — Male" }] },
+  { id: "mr", label: "Marathi", font: "Noto Sans Devanagari", voices: [
+    { id: "mr-IN-AarohiNeural", label: "Aarohi — Female" }, { id: "mr-IN-ManoharNeural", label: "Manohar — Male" }] },
+  { id: "bn", label: "Bengali", font: "Noto Sans Bengali", voices: [
+    { id: "bn-IN-TanishaaNeural", label: "Tanishaa — Female" }, { id: "bn-IN-BashkarNeural", label: "Bashkar — Male" }] },
+  { id: "gu", label: "Gujarati", font: "Noto Sans Gujarati", voices: [
+    { id: "gu-IN-DhwaniNeural", label: "Dhwani — Female" }, { id: "gu-IN-NiranjanNeural", label: "Niranjan — Male" }] },
+  { id: "ur", label: "Urdu", font: "Noto Sans Arabic", rtl: true, voices: [
+    { id: "ur-PK-UzmaNeural", label: "Uzma — Female" }, { id: "ur-PK-AsadNeural", label: "Asad — Male" }] },
+  { id: "ar", label: "Arabic", font: "Noto Sans Arabic", rtl: true, voices: [
+    { id: "ar-EG-SalmaNeural", label: "Salma — Female" }, { id: "ar-SA-HamedNeural", label: "Hamed — Male" }] },
+  { id: "es", label: "Spanish", voices: [
+    { id: "es-ES-ElviraNeural", label: "Elvira — Female" }, { id: "es-MX-JorgeNeural", label: "Jorge — Male" }] },
+  { id: "fr", label: "French", voices: [
+    { id: "fr-FR-DeniseNeural", label: "Denise — Female" }, { id: "fr-FR-HenriNeural", label: "Henri — Male" }] },
+  { id: "de", label: "German", voices: [
+    { id: "de-DE-KatjaNeural", label: "Katja — Female" }, { id: "de-DE-ConradNeural", label: "Conrad — Male" }] },
+  { id: "pt", label: "Portuguese", voices: [
+    { id: "pt-BR-FranciscaNeural", label: "Francisca — Female" }, { id: "pt-BR-AntonioNeural", label: "Antonio — Male" }] },
+  { id: "ru", label: "Russian", font: "Noto Sans", voices: [
+    { id: "ru-RU-SvetlanaNeural", label: "Svetlana — Female" }, { id: "ru-RU-DmitryNeural", label: "Dmitry — Male" }] },
+  { id: "ja", label: "Japanese", font: "Noto Sans JP", voices: [
+    { id: "ja-JP-NanamiNeural", label: "Nanami — Female" }, { id: "ja-JP-KeitaNeural", label: "Keita — Male" }] },
+  { id: "ko", label: "Korean", font: "Noto Sans KR", voices: [
+    { id: "ko-KR-SunHiNeural", label: "SunHi — Female" }, { id: "ko-KR-InJoonNeural", label: "InJoon — Male" }] },
+  { id: "zh", label: "Chinese", font: "Noto Sans SC", voices: [
+    { id: "zh-CN-XiaoxiaoNeural", label: "Xiaoxiao — Female" }, { id: "zh-CN-YunxiNeural", label: "Yunxi — Male" }] },
+  { id: "id", label: "Indonesian", voices: [
+    { id: "id-ID-GadisNeural", label: "Gadis — Female" }, { id: "id-ID-ArdiNeural", label: "Ardi — Male" }] },
+];
+function resolveLang(id) {
+  const L = LANGUAGES.find((x) => x.id === id) || LANGUAGES[0];
+  const font = L.font || "Arial Black";
+  const fontCss = L.font ? `https://fonts.googleapis.com/css2?family=${L.font.replace(/ /g, "+")}:wght@700&display=swap` : "";
+  return { label: L.label, font, fontCss, rtl: !!L.rtl };
+}
+
 // ---- .env helpers for the Settings panel ----
 const ENV_PATH = join(ROOT, ".env");
 function readEnvRaw() {
@@ -144,7 +193,9 @@ function renderOne(config, job) {
     child.stderr.on("data", onData);
     child.on("close", (code) => {
       if (code === 0) {
-        const f = `${slugify(config.title)}.mp4`;
+        // read the actual output filename from make.mjs's "Saved:" line (robust for any language)
+        const m = job.log.join("\n").match(/Saved:\s*.*\/out\/([^\s]+\.mp4)/);
+        const f = m ? m[1] : `${slugify(config.title)}.mp4`;
         if (existsSync(join(OUT, f))) job.files.push(f);
       }
       resolve(code);
@@ -166,6 +217,7 @@ app.get("/api/config", (_req, res) =>
     voices: VOICES, aspects: ASPECTS, qualities: QUALITIES, durations: DURATIONS,
     genres: GENRES, countries: COUNTRIES, llmProviders: LLM_PROVIDERS,
     videoSources: VIDEO_SOURCES, falModels: FAL_MODELS,
+    languages: LANGUAGES.map((l) => ({ id: l.id, label: l.label, voices: l.voices })),
   })
 );
 
@@ -217,6 +269,7 @@ app.post("/api/generate", async (req, res) => {
     return res.status(400).json({ error: "Pick a topic, a genre, a country, or turn on Random." });
   const count = Math.min(Math.max(parseInt(b.count) || 1, 1), 10);
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
 
   busy = true;
   const job = newJob(count);
@@ -225,7 +278,7 @@ app.post("/api/generate", async (req, res) => {
   (async () => {
     try {
       const what = random ? "random topics" : (topic || [genre, country].filter(Boolean).join(" / ") || "your idea");
-      pushLog(job, `🤖 Writing ${count} script(s) — ${what} …`);
+      pushLog(job, `🤖 Writing ${count} script(s) in ${lang.label} — ${what} …`);
       const configs = await generateScripts({
         topic, genre, country, random,
         count,
@@ -235,6 +288,7 @@ app.post("/api/generate", async (req, res) => {
         width, height,
         source: b.source || "pexels",
         videoModel: b.videoModel || "",
+        language: lang.label, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
       });
       job.total = configs.length;
       pushLog(job, `✅ ${configs.length} script(s) ready. Rendering…`);
@@ -260,6 +314,7 @@ app.post("/api/render", (req, res) => {
   if (!b.title || scenes.length < 2)
     return res.status(400).json({ error: "Need a title and at least 2 scenes." });
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
   const config = {
     title: String(b.title).slice(0, 100),
     description: b.description || "",
@@ -269,6 +324,7 @@ app.post("/api/render", (req, res) => {
     music: "", width, height,
     source: b.source || "pexels",
     videoModel: b.videoModel || "",
+    font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };
   busy = true;

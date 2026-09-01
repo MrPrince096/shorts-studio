@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -7,6 +8,8 @@ import {
   useCurrentFrame,
   useVideoConfig,
   interpolate,
+  delayRender,
+  continueRender,
 } from "remotion";
 
 type Word = { text: string; start: number; end: number };
@@ -16,6 +19,9 @@ type Props = {
   words: Word[];
   audio: string;
   music: string;
+  font?: string;
+  fontCss?: string;
+  rtl?: boolean;
 };
 
 const SceneClip: React.FC<{ src: string; durationInFrames: number }> = ({ src, durationInFrames }) => {
@@ -41,7 +47,7 @@ const SceneClip: React.FC<{ src: string; durationInFrames: number }> = ({ src, d
 
 const GROUP = 3;
 
-const Captions: React.FC<{ words: Word[] }> = ({ words }) => {
+const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean }> = ({ words, font, rtl }) => {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const t = frame / fps;
@@ -78,6 +84,7 @@ const Captions: React.FC<{ words: Word[] }> = ({ words }) => {
           display: "flex",
           flexWrap: "wrap",
           justifyContent: "center",
+          direction: rtl ? "rtl" : "ltr",
           gap: `0 ${gap}px`,
           transform: `translateY(${shiftY}px)`,
         }}
@@ -92,7 +99,7 @@ const Captions: React.FC<{ words: Word[] }> = ({ words }) => {
             <span
               key={globalIdx}
               style={{
-                fontFamily: "'Arial Black', Impact, sans-serif",
+                fontFamily: `'${font}', 'Arial Black', Impact, sans-serif`,
                 fontWeight: 900,
                 fontSize,
                 lineHeight: 1.05,
@@ -114,8 +121,25 @@ const Captions: React.FC<{ words: Word[] }> = ({ words }) => {
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music }) => {
+export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false }) => {
   const { fps } = useVideoConfig();
+  const [handle] = useState(() => (fontCss ? delayRender("loading-font") : null));
+
+  useEffect(() => {
+    if (!fontCss || handle === null) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = fontCss;
+    document.head.appendChild(link);
+    const done = () => continueRender(handle);
+    // wait for the webfont to actually load, then release the render
+    (document as any).fonts
+      ? (document as any).fonts.load(`700 100px "${font}"`).then(done).catch(done)
+      : setTimeout(done, 1500);
+    const safety = setTimeout(done, 8000); // never hang the render
+    return () => clearTimeout(safety);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
@@ -137,7 +161,7 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music }) => {
         }}
       />
 
-      <Captions words={words} />
+      <Captions words={words} font={font} rtl={rtl} />
 
       {audio ? <Audio src={staticFile(audio)} /> : null}
       {music ? <Audio src={staticFile(music)} volume={0.18} /> : null}
