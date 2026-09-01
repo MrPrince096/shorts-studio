@@ -143,6 +143,20 @@
         The AI writes each script + picks the footage, then renders. Add your free Gemini key in <b>⚙️ Settings</b> first. ~1–3 min per video.</div>
     </div>
 
+    <!-- STORYTELLER SERIES -->
+    <div class="card">
+      <h2>📖 Storyteller Series — one story, many connected parts</h2>
+      <label>Story / topic</label>
+      <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana · history of Rome · a mystery thriller" />
+      <div class="row">
+        <div><label>Total parts</label><select id="seriesTotal"></select></div>
+        <div><label>Make now</label><select id="seriesBatch"></select></div>
+      </div>
+      <div class="btnrow"><button class="action primary" id="goSeries">📖 Start Series</button></div>
+      <div class="hint">Uses the <b>language, voice, format & visual source</b> chosen above. Each part continues the story and ends on a hook — and it's <b>resumable</b>, so come back and make more parts anytime.</div>
+      <div id="seriesList" style="margin-top:14px"></div>
+    </div>
+
     <!-- ADVANCED: manual scenes -->
     <details>
       <summary>⚙️ Advanced — write the scenes yourself</summary>
@@ -259,6 +273,9 @@ async function loadConfig(){
   (c.videoSources||[]).forEach(s => $('#source').appendChild(opt(s.id, s.label)));
   (c.falModels||[]).forEach(m => $('#videoModel').appendChild(opt(m.id, m.label)));
   (c.llmProviders||[]).forEach(p => $('#llmProvider').appendChild(opt(p.id, p.label)));
+  [3,5,10,15,20,30,50].forEach(n => $('#seriesTotal').appendChild(opt(n, n+' parts')));
+  for(let i=1;i<=10;i++) $('#seriesBatch').appendChild(opt(i, i+(i===1?' part now':' parts now')));
+  $('#seriesTotal').value='10'; $('#seriesBatch').value='3';
   $('#source').onchange = () => { $('#falModelBox').style.display = $('#source').value==='fal' ? 'block':'none'; };
   $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#source').value='pexels';
 }
@@ -355,8 +372,9 @@ async function refreshGallery(){
 
 const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value });
 let polling=null;
-function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; $('#goAI').disabled=true; $('#goManual').disabled=true; $('#progress').scrollIntoView({behavior:'smooth'}); }
-function endProgress(){ $('#goAI').disabled=false; $('#goManual').disabled=false; }
+const ACT = ['#goAI','#goManual','#goSeries'];
+function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
+function endProgress(){ ACT.forEach(s=>$(s).disabled=false); }
 
 async function poll(id){
   const s = await (await fetch('/api/status/'+id)).json();
@@ -370,10 +388,10 @@ async function poll(id){
       $('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s) rendered</span>`;
       $('#result').innerHTML=(s.files||[]).map(f=>`<video controls src="/out/${encodeURIComponent(f)}"></video>
         <div style="margin:4px 0 12px"><a href="/out/${encodeURIComponent(f)}" download>⬇ ${f}</a></div>`).join('');
-      refreshGallery();
+      refreshGallery(); refreshSeries();
     } else {
       $('#status').innerHTML=`<span class="err">❌ Failed — see the log above.</span>`;
-      if((s.files||[]).length){ refreshGallery(); }
+      if((s.files||[]).length){ refreshGallery(); refreshSeries(); }
     }
   }
 }
@@ -398,7 +416,25 @@ $('#goManual').onclick = () => {
   run('/api/render', { title:$('#title').value.trim(), description:$('#desc').value.trim(), tags:$('#tags').value, scenes, ...fmt() });
 };
 
-loadConfig(); refreshGallery(); sceneRow(); sceneRow();
+$('#goSeries').onclick = () => {
+  const topic = $('#seriesTopic').value.trim();
+  if(!topic){ alert('Enter a story topic for the series.'); return; }
+  run('/api/series/start', { topic, total:$('#seriesTotal').value, batch:$('#seriesBatch').value, ...fmt() });
+};
+async function refreshSeries(){
+  const list = await (await fetch('/api/series')).json();
+  const el = $('#seriesList');
+  if(!list.length){ el.innerHTML=''; return; }
+  el.innerHTML = '<div style="font-size:12px;color:var(--muted);margin:4px 0 6px">Your series</div>' + list.map(s=>{
+    const done = s.done>=s.total;
+    return `<div class="vid"><div class="t">${s.title}</div>
+      <div class="m">${s.language} · ${s.done}/${s.total} parts ${done?'· ✓ complete':''}</div>
+      ${done?'':`<button class="action ghost" onclick="continueSeries('${s.id}')">▶️ Make next parts</button>`}</div>`;
+  }).join('');
+}
+window.continueSeries = (id) => run('/api/series/continue', { id, batch:$('#seriesBatch').value });
+
+loadConfig(); refreshGallery(); refreshSeries(); sceneRow(); sceneRow();
 </script>
 </body>
 </html>

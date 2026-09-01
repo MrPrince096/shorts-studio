@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts } from "./scripts/generate.mjs";
+import { createOutline, episodeConfig } from "./scripts/series.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = join(ROOT, "out");
@@ -188,16 +189,17 @@ function renderOne(config, job) {
   return new Promise((resolve) => {
     writeFileSync(join(ROOT, "scenes.json"), JSON.stringify(config, null, 2));
     job.title = config.title;
+    let local = "";
     const child = spawn(process.execPath, [join(ROOT, "scripts", "make.mjs")], { cwd: ROOT });
-    const onData = (d) => pushLog(job, d.toString());
+    const onData = (d) => { const s = d.toString(); local += s; pushLog(job, s); };
     child.stdout.on("data", onData);
     child.stderr.on("data", onData);
     child.on("close", (code) => {
       if (code === 0) {
-        // read the actual output filename from make.mjs's "Saved:" line (robust for any language)
-        const m = job.log.join("\n").match(/Saved:\s*.*\/out\/([^\s]+\.mp4)/);
+        // read THIS render's output filename from its own "Saved:" line
+        const m = local.match(/Saved:\s*.*\/out\/([^\s]+\.mp4)/);
         const f = m ? m[1] : `${slugify(config.title)}.mp4`;
-        if (existsSync(join(OUT, f))) job.files.push(f);
+        if (existsSync(join(OUT, f)) && !job.files.includes(f)) job.files.push(f);
       }
       resolve(code);
     });
@@ -208,6 +210,40 @@ async function runAll(configs, job) {
     job.current = i + 1;
     pushLog(job, `\n===== Video ${i + 1}/${configs.length}: ${configs[i].title} =====`);
     await renderOne(configs[i], job);
+  }
+  job.status = job.files.length ? "done" : "error";
+  busy = false;
+}
+
+// ---- Storyteller series (persistent, resumable) ----
+const SERIES_DIR = join(ROOT, "series");
+const clamp = (n, lo, hi) => Math.min(Math.max(parseInt(n) || lo, lo), hi);
+function saveSeries(s) {
+  if (!existsSync(SERIES_DIR)) mkdirSync(SERIES_DIR, { recursive: true });
+  writeFileSync(join(SERIES_DIR, s.id + ".json"), JSON.stringify(s, null, 2));
+}
+function loadSeries(id) {
+  const p = join(SERIES_DIR, (id || "").replace(/[^a-z0-9]/gi, "") + ".json");
+  return existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null;
+}
+async function runSeries(series, batch, job) {
+  const startDone = series.done;
+  const end = Math.min(series.total, series.done + batch);
+  job.total = end - startDone;
+  for (let part = startDone + 1; part <= end; part++) {
+    job.current = part - startDone;
+    pushLog(job, `\n===== ${series.seriesTitle} — Part ${part}/${series.total} =====`);
+    series.summary = series.recaps.slice(-12).join(" ");
+    let ep;
+    try { ep = await episodeConfig(series, part); }
+    catch (e) { pushLog(job, "❌ script: " + e.message); break; }
+    const code = await renderOne(ep.config, job);
+    if (code !== 0) { pushLog(job, `❌ Part ${part} render failed — stopping.`); break; }
+    series.done = part;
+    const f = job.files[job.files.length - 1];
+    if (f && !series.files.includes(f)) series.files.push(f);
+    series.recaps.push(ep.recap);
+    saveSeries(series);
   }
   job.status = job.files.length ? "done" : "error";
   busy = false;
@@ -332,6 +368,71 @@ app.post("/api/render", (req, res) => {
   const job = newJob(1);
   res.json({ jobId: job.id, dims: `${width}x${height}` });
   runAll([config], job);
+});
+
+// ---- Series: start / continue / list ----
+app.get("/api/series", (_req, res) => {
+  const list = existsSync(SERIES_DIR)
+    ? readdirSync(SERIES_DIR).filter((f) => f.endsWith(".json")).map((f) => {
+        try { const s = JSON.parse(readFileSync(join(SERIES_DIR, f), "utf8"));
+          return { id: s.id, title: s.seriesTitle, total: s.total, done: s.done, language: s.language }; }
+        catch { return null; }
+      }).filter(Boolean).sort((a, b) => (a.id < b.id ? 1 : -1))
+    : [];
+  res.json(list);
+});
+
+app.post("/api/series/start", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  if (!b.topic || !String(b.topic).trim()) return res.status(400).json({ error: "Enter a story topic." });
+  const total = clamp(b.total, 2, 100);
+  const batch = clamp(b.batch, 1, 20);
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
+  busy = true;
+  const job = newJob(batch);
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      pushLog(job, `📖 Planning "${b.topic}" as a ${total}-part series…`);
+      const o = await createOutline({ topic: String(b.topic).trim(), total });
+      const series = {
+        id: "s" + Date.now().toString(36),
+        seriesTitle: o.seriesTitle, slug: o.slug, topic: String(b.topic).trim(),
+        language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%",
+        aspect: b.aspect || "9:16", quality: b.quality || "1080", duration: b.duration || "medium",
+        source: b.source || "pexels", videoModel: b.videoModel || "",
+        width, height, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
+        outline: o.outline, total, done: 0, files: [], recaps: [],
+      };
+      saveSeries(series);
+      job.seriesId = series.id;
+      pushLog(job, `✅ "${series.seriesTitle}" outlined in ${total} parts. Rendering first ${batch}…`);
+      await runSeries(series, batch, job);
+    } catch (e) {
+      pushLog(job, "❌ " + (e.message === "NO_LLM_KEY" ? "No AI key set — add a Gemini key in Settings." : e.message));
+      job.status = "error"; busy = false;
+    }
+  })();
+});
+
+app.post("/api/series/continue", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const series = loadSeries((req.body || {}).id);
+  if (!series) return res.status(404).json({ error: "Series not found." });
+  if (series.done >= series.total) return res.status(400).json({ error: "This series is already complete." });
+  const batch = clamp((req.body || {}).batch, 1, 20);
+  busy = true;
+  const job = newJob(batch);
+  job.seriesId = series.id;
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      pushLog(job, `▶️ Continuing "${series.seriesTitle}" from Part ${series.done + 1}…`);
+      await runSeries(series, batch, job);
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
 });
 
 app.get("/api/status/:id", (req, res) => {

@@ -96,11 +96,17 @@ async function llmOllama(prompt) {
   return data?.response || "";
 }
 
-async function callLLM(prompt) {
+export async function callLLM(prompt) {
   const provider = env("LLM_PROVIDER", "gemini").toLowerCase();
   if (provider === "openai") return llmOpenAI(prompt);
   if (provider === "ollama") return llmOllama(prompt);
   return llmGemini(prompt);
+}
+
+// parse JSON possibly wrapped in ```json fences
+export function parseLLMJson(raw) {
+  let text = String(raw).trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+  return JSON.parse(text);
 }
 
 // ---------- prompt building ----------

@@ -9,6 +9,7 @@ client_secret.json
 # generated / runtime
 out/
 logs/
+series/
 scenes.json
 queue/done/
 public/*.mp4
