@@ -10,6 +10,8 @@ client_secret.json
 out/
 logs/
 series/
+drafts/
+assets/
 scenes.json
 queue/done/
 public/*.mp4

@@ -2,7 +2,7 @@
 // Run: npm start   (opens http://localhost:4321)
 import express from "express";
 import { spawn, execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
@@ -38,6 +38,52 @@ const app = express();
 app.use(express.json({ limit: "80mb" })); // large limit for base64 media uploads
 app.use(express.static(join(ROOT, "web")));
 app.use("/out", express.static(OUT));
+const DRAFTS_DIR = join(ROOT, "drafts");
+const ASSETS_DIR = join(ROOT, "assets");
+app.use("/assets", express.static(ASSETS_DIR));
+
+// ---- Drafts (save/load create-form setups) ----
+app.post("/api/drafts", (req, res) => {
+  const b = req.body || {};
+  if (!existsSync(DRAFTS_DIR)) mkdirSync(DRAFTS_DIR, { recursive: true });
+  const id = (b.id && String(b.id).replace(/[^a-z0-9]/gi, "")) || "d" + Date.now().toString(36);
+  writeFileSync(join(DRAFTS_DIR, id + ".json"), JSON.stringify({ id, name: String(b.name || "Untitled").slice(0, 80), data: b.data || {}, mtime: Date.now() }));
+  res.json({ ok: true, id });
+});
+app.get("/api/drafts", (_req, res) => {
+  const list = existsSync(DRAFTS_DIR)
+    ? readdirSync(DRAFTS_DIR).filter((f) => f.endsWith(".json")).map((f) => { try { return JSON.parse(readFileSync(join(DRAFTS_DIR, f), "utf8")); } catch { return null; } }).filter(Boolean).sort((a, b) => b.mtime - a.mtime)
+    : [];
+  res.json(list);
+});
+app.delete("/api/drafts/:id", (req, res) => {
+  const p = join(DRAFTS_DIR, req.params.id.replace(/[^a-z0-9]/gi, "") + ".json");
+  if (existsSync(p)) unlinkSync(p);
+  res.json({ ok: true });
+});
+
+// ---- Assets (image library) ----
+app.post("/api/assets", (req, res) => {
+  const m = String((req.body || {}).dataUrl || "").match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: "Attach an image." });
+  if (!existsSync(ASSETS_DIR)) mkdirSync(ASSETS_DIR, { recursive: true });
+  const ext = (m[1].split("/")[1] || "jpg").replace("jpeg", "jpg");
+  const file = "a" + Date.now().toString(36) + "." + ext;
+  writeFileSync(join(ASSETS_DIR, file), Buffer.from(m[2], "base64"));
+  res.json({ ok: true, file });
+});
+app.get("/api/assets", (_req, res) => {
+  const list = existsSync(ASSETS_DIR)
+    ? readdirSync(ASSETS_DIR).filter((f) => /\.(jpg|png|webp|gif)$/i.test(f)).map((f) => { const s = statSync(join(ASSETS_DIR, f)); return { file: f, size: s.size, mtime: s.mtimeMs }; }).sort((a, b) => b.mtime - a.mtime)
+    : [];
+  res.json(list);
+});
+app.delete("/api/assets/:file", (req, res) => {
+  const f = req.params.file.replace(/[^a-z0-9.]/gi, "");
+  const p = join(ASSETS_DIR, f);
+  if (existsSync(p) && p.startsWith(ASSETS_DIR)) unlinkSync(p);
+  res.json({ ok: true });
+});
 
 const VOICES = [
   { id: "en-US-AriaNeural", label: "Aria — US Female (warm)" },

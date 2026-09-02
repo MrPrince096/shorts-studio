@@ -183,6 +183,7 @@
           <div class="withbtn"><input id="topic" class="big" placeholder="e.g. 5 morning habits for success" /><button class="btn ghost" id="surprise" title="Random">🎲</button></div>
           <div class="row"><div><label>How many videos</label><select id="count"></select></div></div>
           <button class="btn grad big" id="goAI" style="width:100%;margin-top:16px">✨ Generate Short</button>
+          <button class="btn ghost" id="saveDraft" style="width:100%;margin-top:8px">💾 Save as draft</button>
           <details>
             <summary>⚙️ Advanced — write scenes yourself</summary>
             <label>Title</label><input id="title" placeholder="Foods Your Heart Loves" />
@@ -273,6 +274,7 @@
     <div class="gal" id="library">
       <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2><div id="gallery" class="vgrid"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
     </div>
+    <input type="file" id="assetUp" accept="image/*" hidden />
   </main>
 </div>
 
@@ -374,8 +376,8 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   const v=n.dataset.nav;
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
-    if(v==='drafts'){$('#libTitle').textContent='Drafts';$('#gallery').className='';$('#gallery').innerHTML='<div class="empty">📝 Drafts coming soon — save scripts here before rendering.</div>';}
-    else if(v==='assets'){$('#libTitle').textContent='Assets';$('#gallery').className='';$('#gallery').innerHTML='<div class="empty">🖼️ Asset library coming soon — your uploaded images & thumbnails.</div>';}
+    if(v==='drafts'){$('#libTitle').textContent='Drafts';showDrafts();}
+    else if(v==='assets'){$('#libTitle').textContent='Assets';showAssets();}
     else {$('#libTitle').textContent=(v==='projects'?'Projects':'My Videos');$('#gallery').className='vgrid';refreshGallery();}
   } else switchTab(v);
 });
@@ -486,6 +488,42 @@ window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:1,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};
 $('#goIdeas').onclick=async()=>{$('#goIdeas').disabled=true;$('#ideaList').innerHTML='<div class="muted"><span class="spin"></span> Brainstorming…</div>';try{const r=await(await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(),count:$('#ideaCount').value,language:$('#language').value,genre:$('#genre').value,country:$('#country').value,llmProvider:$('#llmPick').value})})).json();if(r.error)$('#ideaList').innerHTML=`<div class="err">${r.error}</div>`;else{window.__i=r.ideas||[];$('#ideaList').innerHTML=(r.ideas||[]).map((i,x)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="btn ghost" style="margin-top:8px" onclick="useIdea(${x})">Use in Shorts →</button></div>`).join('');loadStats();}}catch(e){$('#ideaList').innerHTML=`<div class="err">${e.message}</div>`;}$('#goIdeas').disabled=false;};
 window.useIdea=(x)=>{const i=window.__i[x];if(!i)return;$('#topic').value=i.title;document.querySelector('[data-nav=shorts]').click();};
+
+// ---- drafts ----
+$('#saveDraft').onclick=()=>{
+  const name=prompt('Name this draft:', ($('#topic').value.trim()||'Untitled'));
+  if(name===null) return;
+  const data={topic:$('#topic').value.trim(),count:$('#count').value,...fmt()};
+  fetch('/api/drafts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})}).then(()=>{const b=$('#saveDraft');const o=b.textContent;b.textContent='✓ Saved';setTimeout(()=>b.textContent=o,1200);});
+};
+function applyDraft(d){
+  if(!d)return; const set=(id,v)=>{if(v!=null&&$(id))$(id).value=v;};
+  $('#topic').value=d.topic||'';
+  set('#language',d.language); populateVoices(d.language||'en'); set('#voice',d.voice);
+  set('#count',d.count); set('#aspect',d.aspect); set('#quality',d.quality);
+  set('#source',d.source); $('#source').dispatchEvent(new Event('change'));
+  set('#videoModel',d.videoModel); set('#imageStyle',d.imageStyle); set('#lenPick',d.duration);
+  set('#llmPick',d.llmProvider); set('#genre',d.genre); set('#country',d.country); set('#watermark',d.watermark);
+  if(d.rate){$('#rate').value=parseInt(d.rate)||0;$('#rateval').textContent=d.rate;}
+  document.querySelector('[data-nav=shorts]').click();
+}
+async function showDrafts(){
+  const l=await(await fetch('/api/drafts')).json(); const g=$('#gallery'); g.className='';
+  if(!l.length){g.innerHTML='<div class="empty">📝 No drafts yet. Set up a video in Shorts, then hit <b>💾 Save as draft</b>.</div>';return;}
+  window.__d=l;
+  g.innerHTML=l.map((d,i)=>`<div class="vid" style="margin-bottom:10px"><div style="font-weight:600">${esc(d.name)}</div><div class="muted" style="font-size:11px;margin-top:2px">${d.data.topic?esc(d.data.topic).slice(0,70):'(no topic)'} · ${d.data.language||'en'} · ${d.data.duration||''}</div><div class="vacts" style="display:flex;gap:8px;margin-top:9px"><button class="btn ghost" onclick="loadDraft(${i})">Load</button><button class="btn ghost" onclick="delDraft('${d.id}')">Delete</button></div></div>`).join('');
+}
+window.loadDraft=(i)=>applyDraft(window.__d[i].data);
+window.delDraft=(id)=>fetch('/api/drafts/'+id,{method:'DELETE'}).then(()=>showDrafts());
+
+// ---- assets ----
+async function showAssets(){
+  const l=await(await fetch('/api/assets')).json(); const g=$('#gallery'); g.className='vgrid';
+  const up=`<div class="vcard" style="cursor:pointer;display:flex;align-items:center;justify-content:center;aspect-ratio:1/1" onclick="document.getElementById('assetUp').click()"><div style="text-align:center;color:var(--muted)"><div style="font-size:28px">＋</div>Upload image</div></div>`;
+  g.innerHTML=up+l.map(a=>`<div class="vcard"><img class="thumb" style="aspect-ratio:1/1;cursor:default" src="/assets/${encodeURIComponent(a.file)}"><div class="vinfo"><div class="vm">${(a.size/1024).toFixed(0)} KB</div><div class="vacts"><a href="/assets/${encodeURIComponent(a.file)}" download>⬇</a><button onclick="delAsset('${a.file}')">🗑 Delete</button></div></div></div>`).join('');
+}
+window.delAsset=(f)=>{if(confirm('Delete this asset?'))fetch('/api/assets/'+f,{method:'DELETE'}).then(()=>showAssets());};
+$('#assetUp').onchange=()=>{const f=$('#assetUp').files[0];if(!f)return;if(f.size>20*1024*1024){alert('Max 20 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{$('#assetUp').value='';showAssets();});rd.readAsDataURL(f);};
 
 injectIcons();loadConfig();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
 </script>
