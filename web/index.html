@@ -28,20 +28,21 @@
   .scene textarea { min-height:44px; resize:vertical; }
   .scene .num { color:var(--muted); font-size:12px; width:20px; padding-top:11px; text-align:center; flex:0 0 20px; }
   .scene .q { flex:0 0 34%; }
-  .scene .del { flex:0 0 30px; background:var(--panel2); border:1px solid var(--line); color:var(--err);
-    border-radius:8px; cursor:pointer; font-size:16px; height:44px; }
+  .scene .del { flex:0 0 30px; background:var(--panel2); border:1px solid var(--line); color:var(--err); border-radius:8px; cursor:pointer; font-size:16px; height:44px; }
   .btnrow { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
   button.action { border:none; border-radius:10px; padding:12px 18px; font-size:14px; font-weight:700; cursor:pointer; }
   .primary { background:var(--accent); color:#111; }
   .primary:disabled { opacity:.5; cursor:not-allowed; }
   .ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); font-weight:600; }
   .rateval { color:var(--accent); font-weight:600; }
+  .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .tab { background:var(--panel2); border:1px solid var(--line); color:var(--muted); border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; }
+  .tab.active { background:var(--accent); color:#111; border-color:var(--accent); }
   details { margin-top:6px; border:1px solid var(--line); border-radius:12px; padding:0 16px; background:var(--panel); }
   details[open]{ padding-bottom:16px; }
   summary { cursor:pointer; padding:14px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
   #progress { display:none; }
-  #log { background:#0a0c11; border:1px solid var(--line); border-radius:8px; padding:12px; font-family:ui-monospace,Menlo,monospace;
-    font-size:12px; color:#a9d3ff; height:150px; overflow:auto; white-space:pre-wrap; }
+  #log { background:#0a0c11; border:1px solid var(--line); border-radius:8px; padding:12px; font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#a9d3ff; height:150px; overflow:auto; white-space:pre-wrap; }
   .status { font-size:14px; margin:8px 0; }
   .spin { display:inline-block; width:14px;height:14px;border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:s .8s linear infinite; vertical-align:-2px; margin-right:6px; }
   @keyframes s { to { transform:rotate(360deg); } }
@@ -54,9 +55,13 @@
   .hint a { color:var(--accent2); }
   .err { color:var(--err); } .ok { color:var(--ok); }
   .big { font-size:16px; padding:13px 14px; }
+  .idea { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:8px; background:var(--panel2); }
+  .idea .it { font-weight:700; font-size:14px; }
+  .idea .ih { color:var(--muted); font-size:13px; margin:3px 0; }
+  .tag { display:inline-block; background:#0a0c11; border:1px solid var(--line); color:#a9d3ff; border-radius:6px; padding:1px 7px; font-size:11px; margin:2px 3px 0 0; }
   .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center; }
   .overlay.open { display:flex; }
-  .modal { width:min(520px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px; }
+  .modal { width:min(520px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px; max-height:88vh; overflow:auto; }
   .modal h2 { margin-top:0; }
   .keystate { font-size:12px; margin:4px 0 0; }
   .modal .close { float:right; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; }
@@ -66,121 +71,118 @@
 <header>
   <span class="dot"></span>
   <h1>Shorts Studio</h1>
-  <span style="color:var(--muted);font-size:13px;margin-left:auto;margin-right:14px">free faceless video generator</span>
+  <span style="color:var(--muted);font-size:13px;margin-left:auto;margin-right:14px">faceless video studio</span>
   <button class="action ghost" id="openSettings">⚙️ Settings</button>
 </header>
 
 <div class="wrap">
   <div>
-    <!-- QUICK CREATE (AI) -->
-    <div class="card">
-      <h2>✨ Quick Create — topic, genre, country, or random</h2>
-      <label>Topic / idea <span style="color:var(--muted)">(optional if you pick a genre or country)</span></label>
-      <div style="display:flex;gap:8px">
-        <input id="topic" class="big" placeholder="e.g. foods good for the heart · morning habits" />
-        <button class="action ghost" id="surprise" title="Random topic">🎲</button>
-      </div>
-
+    <!-- SHARED OUTPUT SETTINGS -->
+    <div class="card" id="outputCard">
+      <h2>🎛️ Output settings</h2>
       <div class="row">
-        <div>
-          <label>Genre</label>
-          <select id="genre"></select>
-        </div>
-        <div>
-          <label>Country</label>
-          <select id="country"></select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>How many videos</label>
-          <select id="count"></select>
-        </div>
-        <div>
-          <label>Duration</label>
-          <select id="duration"></select>
-        </div>
+        <div><label>Language 🌐</label><select id="language"></select></div>
+        <div><label>Voice</label><select id="voice"></select></div>
       </div>
       <div class="row">
-        <div>
-          <label>Language 🌐</label>
-          <select id="language"></select>
-        </div>
-        <div>
-          <label>Voice</label>
-          <select id="voice"></select>
-        </div>
+        <div><label>Aspect ratio</label><select id="aspect"></select></div>
+        <div><label>Resolution</label><select id="quality"></select></div>
       </div>
       <div class="row">
-        <div>
-          <label>Aspect ratio</label>
-          <select id="aspect"></select>
-        </div>
-        <div>
-          <label>Resolution</label>
-          <select id="quality"></select>
-        </div>
+        <div><label>Visual source</label><select id="source"></select></div>
+        <div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div>
+        <div id="falModelBox" style="display:none"><label>AI video model</label><select id="videoModel"></select></div>
       </div>
-      <div class="row">
-        <div>
-          <label>Visual source</label>
-          <select id="source"></select>
-        </div>
-        <div id="styleBox" style="display:none">
-          <label>Image style 🎨</label>
-          <select id="imageStyle"></select>
-        </div>
-        <div id="falModelBox" style="display:none">
-          <label>AI video model</label>
-          <select id="videoModel"></select>
-        </div>
-      </div>
-
       <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
       <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
-
-      <div class="btnrow">
-        <button class="action primary big" id="goAI">✨ Make Videos</button>
-      </div>
-      <div class="hint">Fill a topic, pick a <b>genre</b> or <b>country</b>, hit 🎲 for a random idea — or leave it all blank for a total surprise.
-        The AI writes each script + picks the footage, then renders. Add your free Gemini key in <b>⚙️ Settings</b> first. ~1–3 min per video.</div>
     </div>
 
-    <!-- STORYTELLER SERIES -->
-    <div class="card">
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" data-tab="shorts">🎬 Shorts</button>
+      <button class="tab" data-tab="series">📖 Series</button>
+      <button class="tab" data-tab="ads">📣 Ads</button>
+      <button class="tab" data-tab="ideas">💡 Ideas</button>
+    </div>
+
+    <!-- SHORTS -->
+    <div class="tabpanel card" id="tab-shorts">
+      <h2>🎬 Make a Short — topic, genre, country, or random</h2>
+      <label>Topic / idea <span style="color:var(--muted)">(optional if you pick a genre/country)</span></label>
+      <div style="display:flex;gap:8px">
+        <input id="topic" class="big" placeholder="e.g. foods good for the heart" />
+        <button class="action ghost" id="surprise" title="Random idea">🎲</button>
+      </div>
+      <div class="row">
+        <div><label>Genre</label><select id="genre"></select></div>
+        <div><label>Country</label><select id="country"></select></div>
+      </div>
+      <div class="row">
+        <div><label>How many videos</label><select id="count"></select></div>
+        <div><label>Duration</label><select id="duration"></select></div>
+      </div>
+      <div class="btnrow"><button class="action primary big" id="goAI">✨ Make Videos</button></div>
+      <details>
+        <summary>⚙️ Advanced — write the scenes yourself</summary>
+        <label>Title</label>
+        <input id="title" placeholder="e.g. Foods Your Heart Loves" />
+        <label>Scenes — narration + a search term per scene</label>
+        <div id="scenes"></div>
+        <div class="btnrow">
+          <button class="action ghost" id="addScene">+ Add scene</button>
+          <button class="action ghost" id="loadEx">Load example</button>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <div><label>Description</label><input id="desc" placeholder="optional" /></div>
+          <div><label>Tags (comma separated)</label><input id="tags" placeholder="motivation, mindset" /></div>
+        </div>
+        <div class="btnrow"><button class="action ghost" id="goManual">Generate this video</button></div>
+      </details>
+    </div>
+
+    <!-- SERIES -->
+    <div class="tabpanel card" id="tab-series" hidden>
       <h2>📖 Storyteller Series — one story, many connected parts</h2>
       <label>Story / topic</label>
-      <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana · history of Rome · a mystery thriller" />
+      <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana · history of Rome" />
       <div class="row">
         <div><label>Total parts</label><select id="seriesTotal"></select></div>
         <div><label>Make now</label><select id="seriesBatch"></select></div>
       </div>
       <div class="btnrow"><button class="action primary" id="goSeries">📖 Start Series</button></div>
-      <div class="hint">Uses the <b>language, voice, format & visual source</b> chosen above. Each part continues the story and ends on a hook — and it's <b>resumable</b>, so come back and make more parts anytime.</div>
+      <div class="hint">Each part continues the story and ends on a hook. Resumable — make more parts anytime.</div>
       <div id="seriesList" style="margin-top:14px"></div>
     </div>
 
-    <!-- ADVANCED: manual scenes -->
-    <details>
-      <summary>⚙️ Advanced — write the scenes yourself</summary>
-      <label>Title</label>
-      <input id="title" placeholder="e.g. Foods Your Heart Loves" />
-      <label>Scenes — narration + a Pexels search term per scene</label>
-      <div id="scenes"></div>
-      <div class="btnrow">
-        <button class="action ghost" id="addScene">+ Add scene</button>
-        <button class="action ghost" id="loadEx">Load example</button>
+    <!-- ADS -->
+    <div class="tabpanel card" id="tab-ads" hidden>
+      <h2>📣 Advertisement — promote a product or service</h2>
+      <label>Product / service</label>
+      <input id="adProduct" class="big" placeholder="e.g. FreshGlow vitamin C face serum" />
+      <label>Key benefits <span style="color:var(--muted)">(comma separated)</span></label>
+      <input id="adBenefits" placeholder="brightens skin, reduces dark spots, all-natural" />
+      <div class="row">
+        <div><label>Call to action</label><input id="adCta" placeholder="Order now at 50% off" /></div>
+        <div><label>Tone</label><select id="adTone"></select></div>
       </div>
-      <div class="row" style="margin-top:14px">
-        <div><label>Description</label><input id="desc" placeholder="optional" /></div>
-        <div><label>Tags (comma separated)</label><input id="tags" placeholder="motivation, mindset" /></div>
+      <div class="row">
+        <div><label>Length</label><select id="adDuration"></select></div>
       </div>
-      <div class="btnrow">
-        <button class="action ghost" id="goManual">Generate this video</button>
+      <div class="btnrow"><button class="action primary big" id="goAds">📣 Make Ad</button></div>
+      <div class="hint">The AI writes a hook → problem → product → benefits → call-to-action ad, then renders it with your chosen voice & visuals.</div>
+    </div>
+
+    <!-- IDEAS -->
+    <div class="tabpanel card" id="tab-ideas" hidden>
+      <h2>💡 Idea Finder — viral ideas, titles & tags (VidIQ-style)</h2>
+      <label>Your niche <span style="color:var(--muted)">(optional)</span></label>
+      <input id="ideaNiche" class="big" placeholder="e.g. fitness · Indian mythology · personal finance" />
+      <div class="row">
+        <div><label>How many ideas</label><select id="ideaCount"></select></div>
       </div>
-      <div class="hint">Uses the voice / format / speed chosen above.</div>
-    </details>
+      <div class="btnrow"><button class="action primary" id="goIdeas">💡 Get Ideas</button></div>
+      <div id="ideaList" style="margin-top:14px"></div>
+    </div>
 
     <!-- PROGRESS -->
     <div class="card" id="progress">
@@ -198,11 +200,10 @@
 </div>
 
 <div class="overlay" id="settingsOverlay">
-  <div class="modal" style="max-height:88vh;overflow:auto">
+  <div class="modal">
     <button class="close" id="closeSettings">×</button>
     <h2>⚙️ Settings</h2>
     <p class="hint" style="margin-top:0">Stored locally in your <code>.env</code> file. Never leaves your machine.</p>
-
     <label>Footage source — Pexels key <span style="color:var(--muted)">(required)</span></label>
     <input id="pexelsKey" type="password" placeholder="paste key…" />
     <div class="keystate" id="pexelsState"></div>
@@ -212,7 +213,6 @@
     <h2 style="margin-bottom:8px">🧠 Script AI (LLM)</h2>
     <label>Which AI writes the scripts</label>
     <select id="llmProvider"></select>
-
     <div id="geminiBox">
       <label>Gemini API key</label>
       <input id="geminiKey" type="password" placeholder="paste key…" />
@@ -225,31 +225,27 @@
       <div class="keystate" id="openaiState"></div>
       <label>OpenAI model</label>
       <input id="openaiModel" placeholder="gpt-4o-mini" />
-      <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Get an OpenAI key →</a></div>
     </div>
     <div id="ollamaBox">
       <label>Ollama URL (local, offline)</label>
       <input id="ollamaUrl" placeholder="http://localhost:11434" />
       <label>Ollama model</label>
       <input id="ollamaModel" placeholder="llama3.1" />
-      <div class="hint">Runs fully offline. <a href="https://ollama.com" target="_blank">Install Ollama →</a> then <code>ollama pull llama3.1</code></div>
     </div>
 
     <hr style="border-color:var(--line);margin:18px 0" />
     <h2 style="margin-bottom:8px">🎨 AI visuals (optional)</h2>
-    <label>Hugging Face token <span style="color:var(--muted)">(free — better AI images via FLUX)</span></label>
+    <label>Hugging Face token <span style="color:var(--muted)">(FLUX images — free credits)</span></label>
     <input id="hfKey" type="password" placeholder="hf_…" />
     <div class="keystate" id="hfState"></div>
-    <div class="hint">Free, rate-limited. <a href="https://huggingface.co/settings/tokens" target="_blank">Get a free HF token →</a> (create a "Read" token)</div>
-
+    <div class="hint"><a href="https://huggingface.co/settings/tokens" target="_blank">Get a free HF token →</a> (Inference permission)</div>
     <label>fal.ai API key <span style="color:var(--muted)">(paid — best images + video)</span></label>
     <input id="falKey" type="password" placeholder="paste key…" />
     <div class="keystate" id="falState"></div>
-    <div class="hint">Paid, per-generation. <a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
-
-    <label>Local image server URL <span style="color:var(--muted)">(free & unlimited — you run it)</span></label>
+    <div class="hint"><a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
+    <label>Local image server URL <span style="color:var(--muted)">(free & unlimited)</span></label>
     <input id="localUrl" placeholder="http://localhost:7801/generate" />
-    <div class="hint">Run FLUX/SDXL on your own Mac for free unlimited images. Ask Claude to set up the local server.</div>
+    <div class="hint">Run FLUX on your Mac. Ask Claude to set up the local server.</div>
 
     <div class="btnrow">
       <button class="action primary" id="saveSettings">Save</button>
@@ -262,6 +258,14 @@
 const $ = (s) => document.querySelector(s);
 function opt(v,l){ const o=document.createElement('option'); o.value=v; o.textContent=l; return o; }
 
+// ---- tabs ----
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.tabpanel').forEach(p=>p.hidden = p.id!=='tab-'+name);
+  $('#outputCard').style.display = name==='ideas' ? 'none':'block';
+}
+document.querySelectorAll('.tab').forEach(t=> t.onclick=()=>switchTab(t.dataset.tab));
+
 let LANGS = [];
 function populateVoices(langId){
   const L = LANGS.find(x => x.id === langId) || LANGS[0];
@@ -272,12 +276,11 @@ async function loadConfig(){
   const c = await (await fetch('/api/config')).json();
   LANGS = c.languages || [];
   LANGS.forEach(l => $('#language').appendChild(opt(l.id, l.label)));
-  $('#language').value = 'en';
-  populateVoices('en');
+  $('#language').value = 'en'; populateVoices('en');
   $('#language').onchange = () => populateVoices($('#language').value);
   c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
   c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
-  c.durations.forEach(d => $('#duration').appendChild(opt(d.id, d.label)));
+  c.durations.forEach(d => { $('#duration').appendChild(opt(d.id, d.label)); $('#adDuration').appendChild(opt(d.id, d.label)); });
   $('#genre').appendChild(opt('', '— any / none —'));
   (c.genres||[]).forEach(g => $('#genre').appendChild(opt(g.id, g.label)));
   $('#country').appendChild(opt('', '— any / none —'));
@@ -289,16 +292,18 @@ async function loadConfig(){
   (c.llmProviders||[]).forEach(p => $('#llmProvider').appendChild(opt(p.id, p.label)));
   [3,5,10,15,20,30,50].forEach(n => $('#seriesTotal').appendChild(opt(n, n+' parts')));
   for(let i=1;i<=10;i++) $('#seriesBatch').appendChild(opt(i, i+(i===1?' part now':' parts now')));
-  $('#seriesTotal').value='10'; $('#seriesBatch').value='3';
+  [6,8,10,12,15,20].forEach(n => $('#ideaCount').appendChild(opt(n, n+' ideas')));
+  ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>$('#adTone').appendChild(opt(t,t)));
+  $('#seriesTotal').value='10'; $('#seriesBatch').value='3'; $('#ideaCount').value='8';
   $('#source').onchange = () => {
     const s = $('#source').value;
     $('#falModelBox').style.display = s==='fal' ? 'block':'none';
     $('#styleBox').style.display = ['image','hf','local','fal-image','fal'].includes(s) ? 'block':'none';
   };
-  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#source').value='pexels';
+  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#adDuration').value='short'; $('#source').value='pexels';
 }
 
-// ---- Settings modal ----
+// ---- settings ----
 const stateHtml = (k, note) => k.set ? `<span class="ok">✔ set (${k.masked})</span>` : `<span class="err">✘ not set${note?' — '+note:''}</span>`;
 function toggleLlmBoxes(){
   const p = $('#llmProvider').value;
@@ -330,8 +335,7 @@ $('#saveSettings').onclick = async () => {
     pexels: $('#pexelsKey').value.trim(), gemini: $('#geminiKey').value.trim(),
     openai: $('#openaiKey').value.trim(), openaiModel: $('#openaiModel').value.trim(),
     ollamaUrl: $('#ollamaUrl').value.trim(), ollamaModel: $('#ollamaModel').value.trim(),
-    fal: $('#falKey').value.trim(), hf: $('#hfKey').value.trim(),
-    localImageUrl: $('#localUrl').value.trim(),
+    fal: $('#falKey').value.trim(), hf: $('#hfKey').value.trim(), localImageUrl: $('#localUrl').value.trim(),
   };
   const r = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ✓</span>` : 'Nothing to save';
@@ -339,24 +343,12 @@ $('#saveSettings').onclick = async () => {
   loadSettings();
 };
 
-// ---- 🎲 random topic ----
-const IDEAS = [
-  'foods that boost your brain','habits of highly successful people','why you procrastinate',
-  'the psychology of first impressions','how sleep repairs your body','the power of walking daily',
-  'facts about the human heart','how to build unbreakable discipline','the science of happiness',
-  'why the ocean is still a mystery','morning routines that change your life','how money changes people',
-  'the truth about motivation','foods that fight inflammation','how to stop overthinking',
-  'the most mysterious places on earth','how your gut controls your mood','why reading rewires your brain'
-];
+// ---- random idea + scenes ----
+const IDEAS = ['foods that boost your brain','habits of successful people','why you procrastinate','the psychology of first impressions','how sleep repairs your body','facts about the human heart','how to build discipline','the science of happiness','morning routines that change your life','the truth about motivation','foods that fight inflammation','how to stop overthinking'];
 $('#surprise').onclick = (e) => { e.preventDefault(); $('#topic').value = IDEAS[Math.floor(Math.random()*IDEAS.length)]; };
-
 function sceneRow(text='', query=''){
-  const div = document.createElement('div');
-  div.className='scene';
-  div.innerHTML = `<span class="num"></span>
-    <textarea placeholder="Narration line...">${text}</textarea>
-    <input class="q" placeholder="Pexels search term" value="${query.replace(/"/g,'&quot;')}" />
-    <button class="del" title="remove">×</button>`;
+  const div = document.createElement('div'); div.className='scene';
+  div.innerHTML = `<span class="num"></span><textarea placeholder="Narration line...">${text}</textarea><input class="q" placeholder="Search term" value="${query.replace(/"/g,'&quot;')}" /><button class="del" title="remove">×</button>`;
   div.querySelector('.del').onclick = () => { div.remove(); renumber(); };
   $('#scenes').appendChild(div); renumber();
 }
@@ -364,39 +356,28 @@ function renumber(){ [...document.querySelectorAll('.scene .num')].forEach((n,i)
 $('#addScene').onclick = () => sceneRow();
 $('#rate').oninput = (e) => $('#rateval').textContent = (e.target.value>0?'+':'') + e.target.value + '%';
 $('#loadEx').onclick = () => {
-  $('#scenes').innerHTML='';
-  $('#title').value='Foods Your Heart Loves';
-  $('#desc').value='Simple foods that keep your heart strong. #hearthealth #nutrition';
-  $('#tags').value='hearthealth, nutrition, wellness, shorts';
-  [['Your heart beats 100,000 times a day. Feed it well.','healthy food heart shape'],
-   ['Fatty fish like salmon protect your arteries.','salmon fillet cooking'],
-   ['Berries fight the inflammation that damages your heart.','fresh berries bowl'],
-   ['Leafy greens lower your blood pressure naturally.','fresh spinach leaves'],
-   ['Love your heart, and it beats strong for life.','person running sunrise']
-  ].forEach(([t,q]) => sceneRow(t,q));
+  $('#scenes').innerHTML=''; $('#title').value='Foods Your Heart Loves';
+  [['Your heart beats 100,000 times a day. Feed it well.','healthy food heart'],['Fatty fish protect your arteries.','salmon cooking'],['Berries fight inflammation.','fresh berries bowl'],['Leafy greens lower blood pressure.','spinach leaves'],['Love your heart, it beats for life.','person running sunrise']].forEach(([t,q]) => sceneRow(t,q));
 };
 
+// ---- gallery ----
 async function refreshGallery(){
   const list = await (await fetch('/api/videos')).json();
   const g = $('#gallery');
   if(!list.length){ g.innerHTML='<div class="hint">No videos yet — make your first one!</div>'; return; }
-  g.innerHTML='';
-  list.forEach(v => {
+  g.innerHTML=''; list.forEach(v => {
     const mb=(v.size/1048576).toFixed(1);
     const el=document.createElement('div'); el.className='vid';
-    el.innerHTML=`<div class="t">${v.file.replace('.mp4','')}</div><div class="m">${mb} MB</div>
-      <video controls preload="none" src="/out/${encodeURIComponent(v.file)}"></video>
-      <div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div>`;
+    el.innerHTML=`<div class="t">${v.file.replace('.mp4','')}</div><div class="m">${mb} MB</div><video controls preload="none" src="/out/${encodeURIComponent(v.file)}"></video><div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div>`;
     g.appendChild(el);
   });
 }
 
 const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value });
+const ACT = ['#goAI','#goManual','#goSeries','#goAds'];
 let polling=null;
-const ACT = ['#goAI','#goManual','#goSeries'];
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
 function endProgress(){ ACT.forEach(s=>$(s).disabled=false); }
-
 async function poll(id){
   const s = await (await fetch('/api/status/'+id)).json();
   $('#log').textContent=(s.log||[]).join('\n'); $('#log').scrollTop=$('#log').scrollHeight;
@@ -407,13 +388,9 @@ async function poll(id){
     clearInterval(polling); polling=null; endProgress();
     if(s.status==='done'){
       $('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s) rendered</span>`;
-      $('#result').innerHTML=(s.files||[]).map(f=>`<video controls src="/out/${encodeURIComponent(f)}"></video>
-        <div style="margin:4px 0 12px"><a href="/out/${encodeURIComponent(f)}" download>⬇ ${f}</a></div>`).join('');
+      $('#result').innerHTML=(s.files||[]).map(f=>`<video controls src="/out/${encodeURIComponent(f)}"></video><div style="margin:4px 0 12px"><a href="/out/${encodeURIComponent(f)}" download>⬇ ${f}</a></div>`).join('');
       refreshGallery(); refreshSeries();
-    } else {
-      $('#status').innerHTML=`<span class="err">❌ Failed — see the log above.</span>`;
-      if((s.files||[]).length){ refreshGallery(); refreshSeries(); }
-    }
+    } else { $('#status').innerHTML=`<span class="err">❌ Failed — see the log above.</span>`; if((s.files||[]).length){ refreshGallery(); refreshSeries(); } }
   }
 }
 function run(url, body){
@@ -424,11 +401,10 @@ function run(url, body){
     .catch(e=>{ $('#status').innerHTML=`<span class="err">${e.message}</span>`; endProgress(); });
 }
 
+// ---- shorts ----
 $('#goAI').onclick = () => {
-  const topic = $('#topic').value.trim();
-  const genre = $('#genre').value;
-  const country = $('#country').value;
-  const random = !topic && !genre && !country; // nothing chosen = fully random
+  const topic=$('#topic').value.trim(), genre=$('#genre').value, country=$('#country').value;
+  const random = !topic && !genre && !country;
   run('/api/generate', { topic, genre, country, random, count:$('#count').value, duration:$('#duration').value, ...fmt() });
 };
 $('#goManual').onclick = () => {
@@ -437,6 +413,7 @@ $('#goManual').onclick = () => {
   run('/api/render', { title:$('#title').value.trim(), description:$('#desc').value.trim(), tags:$('#tags').value, scenes, ...fmt() });
 };
 
+// ---- series ----
 $('#goSeries').onclick = () => {
   const topic = $('#seriesTopic').value.trim();
   if(!topic){ alert('Enter a story topic for the series.'); return; }
@@ -448,12 +425,29 @@ async function refreshSeries(){
   if(!list.length){ el.innerHTML=''; return; }
   el.innerHTML = '<div style="font-size:12px;color:var(--muted);margin:4px 0 6px">Your series</div>' + list.map(s=>{
     const done = s.done>=s.total;
-    return `<div class="vid"><div class="t">${s.title}</div>
-      <div class="m">${s.language} · ${s.done}/${s.total} parts ${done?'· ✓ complete':''}</div>
-      ${done?'':`<button class="action ghost" onclick="continueSeries('${s.id}')">▶️ Make next parts</button>`}</div>`;
+    return `<div class="vid"><div class="t">${s.title}</div><div class="m">${s.language} · ${s.done}/${s.total} parts ${done?'· ✓ complete':''}</div>${done?'':`<button class="action ghost" onclick="continueSeries('${s.id}')">▶️ Make next parts</button>`}</div>`;
   }).join('');
 }
 window.continueSeries = (id) => run('/api/series/continue', { id, batch:$('#seriesBatch').value });
+
+// ---- ads ----
+$('#goAds').onclick = () => {
+  const product=$('#adProduct').value.trim();
+  if(!product){ alert('Enter the product or service to advertise.'); return; }
+  run('/api/generate', { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, duration:$('#adDuration').value, ...fmt() });
+};
+
+// ---- ideas ----
+$('#goIdeas').onclick = async () => {
+  $('#goIdeas').disabled=true; $('#ideaList').innerHTML='<div class="hint"><span class="spin"></span> Brainstorming viral ideas…</div>';
+  try{
+    const r = await (await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(), count:$('#ideaCount').value, language:$('#language').value})})).json();
+    if(r.error){ $('#ideaList').innerHTML=`<div class="err">${r.error}</div>`; }
+    else { window.__ideas=r.ideas||[]; $('#ideaList').innerHTML = (r.ideas||[]).map((i,idx)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="action ghost" style="margin-top:8px" onclick="useIdea(${idx})">Use in Shorts →</button></div>`).join(''); }
+  }catch(e){ $('#ideaList').innerHTML=`<div class="err">${e.message}</div>`; }
+  $('#goIdeas').disabled=false;
+};
+window.useIdea = (idx) => { const i=window.__ideas[idx]; if(!i) return; $('#topic').value=i.title; switchTab('shorts'); window.scrollTo({top:0,behavior:'smooth'}); };
 
 loadConfig(); refreshGallery(); refreshSeries(); sceneRow(); sceneRow();
 </script>

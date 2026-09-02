@@ -125,10 +125,28 @@ function buildSubject({ topic, genre, country, random, count }) {
   return bits.join(", ");
 }
 
-export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl }) {
+// VidIQ-style: brainstorm viral short ideas + titles + SEO tags for a niche.
+export async function generateIdeas({ niche, count = 8, language = "English" }) {
+  const prompt = `You are a YouTube growth strategist. Suggest ${count} fresh, high-potential SHORT-video ideas ${niche ? `in the niche: "${niche}"` : "for a broad audience"}.
+For EACH idea give: a scroll-stopping "title" (<= 9 words${language && language.toLowerCase() !== "english" ? `, in ${language}` : ""}), a one-line "hook", a short "why" it can go viral, and 4-6 SEO "tags".
+Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
+  const data = parseLLMJson(await callLLM(prompt));
+  return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
+}
+
+export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl, ad, product, benefits, cta, tone }) {
   const nScenes = SCENES_FOR[duration] || 7;
-  const subject = buildSubject({ topic, genre, country, random, count });
   const nonEnglish = language && language.toLowerCase() !== "english";
+  const subject = ad
+    ? `that is a high-converting ADVERTISEMENT for: "${product || topic}"`
+    : buildSubject({ topic, genre, country, random, count });
+  const adRules = ad
+    ? `\nADVERTISEMENT RULES:
+- Structure across the scenes: strong HOOK → the problem/pain → introduce ${product || "the product"} as the solution → 2-3 concrete benefits → a clear CALL TO ACTION.
+${benefits ? `- Benefits to highlight: ${benefits}.` : ""}
+- The FINAL scene MUST be a clear call to action${cta ? `: "${cta}"` : ""}.
+- Tone: ${tone || "energetic, persuasive, trustworthy"}. Sound like a real ad, not a lecture.`
+    : "";
 
   const langBlock = nonEnglish
     ? `\nLANGUAGE RULES (very important):
@@ -149,7 +167,7 @@ For EACH video:
   - "imagePrompt": a rich 15-25 word ENGLISH description of the exact scene for an AI image generator — NAME the specific people/characters and describe their appearance, clothing, the action, the setting and mood. Be concrete and accurate (e.g. "Ravana, a fearsome ten-headed demon king in golden armor, seizing princess Sita beside a forest hut").
 - Scene 1 is a strong scroll-stopping hook. The final scene is a memorable closing line.
 - Keep it factual, vivid and positive. Do NOT put hashtags inside "text".
-- Provide "title" (3 to 6 words), "description" (one line ending with 2 to 4 hashtags), and 4 to 6 "tags".${langBlock}
+- Provide "title" (3 to 6 words), "description" (one line ending with 2 to 4 hashtags), and 4 to 6 "tags".${langBlock}${adRules}
 ${count > 1 ? `Make the ${count} videos cover clearly different angles so they do not repeat.` : ""}
 
 Return ONLY valid JSON, no markdown, of exactly this shape:

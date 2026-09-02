@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -321,7 +321,9 @@ app.post("/api/generate", async (req, res) => {
   const genre = String(b.genre || "").trim();
   const country = String(b.country || "").trim();
   const random = !!b.random;
-  if (!topic && !genre && !country && !random)
+  if (b.ad && !String(b.product || "").trim())
+    return res.status(400).json({ error: "Enter the product / service to advertise." });
+  if (!b.ad && !topic && !genre && !country && !random)
     return res.status(400).json({ error: "Pick a topic, a genre, a country, or turn on Random." });
   const count = Math.min(Math.max(parseInt(b.count) || 1, 1), 10);
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
@@ -345,6 +347,7 @@ app.post("/api/generate", async (req, res) => {
         source: b.source || "pexels",
         videoModel: b.videoModel || "",
         language: lang.label, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
+        ad: !!b.ad, product: b.product || "", benefits: b.benefits || "", cta: b.cta || "", tone: b.tone || "",
       });
       configs.forEach((c) => (c.imageStyle = b.imageStyle || ""));
       job.total = configs.length;
@@ -389,6 +392,23 @@ app.post("/api/render", (req, res) => {
   const job = newJob(1);
   res.json({ jobId: job.id, dims: `${width}x${height}` });
   runAll([config], job);
+});
+
+// ---- Ideas (VidIQ-style: niche -> viral ideas + titles + tags) ----
+app.post("/api/ideas", async (req, res) => {
+  const b = req.body || {};
+  try {
+    const ideas = await generateIdeas({
+      niche: String(b.niche || "").trim(),
+      count: Math.min(Math.max(parseInt(b.count) || 8, 1), 20),
+      language: resolveLang(b.language || "en").label,
+    });
+    res.json({ ideas });
+  } catch (e) {
+    res.status(e.message === "NO_LLM_KEY" ? 400 : 500).json({
+      error: e.message === "NO_LLM_KEY" ? "Add a Gemini key in Settings to generate ideas." : e.message,
+    });
+  }
 });
 
 // ---- Series: start / continue / list ----
