@@ -12,7 +12,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { extname } from "node:path";
 
 const env = (k) => process.env[k] || "";
+// Local (free, offline) is preferred when configured; then the cloud providers.
 export function avatarProviderName() {
+  if (env("LOCAL_AVATAR_URL")) return "local";
   if (env("FAL_KEY")) return "fal";
   if (env("DID_API_KEY")) return "did";
   if (env("HEYGEN_API_KEY")) return "heygen";
@@ -34,6 +36,29 @@ async function download(url, outFile) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`download ${r.status}`);
   writeFileSync(outFile, Buffer.from(await r.arrayBuffer()));
+}
+
+// ---------------- Local server (free, offline; you run the model on your GPU/Mac) ----------------
+// Uses OUR edge-tts audio -> captions stay perfectly in sync. No watermark, no cost.
+// Expects a local HTTP endpoint that accepts multipart {image, audio} and returns
+// either an mp4 body, or JSON { video_url } / { video_base64 }.
+async function localTalking({ photoPath, audioPath, outFile, log }) {
+  const url = env("LOCAL_AVATAR_URL");
+  log(`🎭 Local avatar server — ${url} (offline, using your voiceover)…`);
+  const form = new FormData();
+  form.append("image", new Blob([readFileSync(photoPath)], { type: mimeFor(photoPath) }), "photo.jpg");
+  form.append("audio", new Blob([readFileSync(audioPath)], { type: mimeFor(audioPath) }), "audio.mp3");
+  const r = await fetch(url, { method: "POST", body: form });
+  if (!r.ok) throw new Error(`local avatar ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const ct = r.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const j = await r.json();
+    if (j.video_url) { await download(j.video_url, outFile); return true; }
+    if (j.video_base64) { writeFileSync(outFile, Buffer.from(String(j.video_base64).replace(/^data:video\/\w+;base64,/, ""), "base64")); return true; }
+    throw new Error("local avatar: JSON response had no video_url/video_base64");
+  }
+  writeFileSync(outFile, Buffer.from(await r.arrayBuffer()));
+  return true;
 }
 
 // ---------------- fal.ai (audio-driven lip-sync; keeps our edge-tts voice) ----------------
@@ -139,6 +164,7 @@ async function heygenTalking({ photoPath, scriptText, width, height, outFile, lo
 export async function generateTalkingVideo({ photoPath, audioPath, scriptText, voice, width, height, outFile, log = console.log }) {
   const provider = avatarProviderName();
   if (!provider) return false;
+  if (provider === "local") return localTalking({ photoPath, audioPath, outFile, log });
   if (provider === "fal") return falTalking({ photoPath, audioPath, outFile, log });
   if (provider === "did") return didTalking({ photoPath, scriptText, voice, outFile, log });
   if (provider === "heygen") return heygenTalking({ photoPath, scriptText, width, height, outFile, log });

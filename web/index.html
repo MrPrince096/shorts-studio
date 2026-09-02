@@ -454,6 +454,8 @@
         <label style="margin-top:16px">HeyGen API key <span class="muted">— most realistic</span></label>
         <div class="field"><input id="heygenKey" type="password" placeholder="paste key…" /><span class="fstat" id="heygenState"></span></div>
         <a class="getlink" href="https://app.heygen.com/settings?nav=API" target="_blank">Get a HeyGen key →</a>
+        <label style="margin-top:16px">Local avatar server URL <span class="muted">— free & offline, runs on your GPU/Mac (preferred when set)</span></label>
+        <input id="localAvatarUrl" placeholder="http://localhost:7860/generate" />
         <div id="avatarStatus" class="note" style="margin:14px 0 0"></div>
       </div>
 
@@ -552,7 +554,7 @@ function setStat(el,k){if(!el)return;el.className='fstat '+(k.set?'on':'off');el
 function toggleLlm(){const p=$('#llmProvider').value;$('#geminiBox').style.display=p==='gemini'?'block':'none';$('#openaiBox').style.display=p==='openai'?'block':'none';$('#ollamaBox').style.display=p==='ollama'?'block':'none';}
 async function loadSettings(){
   const s=await(await fetch('/api/settings')).json();
-  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';
+  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';$('#localAvatarUrl').value=s.localAvatarUrl||'';
   setStat($('#pexelsState'),s.keys.pexels);setStat($('#geminiState'),s.keys.gemini);setStat($('#openaiState'),s.keys.openai);setStat($('#hfState'),s.keys.hf);setStat($('#falState'),s.keys.fal);
   setStat($('#didState'),s.keys.did);setStat($('#heygenState'),s.keys.heygen);
   const ap=s.avatarProvider;
@@ -572,7 +574,7 @@ $('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
 $('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
 $('#saveSettings').onclick=async()=>{
-  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim()};
+  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim()};
   const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML=r.saved&&r.saved.length?'<span class="ok">Saved ✓</span>':'Nothing to save';
   ['pexelsKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey'].forEach(id=>$('#'+id).value='');loadSettings();

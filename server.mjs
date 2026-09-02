@@ -414,6 +414,7 @@ app.get("/api/settings", (_req, res) => {
     ollamaUrl: getEnvValue("OLLAMA_URL") || "http://localhost:11434",
     ollamaModel: getEnvValue("OLLAMA_MODEL") || "llama3.1",
     localImageUrl: getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate",
+    localAvatarUrl: getEnvValue("LOCAL_AVATAR_URL") || "",
     avatarProvider: avatarProvider(),
     keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY") },
   });
@@ -436,6 +437,7 @@ app.post("/api/settings", (req, res) => {
   setIf("did", "DID_API_KEY", "D-ID key");
   setIf("heygen", "HEYGEN_API_KEY", "HeyGen key");
   setIf("localImageUrl", "LOCAL_IMAGE_URL", "Local image URL");
+  setIf("localAvatarUrl", "LOCAL_AVATAR_URL", "Local avatar URL");
   res.json({ ok: true, saved });
 });
 
@@ -641,7 +643,8 @@ const CREATORS_DIR = join(ROOT, "creators");
 app.use("/creators", express.static(CREATORS_DIR));
 function avatarProvider() {
   // which talking-avatar backend is configured (reads the .env file, like the rest
-  // of the server). Providers mirror scripts/avatar.mjs. None are free.
+  // of the server). Mirrors scripts/avatar.mjs — local (free/offline) is preferred.
+  if (getEnvValue("LOCAL_AVATAR_URL")) return "local";
   if (getEnvValue("FAL_KEY")) return "fal";
   if (getEnvValue("DID_API_KEY")) return "did";
   if (getEnvValue("HEYGEN_API_KEY")) return "heygen";
