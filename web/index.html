@@ -100,6 +100,21 @@
   .stat{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
   .stat .n{font-size:24px;font-weight:800}
   .stat .l{color:var(--muted);font-size:11.5px;margin-top:2px}
+  /* dashboard */
+  summary span[data-icon]{display:inline-flex;vertical-align:-3px;margin-right:6px}
+  summary svg{width:15px;height:15px;color:var(--accent)}
+  .dashgrid{display:flex;flex-direction:column;gap:20px}
+  .sectitle{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px}
+  .sectitle svg{width:16px;height:16px;color:var(--accent)}
+  .qa{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .qacard{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:18px;cursor:pointer;transition:transform .12s,border-color .12s}
+  .qacard:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .qacard .qi{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(124,92,255,.22),rgba(79,140,255,.14));display:flex;align-items:center;justify-content:center;margin-bottom:13px}
+  .qacard .qi svg{width:22px;height:22px;color:#b9a8ff}
+  .qacard .qt{font-weight:700;font-size:15px}
+  .qacard .qd{color:var(--muted);font-size:12.5px;margin-top:4px;line-height:1.4}
+  .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:720px){.stats4{grid-template-columns:1fr 1fr}}
   #log{background:#07090e;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9fd0ff;max-height:150px;overflow:auto;white-space:pre-wrap;margin-top:8px}
   .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
   @keyframes s{to{transform:rotate(360deg)}}
@@ -140,7 +155,7 @@
 <div class="app">
   <aside class="sidebar">
     <div class="brand"><span class="logo" data-icon="film"></span><b>Shorts Studio</b><span class="pro">Pro</span></div>
-    <div class="nav active" data-nav="shorts"><span class="ic" data-icon="home"></span> Dashboard</div>
+    <div class="nav active" data-nav="dashboard"><span class="ic" data-icon="home"></span> Dashboard</div>
     <div class="nav" data-nav="shorts"><span class="ic" data-icon="play"></span> Shorts</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
@@ -175,10 +190,10 @@
           <label>Topic or idea <span class="muted">(optional with a genre/country)</span></label>
           <div class="withbtn"><input id="topic" class="big" placeholder="e.g. 5 morning habits for success" /><button class="btn ghost" id="surprise" title="Random">🎲</button></div>
           <div class="row"><div><label>How many videos</label><select id="count"></select></div></div>
-          <button class="btn grad big" id="goAI" style="width:100%;margin-top:16px">✨ Generate Short</button>
-          <button class="btn ghost" id="saveDraft" style="width:100%;margin-top:8px">💾 Save as draft</button>
+          <button class="btn grad big" id="goAI" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Generate Short</button>
+          <button class="btn ghost" id="saveDraft" style="width:100%;margin-top:8px"><span data-icon="save"></span>Save as draft</button>
           <details>
-            <summary>⚙️ Advanced — write scenes yourself</summary>
+            <summary><span data-icon="sliders"></span>Advanced — write scenes yourself</summary>
             <label>Title</label><input id="title" placeholder="Foods Your Heart Loves" />
             <label>Scenes — narration + search term</label>
             <div id="scenes"></div>
@@ -194,7 +209,7 @@
           <label>Story / topic</label>
           <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana" />
           <div class="row"><div><label>Total parts</label><select id="seriesTotal"></select></div><div><label>Make now</label><select id="seriesBatch"></select></div></div>
-          <button class="btn grad big" id="goSeries" style="width:100%;margin-top:16px">📖 Start Series</button>
+          <button class="btn grad big" id="goSeries" style="width:100%;margin-top:16px"><span data-icon="book"></span>Start Series</button>
           <div id="seriesList" style="margin-top:14px"></div>
         </div>
         <!-- ADS -->
@@ -208,7 +223,7 @@
           <label>Key benefits</label>
           <input id="adBenefits" placeholder="brightens skin, reduces dark spots" />
           <div class="row"><div><label>Call to action</label><input id="adCta" placeholder="Order now 50% off" /></div><div><label>Tone</label><select id="adTone"></select></div></div>
-          <button class="btn grad big" id="goAds" style="width:100%;margin-top:16px">📣 Make Ad</button>
+          <button class="btn grad big" id="goAds" style="width:100%;margin-top:16px"><span data-icon="mega"></span>Make Ad</button>
         </div>
         <!-- IDEAS -->
         <div class="card tabpanel" id="tab-ideas" hidden>
@@ -217,7 +232,7 @@
           <label>Your niche <span class="muted">(optional)</span></label>
           <input id="ideaNiche" class="big" placeholder="fitness · Indian mythology · finance" />
           <div class="row"><div><label>How many ideas</label><select id="ideaCount"></select></div></div>
-          <button class="btn grad big" id="goIdeas" style="width:100%;margin-top:16px">💡 Get Ideas</button>
+          <button class="btn grad big" id="goIdeas" style="width:100%;margin-top:16px"><span data-icon="bulb"></span>Get Ideas</button>
           <div id="ideaList" style="margin-top:14px"></div>
         </div>
 
@@ -266,6 +281,34 @@
             <div class="stat"><div class="n" id="statIdeas">0</div><div class="l">Ideas generated</div></div>
             <div class="stat"><div class="n" id="statLangs">34</div><div class="l">Languages</div></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD (overview) -->
+    <div class="gal" id="dashboard">
+      <div class="dashgrid">
+        <div class="card">
+          <div class="sectitle"><span data-icon="zap"></span> Quick actions</div>
+          <div class="qa">
+            <div class="qacard" data-go="shorts"><div class="qi" data-icon="spark"></div><div class="qt">Create Short</div><div class="qd">AI script, voiceover & captions in minutes</div></div>
+            <div class="qacard" data-go="series"><div class="qi" data-icon="book"></div><div class="qt">Storyteller Series</div><div class="qd">One story → connected, resumable parts</div></div>
+            <div class="qacard" data-go="ads"><div class="qi" data-icon="mega"></div><div class="qt">Advertisement</div><div class="qd">Promote a product with its real image</div></div>
+            <div class="qacard" data-go="ideas"><div class="qi" data-icon="bulb"></div><div class="qt">Idea Finder</div><div class="qd">Viral titles, hooks & tags to steal</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sectitle"><span data-icon="chart"></span> Your stats</div>
+          <div class="stats4">
+            <div class="stat"><div class="n" id="dVideos">0</div><div class="l">Videos created</div></div>
+            <div class="stat"><div class="n" id="dSeries">0</div><div class="l">Series parts</div></div>
+            <div class="stat"><div class="n" id="dIdeas">0</div><div class="l">Ideas generated</div></div>
+            <div class="stat"><div class="n" id="dLangs">34</div><div class="l">Languages</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sectitle"><span data-icon="video"></span> Recent videos</div>
+          <div id="dashRecent" class="vgrid"><div class="muted" style="font-size:12px">No videos yet.</div></div>
         </div>
       </div>
     </div>
@@ -361,17 +404,22 @@ const ICONS={
   image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
   file:'<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/>',
   search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+  sliders:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
 // nav + tabs
 function switchTab(name){
+  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
-  $('#library').classList.remove('show'); $('#workspace').style.display='grid';
+  $('#workspace').style.display='grid';
 }
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
+  if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
+  $('#dashboard').classList.remove('show');
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
     if(v==='drafts'){$('#libTitle').textContent='Drafts';showDrafts();}
@@ -379,6 +427,13 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
     else {$('#libTitle').textContent=(v==='projects'?'Projects':'My Videos');$('#gallery').className='vgrid';refreshGallery();}
   } else switchTab(v);
 });
+document.querySelectorAll('.qacard[data-go]').forEach(c=>c.onclick=()=>document.querySelector('[data-nav='+c.dataset.go+']').click());
+async function showDashboard(){
+  loadStats();
+  VIDEOS=await(await fetch('/api/videos')).json(); const g=$('#dashRecent');
+  if(!VIDEOS.length){g.innerHTML='<div class="empty">No videos yet — pick a Quick action above to create your first one.</div>';return;}
+  g.innerHTML=VIDEOS.slice(0,8).map((v,i)=>`<div class="vcard"><img class="thumb" loading="lazy" ${v.thumb?`src="/out/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
+}
 
 let LANGS=[];
 function populateVoices(id){const L=LANGS.find(x=>x.id===id)||LANGS[0];$('#voice').innerHTML='';(L?L.voices:[]).forEach(v=>$('#voice').appendChild(opt(v.id,v.label)));}
@@ -439,7 +494,7 @@ $('#addScene').onclick=()=>sceneRow();
 $('#rate').oninput=(e)=>$('#rateval').textContent=(e.target.value>0?'+':'')+e.target.value+'%';
 $('#loadEx').onclick=()=>{$('#scenes').innerHTML='';$('#title').value='Foods Your Heart Loves';[['Your heart beats 100,000 times a day.','healthy food heart'],['Fatty fish protect your arteries.','salmon cooking'],['Berries fight inflammation.','fresh berries'],['Leafy greens lower blood pressure.','spinach leaves'],['Love your heart, it beats for life.','person running sunrise']].forEach(([t,q])=>sceneRow(t,q));};
 
-async function loadStats(){try{const s=await(await fetch('/api/stats')).json();$('#statVideos').textContent=s.videosCreated;$('#statSeries').textContent=s.seriesParts;$('#statIdeas').textContent=s.ideasGenerated;}catch(e){}}
+async function loadStats(){try{const s=await(await fetch('/api/stats')).json();const set=(id,v)=>{const e=$(id);if(e)e.textContent=v;};set('#statVideos',s.videosCreated);set('#statSeries',s.seriesParts);set('#statIdeas',s.ideasGenerated);set('#dVideos',s.videosCreated);set('#dSeries',s.seriesParts);set('#dIdeas',s.ideasGenerated);}catch(e){}}
 async function refreshRecent(){
   const l=await(await fetch('/api/videos')).json();
   const el=$('#recentList');
@@ -498,7 +553,7 @@ $('#saveDraft').onclick=()=>{
   const name=prompt('Name this draft:', ($('#topic').value.trim()||'Untitled'));
   if(name===null) return;
   const data={topic:$('#topic').value.trim(),count:$('#count').value,...fmt()};
-  fetch('/api/drafts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})}).then(()=>{const b=$('#saveDraft');const o=b.textContent;b.textContent='✓ Saved';setTimeout(()=>b.textContent=o,1200);});
+  fetch('/api/drafts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})}).then(()=>{const b=$('#saveDraft');const o=b.innerHTML;b.innerHTML='✓ Saved';setTimeout(()=>b.innerHTML=o,1200);});
 };
 function applyDraft(d){
   if(!d)return; const set=(id,v)=>{if(v!=null&&$(id))$(id).value=v;};
@@ -530,6 +585,7 @@ window.delAsset=(f)=>{if(confirm('Delete this asset?'))fetch('/api/assets/'+f,{m
 $('#assetUp').onchange=()=>{const f=$('#assetUp').files[0];if(!f)return;if(f.size>20*1024*1024){alert('Max 20 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{$('#assetUp').value='';showAssets();});rd.readAsDataURL(f);};
 
 injectIcons();loadConfig();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
+document.querySelector('[data-nav=dashboard]').click();
 </script>
 </body>
 </html>
