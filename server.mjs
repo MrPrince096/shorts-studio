@@ -8,7 +8,26 @@ import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts, generateIdeas } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
-import { visionScript } from "./scripts/vision.mjs";
+import { visionScript, describeImage } from "./scripts/vision.mjs";
+
+// decode a base64 data URL, save under public/, return { uploadPath, uploadIsImage, analyzeB64, analyzeMime }
+function saveUploadFromDataUrl(dataUrl) {
+  const m = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) return null;
+  const mime = m[1];
+  const isVideo = mime.startsWith("video");
+  const buf = Buffer.from(m[2], "base64");
+  const ext = isVideo ? "mp4" : (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
+  const uploadPath = join(dirname(fileURLToPath(import.meta.url)), "public", `upload.${ext}`);
+  writeFileSync(uploadPath, buf);
+  let analyzeB64 = buf.toString("base64"), analyzeMime = mime;
+  if (isVideo) {
+    const fr = join(dirname(fileURLToPath(import.meta.url)), "public", "upload_frame.jpg");
+    execFileSync("ffmpeg", ["-y", "-ss", "0.5", "-i", uploadPath, "-frames:v", "1", "-q:v", "2", fr], { stdio: "ignore" });
+    analyzeB64 = readFileSync(fr).toString("base64"); analyzeMime = "image/jpeg";
+  }
+  return { uploadPath, uploadIsImage: !isVideo, analyzeB64, analyzeMime };
+}
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = join(ROOT, "out");
@@ -342,7 +361,16 @@ app.post("/api/generate", async (req, res) => {
 
   (async () => {
     try {
-      const what = random ? "random topics" : (topic || [genre, country].filter(Boolean).join(" / ") || "your idea");
+      // optional product image for ads: analyze it, and use it as the visual
+      let productImageDesc = "", upload = null;
+      if (b.ad && b.imageDataUrl) {
+        upload = saveUploadFromDataUrl(b.imageDataUrl);
+        if (upload) {
+          pushLog(job, "🔍 Analyzing your product image…");
+          try { productImageDesc = await describeImage({ imageB64: upload.analyzeB64, mime: upload.analyzeMime }); } catch (e) { pushLog(job, "(image analysis skipped: " + e.message + ")"); }
+        }
+      }
+      const what = b.ad ? `ad for "${b.product}"` : (random ? "random topics" : (topic || [genre, country].filter(Boolean).join(" / ") || "your idea"));
       pushLog(job, `🤖 Writing ${count} script(s) in ${lang.label} — ${what} …`);
       const configs = await generateScripts({
         topic, genre, country, random,
@@ -354,9 +382,12 @@ app.post("/api/generate", async (req, res) => {
         source: b.source || "pexels",
         videoModel: b.videoModel || "",
         language: lang.label, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
-        ad: !!b.ad, product: b.product || "", benefits: b.benefits || "", cta: b.cta || "", tone: b.tone || "",
+        ad: !!b.ad, product: b.product || "", benefits: b.benefits || "", cta: b.cta || "", tone: b.tone || "", productImageDesc,
       });
-      configs.forEach((c) => (c.imageStyle = b.imageStyle || ""));
+      configs.forEach((c) => {
+        c.imageStyle = b.imageStyle || "";
+        if (upload) { c.source = "upload"; c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
+      });
       job.total = configs.length;
       pushLog(job, `✅ ${configs.length} script(s) ready. Rendering…`);
       await runAll(configs, job);
@@ -399,53 +430,6 @@ app.post("/api/render", (req, res) => {
   const job = newJob(1);
   res.json({ jobId: job.id, dims: `${width}x${height}` });
   runAll([config], job);
-});
-
-// ---- From Media: upload image/video -> analyze -> render a video about it ----
-app.post("/api/media", (req, res) => {
-  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
-  const b = req.body || {};
-  const m = String(b.dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) return res.status(400).json({ error: "Attach an image or video first." });
-  const mime = m[1];
-  const isVideo = mime.startsWith("video");
-  const buf = Buffer.from(m[2], "base64");
-  const ext = isVideo ? "mp4" : (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
-  const uploadPath = join(ROOT, "public", `upload.${ext}`);
-  writeFileSync(uploadPath, buf);
-  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
-  const lang = resolveLang(b.language || "en");
-  const nScenes = { short: 5, medium: 7, long: 9 }[b.duration || "short"] || 5;
-
-  busy = true;
-  const job = newJob(1);
-  res.json({ jobId: job.id });
-  (async () => {
-    try {
-      // get an image to analyze (a frame for video)
-      let analyzeB64, analyzeMime;
-      if (isVideo) {
-        const frame = join(ROOT, "public", "upload_frame.jpg");
-        execFileSync("ffmpeg", ["-y", "-ss", "0.5", "-i", uploadPath, "-frames:v", "1", "-q:v", "2", frame], { stdio: "ignore" });
-        analyzeB64 = readFileSync(frame).toString("base64"); analyzeMime = "image/jpeg";
-      } else { analyzeB64 = buf.toString("base64"); analyzeMime = mime; }
-
-      pushLog(job, "🔍 Analyzing your media with AI vision…");
-      const vs = await visionScript({ imageB64: analyzeB64, mime: analyzeMime, nScenes, language: lang.label });
-      pushLog(job, `✅ "${vs.title}" — rendering from your ${isVideo ? "video" : "image"}…`);
-      const config = {
-        title: vs.title, description: vs.description, tags: vs.tags,
-        voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%", music: "",
-        width, height, source: "upload", uploadFile: uploadPath, uploadIsImage: !isVideo,
-        font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl, imageStyle: "",
-        scenes: vs.scenes,
-      };
-      await runAll([config], job);
-    } catch (e) {
-      pushLog(job, "❌ " + (e.message === "NO_GEMINI_KEY" ? "Add a Gemini key in Settings — needed to analyze media." : e.message));
-      job.status = "error"; busy = false;
-    }
-  })();
 });
 
 // ---- Ideas (VidIQ-style: niche -> viral ideas + titles + tags) ----

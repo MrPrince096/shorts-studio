@@ -16,6 +16,20 @@ function geminiKey() {
   return "";
 }
 
+// Describe an uploaded product image in plain text (to inform an ad script).
+export async function describeImage({ imageB64, mime = "image/jpeg" }) {
+  const key = geminiKey();
+  if (!key) throw new Error("NO_GEMINI_KEY");
+  const prompt = `Look at this product photo. In 2-3 sentences describe exactly what the product is: its type/category, what it looks like (color, form, packaging, notable features), and any visible brand or text. Be factual and specific — this describes a real product for an advertisement.`;
+  const body = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: imageB64 } }] }] };
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Vision ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  const d = await res.json();
+  return (d?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+}
+
 export async function visionScript({ imageB64, mime = "image/jpeg", nScenes = 5, language = "English" }) {
   const key = geminiKey();
   if (!key) throw new Error("NO_GEMINI_KEY");

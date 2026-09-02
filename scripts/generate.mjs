@@ -134,7 +134,7 @@ Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
   return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
 }
 
-export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl, ad, product, benefits, cta, tone }) {
+export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl, ad, product, benefits, cta, tone, productImageDesc }) {
   const nScenes = SCENES_FOR[duration] || 7;
   const nonEnglish = language && language.toLowerCase() !== "english";
   const subject = ad
@@ -143,6 +143,7 @@ export async function generateScripts({ topic, genre, country, random, count = 1
   const adRules = ad
     ? `\nADVERTISEMENT RULES:
 - Structure across the scenes: strong HOOK → the problem/pain → introduce ${product || "the product"} as the solution → 2-3 concrete benefits → a clear CALL TO ACTION.
+${productImageDesc ? `- The REAL product (from its photo) looks like this — stay accurate to it: ${productImageDesc}` : ""}
 ${benefits ? `- Benefits to highlight: ${benefits}.` : ""}
 - The FINAL scene MUST be a clear call to action${cta ? `: "${cta}"` : ""}.
 - Tone: ${tone || "energetic, persuasive, trustworthy"}. Sound like a real ad, not a lecture.`

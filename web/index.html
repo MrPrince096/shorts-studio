@@ -107,7 +107,6 @@
       <button class="tab active" data-tab="shorts">🎬 Shorts</button>
       <button class="tab" data-tab="series">📖 Series</button>
       <button class="tab" data-tab="ads">📣 Ads</button>
-      <button class="tab" data-tab="media">🖼️ From Media</button>
       <button class="tab" data-tab="ideas">💡 Ideas</button>
     </div>
 
@@ -165,6 +164,8 @@
       <h2>📣 Advertisement — promote a product or service</h2>
       <label>Product / service</label>
       <input id="adProduct" class="big" placeholder="e.g. FreshGlow vitamin C face serum" />
+      <label>Product image / clip <span style="color:var(--muted)">(optional — AI analyzes it and shows the real product)</span></label>
+      <input id="adImage" type="file" accept="image/*,video/*" />
       <label>Key benefits <span style="color:var(--muted)">(comma separated)</span></label>
       <input id="adBenefits" placeholder="brightens skin, reduces dark spots, all-natural" />
       <div class="row">
@@ -176,16 +177,6 @@
       </div>
       <div class="btnrow"><button class="action primary big" id="goAds">📣 Make Ad</button></div>
       <div class="hint">The AI writes a hook → problem → product → benefits → call-to-action ad, then renders it with your chosen voice & visuals.</div>
-    </div>
-
-    <!-- FROM MEDIA -->
-    <div class="tabpanel card" id="tab-media" hidden>
-      <h2>🖼️ From Media — turn a photo or clip into a video</h2>
-      <label>Your image or video</label>
-      <input id="mediaFile" type="file" accept="image/*,video/*" />
-      <div class="row"><div><label>Length</label><select id="mediaDuration"></select></div></div>
-      <div class="btnrow"><button class="action primary big" id="goMedia">🖼️ Make Video</button></div>
-      <div class="hint">The AI looks at your media, writes a short video about its subject, and builds the video using it as the visual — with your chosen voice, language & format. Needs a Gemini key. (Max ~70&nbsp;MB; use short clips.)</div>
     </div>
 
     <!-- IDEAS -->
@@ -296,7 +287,7 @@ async function loadConfig(){
   $('#language').onchange = () => populateVoices($('#language').value);
   c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
   c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
-  c.durations.forEach(d => { $('#duration').appendChild(opt(d.id, d.label)); $('#adDuration').appendChild(opt(d.id, d.label)); $('#mediaDuration').appendChild(opt(d.id, d.label)); });
+  c.durations.forEach(d => { $('#duration').appendChild(opt(d.id, d.label)); $('#adDuration').appendChild(opt(d.id, d.label)); });
   $('#genre').appendChild(opt('', '— any / none —'));
   (c.genres||[]).forEach(g => $('#genre').appendChild(opt(g.id, g.label)));
   $('#country').appendChild(opt('', '— any / none —'));
@@ -316,7 +307,7 @@ async function loadConfig(){
     $('#falModelBox').style.display = s==='fal' ? 'block':'none';
     $('#styleBox').style.display = ['image','hf','local','fal-image','fal'].includes(s) ? 'block':'none';
   };
-  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#adDuration').value='short'; $('#mediaDuration').value='short'; $('#source').value='pexels';
+  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#adDuration').value='short'; $('#source').value='pexels';
 }
 
 // ---- settings ----
@@ -398,7 +389,7 @@ async function refreshGallery(){
 }
 
 const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value });
-const ACT = ['#goAI','#goManual','#goSeries','#goAds','#goMedia'];
+const ACT = ['#goAI','#goManual','#goSeries','#goAds'];
 let polling=null;
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
 function endProgress(){ ACT.forEach(s=>$(s).disabled=false); }
@@ -458,17 +449,14 @@ window.continueSeries = (id) => run('/api/series/continue', { id, batch:$('#seri
 $('#goAds').onclick = () => {
   const product=$('#adProduct').value.trim();
   if(!product){ alert('Enter the product or service to advertise.'); return; }
-  run('/api/generate', { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, duration:$('#adDuration').value, ...fmt() });
-};
-
-// ---- from media ----
-$('#goMedia').onclick = () => {
-  const f = $('#mediaFile').files[0];
-  if(!f){ alert('Choose an image or video file first.'); return; }
-  if(f.size > 70*1024*1024){ alert('File too large (max ~70 MB). Use a shorter clip.'); return; }
-  const reader = new FileReader();
-  reader.onload = () => run('/api/media', { dataUrl: reader.result, duration:$('#mediaDuration').value, ...fmt() });
-  reader.readAsDataURL(f);
+  const base = { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, duration:$('#adDuration').value, ...fmt() };
+  const f = $('#adImage').files[0];
+  if(f){
+    if(f.size > 70*1024*1024){ alert('Image/clip too large (max ~70 MB).'); return; }
+    const reader = new FileReader();
+    reader.onload = () => run('/api/generate', { ...base, imageDataUrl: reader.result });
+    reader.readAsDataURL(f);
+  } else { run('/api/generate', base); }
 };
 
 // ---- ideas ----
