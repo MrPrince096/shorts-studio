@@ -115,6 +115,24 @@
   .qacard .qd{color:var(--muted);font-size:12.5px;margin-top:4px;line-height:1.4}
   .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
   @media(max-width:720px){.stats4{grid-template-columns:1fr 1fr}}
+  /* ads studio */
+  .seg{display:flex;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:16px;flex-wrap:wrap}
+  .seg button{flex:1;min-width:84px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:12.5px;padding:8px 10px;border-radius:9px;cursor:pointer}
+  .seg button.on{background:var(--grad);color:#fff}
+  .note{background:rgba(79,140,255,.1);border:1px solid rgba(79,140,255,.3);border-radius:11px;padding:11px 13px;font-size:12.5px;color:#bcd3ff;margin-bottom:14px;line-height:1.45}
+  .note b{color:#fff}
+  .note.warn{background:rgba(255,210,63,.1);border-color:rgba(255,210,63,.3);color:#ffe9a6}
+  .ideacard{border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:10px;background:var(--panel2)}
+  .ideacard .cat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;background:rgba(124,92,255,.18);color:#b9a8ff;border:1px solid rgba(124,92,255,.35);padding:2px 8px;border-radius:20px;margin-bottom:7px}
+  .ideacard .itl{font-weight:700;font-size:14.5px}
+  .ideacard .hk{font-size:13px;margin:6px 0 5px;color:var(--text)}
+  .ideacard .cc{color:var(--muted);font-size:12px;line-height:1.4}
+  .crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px;margin-top:16px}
+  .crcard{border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--panel2);text-align:center}
+  .crcard img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block}
+  .crcard .cn{font-weight:600;font-size:12.5px;padding:8px 6px 1px}
+  .crcard .cx{color:var(--muted);font-size:10.5px;padding:0 6px}
+  .crcard button{font-size:11px;margin:7px 0 10px;background:var(--panel);border:1px solid var(--line);color:var(--err);border-radius:8px;padding:3px 10px;cursor:pointer}
   #log{background:#07090e;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9fd0ff;max-height:150px;overflow:auto;white-space:pre-wrap;margin-top:8px}
   .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
   @keyframes s{to{transform:rotate(360deg)}}
@@ -212,18 +230,66 @@
           <button class="btn grad big" id="goSeries" style="width:100%;margin-top:16px"><span data-icon="book"></span>Start Series</button>
           <div id="seriesList" style="margin-top:14px"></div>
         </div>
-        <!-- ADS -->
+        <!-- ADS STUDIO -->
         <div class="card tabpanel" id="tab-ads" hidden>
-          <h2><span data-icon="mega"></span> Advertisement</h2>
-          <div class="cardsub">Promote a product or service</div>
-          <label>Product / service</label>
-          <input id="adProduct" class="big" placeholder="FreshGlow vitamin C serum" />
-          <label>Product image / clip <span class="muted">(optional — shows the real product)</span></label>
-          <input id="adImage" type="file" accept="image/*,video/*" />
-          <label>Key benefits</label>
-          <input id="adBenefits" placeholder="brightens skin, reduces dark spots" />
-          <div class="row"><div><label>Call to action</label><input id="adCta" placeholder="Order now 50% off" /></div><div><label>Tone</label><select id="adTone"></select></div></div>
-          <button class="btn grad big" id="goAds" style="width:100%;margin-top:16px"><span data-icon="mega"></span>Make Ad</button>
+          <h2><span data-icon="mega"></span> Ads Studio</h2>
+          <div class="cardsub">UGC, product & social ads from one image</div>
+          <div class="seg" id="adSeg">
+            <button data-ad="ugc" class="on">UGC Ad</button>
+            <button data-ad="product">Product Ad</button>
+            <button data-ad="social">Social Ad</button>
+            <button data-ad="creators">My Creators</button>
+          </div>
+
+          <!-- UGC -->
+          <div class="adpanel" id="ad-ugc">
+            <div class="note">Upload a product/person image → AI reads it and pitches ad ideas. Pick one and it renders a UGC-style ad: your product footage + voiceover + captions. <b>Talking-face creators need an avatar API (see My Creators).</b></div>
+            <label>Product / person image</label>
+            <input id="ugcImage" type="file" accept="image/*" />
+            <div class="row"><div><label>Product name <span class="muted">(optional)</span></label><input id="ugcProduct" placeholder="FreshGlow serum" /></div><div><label>Audience <span class="muted">(optional)</span></label><input id="ugcAudience" placeholder="women 20-35" /></div></div>
+            <div class="row"><div><label>Main selling point <span class="muted">(optional)</span></label><input id="ugcPoint" placeholder="fades dark spots in 2 weeks" /></div><div><label>Offer <span class="muted">(optional)</span></label><input id="ugcOffer" placeholder="50% off today" /></div></div>
+            <button class="btn grad big" id="goUgcIdeas" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Analyze & get ad ideas</button>
+            <div id="ugcIdeas" style="margin-top:14px"></div>
+            <div id="ugcMake" hidden>
+              <hr />
+              <div class="note" id="ugcChosen"></div>
+              <div class="row"><div><label>Creator</label><select id="ugcCreator"><option value="">Product showcase (voiceover + captions)</option></select></div><div><label>Tone</label><select id="ugcTone"></select></div></div>
+              <button class="btn grad big" id="goUgc" style="width:100%;margin-top:14px"><span data-icon="mega"></span>Generate UGC ad</button>
+            </div>
+          </div>
+
+          <!-- PRODUCT -->
+          <div class="adpanel" id="ad-product" hidden>
+            <label>Product / service</label>
+            <input id="adProduct" class="big" placeholder="FreshGlow vitamin C serum" />
+            <label>Product image / clip <span class="muted">(optional — shows the real product)</span></label>
+            <input id="adImage" type="file" accept="image/*,video/*" />
+            <label>Key benefits</label>
+            <input id="adBenefits" placeholder="brightens skin, reduces dark spots" />
+            <div class="row"><div><label>Call to action</label><input id="adCta" placeholder="Order now 50% off" /></div><div><label>Tone</label><select id="adTone"></select></div></div>
+            <button class="btn grad big" id="goAds" style="width:100%;margin-top:16px"><span data-icon="mega"></span>Make Ad</button>
+          </div>
+
+          <!-- SOCIAL -->
+          <div class="adpanel" id="ad-social" hidden>
+            <div class="note">Presets tune tone & pacing per format. Aspect ratio comes from <b>Quick settings</b> (9:16, 1:1, 16:9…).</div>
+            <label>Product / service</label>
+            <input id="socProduct" class="big" placeholder="FreshGlow serum" />
+            <div class="row"><div><label>Preset</label><select id="socPreset"></select></div><div><label>Call to action</label><input id="socCta" placeholder="Shop now" /></div></div>
+            <label>Key benefits</label>
+            <input id="socBenefits" placeholder="glowing skin in 2 weeks" />
+            <button class="btn grad big" id="goSocial" style="width:100%;margin-top:16px"><span data-icon="mega"></span>Make Social Ad</button>
+          </div>
+
+          <!-- CREATORS (Track B scaffold) -->
+          <div class="adpanel" id="ad-creators" hidden>
+            <div class="note warn" id="avatarNote">Checking avatar support…</div>
+            <label>Your photo <span class="muted">— clear, front-facing, good light</span></label>
+            <input id="crPhoto" type="file" accept="image/*" />
+            <div class="row"><div><label>Creator name</label><input id="crName" placeholder="e.g. Me" /></div><div><label>Personality</label><input id="crPersona" placeholder="friendly, casual, curious" /></div></div>
+            <button class="btn ghost" id="goCreator" style="width:100%;margin-top:14px"><span data-icon="plus"></span>Save my AI creator</button>
+            <div id="crList" class="crgrid"></div>
+          </div>
         </div>
         <!-- IDEAS -->
         <div class="card tabpanel" id="tab-ideas" hidden>
@@ -455,7 +521,8 @@ async function loadConfig(){
   [3,5,10,15,20,30,50].forEach(n=>$('#seriesTotal').appendChild(opt(n,n+' parts')));
   for(let i=1;i<=10;i++)$('#seriesBatch').appendChild(opt(i,i+(i===1?' part now':' parts now')));
   [6,8,10,12,15,20].forEach(n=>$('#ideaCount').appendChild(opt(n,n+' ideas')));
-  ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>$('#adTone').appendChild(opt(t,t)));
+  ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>{$('#adTone').appendChild(opt(t,t));$('#ugcTone').appendChild(opt(t,t));});
+  [['short-form vertical','Short-form vertical'],['social story','Social story'],['product promo','Product promo'],['testimonial','Testimonial'],['offer','Offer / discount']].forEach(([v,l])=>$('#socPreset').appendChild(opt(v,l)));
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
   [['in','Zoom in (default)'],['out','Zoom out'],['subtle','Subtle zoom'],['none','Static (no motion)'],['random','Random per scene']].forEach(([v,l])=>$('#motion').appendChild(opt(v,l)));
   $('#captionPos').value='bottom'; $('#motion').value='in';
@@ -545,6 +612,55 @@ $('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:1,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};
+
+// ---- Ads Studio: segmented sub-nav ----
+document.querySelectorAll('#adSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#adSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  const v=b.dataset.ad;
+  ['ugc','product','social','creators'].forEach(k=>$('#ad-'+k).hidden=k!==v);
+  if(v==='creators')loadCreators();
+});
+// ---- UGC: image -> ad ideas -> generate ----
+let UGCIMG=null;
+$('#ugcImage').onchange=()=>{const f=$('#ugcImage').files[0];if(!f){UGCIMG=null;return;}if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>UGCIMG=rd.result;rd.readAsDataURL(f);};
+$('#goUgcIdeas').onclick=async()=>{
+  if(!UGCIMG&&!$('#ugcProduct').value.trim()){alert('Upload a product image or type the product name.');return;}
+  const btn=$('#goUgcIdeas');btn.disabled=true;$('#ugcMake').hidden=true;
+  $('#ugcIdeas').innerHTML='<div class="muted"><span class="spin"></span> Reading your product & brainstorming ad angles…</div>';
+  try{
+    const r=await(await fetch('/api/ads/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageDataUrl:UGCIMG,product:$('#ugcProduct').value.trim(),audience:$('#ugcAudience').value.trim(),sellingPoint:$('#ugcPoint').value.trim(),offer:$('#ugcOffer').value.trim(),language:$('#language').value,llmProvider:$('#llmPick').value})})).json();
+    if(r.error){$('#ugcIdeas').innerHTML=`<div class="err">${r.error}</div>`;}
+    else{window.__ugc=r.ideas||[];
+      const dsc=r.productDesc?`<div class="note" style="margin-bottom:12px"><b>AI sees:</b> ${esc(r.productDesc).slice(0,240)}</div>`:'';
+      $('#ugcIdeas').innerHTML=dsc+(window.__ugc.length?window.__ugc.map((i,x)=>`<div class="ideacard"><span class="cat">${esc(i.category||'UGC')}</span><div class="itl">${esc(i.title||'')}</div><div class="hk">🎬 “${esc(i.hook||'')}”</div><div class="cc">${esc(i.concept||'')}</div>${i.cta?`<div class="cc" style="margin-top:4px;color:var(--ok)">→ ${esc(i.cta)}</div>`:''}<button class="btn ghost" style="margin-top:10px" onclick="useUgc(${x})">Use this idea →</button></div>`).join(''):'<div class="err">No ideas returned. Try again.</div>');}
+  }catch(e){$('#ugcIdeas').innerHTML=`<div class="err">${e.message}</div>`;}
+  btn.disabled=false;
+};
+window.useUgc=(x)=>{const i=window.__ugc[x];if(!i)return;window.__ugcPick=i;
+  $('#ugcChosen').innerHTML=`<b>${esc(i.title||'')}</b> · ${esc(i.category||'')}<br>🎬 “${esc(i.hook||'')}”`;
+  $('#ugcMake').hidden=false;$('#ugcMake').scrollIntoView({behavior:'smooth',block:'nearest'});};
+$('#goUgc').onclick=()=>{const i=window.__ugcPick;if(!i){alert('Pick an idea first.');return;}
+  const product=$('#ugcProduct').value.trim()||i.title||'this product';
+  const base={ad:true,product,benefits:[i.concept,i.hook,$('#ugcPoint').value.trim()].filter(Boolean).join(' — '),cta:i.cta||$('#ugcOffer').value.trim()||'Try it today',tone:$('#ugcTone').value,count:1,...fmt()};
+  if(UGCIMG)run('/api/generate',{...base,imageDataUrl:UGCIMG});else run('/api/generate',base);};
+// ---- Social ad (preset over the product-ad pipeline) ----
+$('#goSocial').onclick=()=>{const product=$('#socProduct').value.trim();if(!product){alert('Enter the product.');return;}
+  const preset=$('#socPreset').value;
+  run('/api/generate',{ad:true,product,benefits:$('#socBenefits').value.trim(),cta:$('#socCta').value.trim(),tone:preset+' social ad',count:1,...fmt()});};
+// ---- My Creators (Track B scaffold) ----
+async function loadCreators(){
+  const r=await(await fetch('/api/creators')).json();
+  $('#avatarNote').className='note '+(r.avatarProvider?'':'warn');
+  $('#avatarNote').innerHTML=r.avatarProvider
+    ? `Avatar provider <b>${r.avatarProvider}</b> is connected. Talking-creator rendering can be wired to it next.`
+    : `<b>No talking-avatar API connected.</b> Save creator profiles now; add a <b>fal.ai / HeyGen / D-ID</b> key in Settings to animate them into talking videos later.`;
+  const g=$('#crList');const l=r.creators||[];
+  g.innerHTML=l.length?l.map(c=>`<div class="crcard"><img src="/creators/${encodeURIComponent(c.photo)}"><div class="cn">${esc(c.name)}</div><div class="cx">${esc(c.personality||'')}</div><button onclick="delCreator('${c.id}')">Delete</button></div>`).join(''):'';
+  const sel=$('#ugcCreator');sel.innerHTML='<option value="">Product showcase (voiceover + captions)</option>'+l.map(c=>`<option value="${c.id}">${esc(c.name)}${r.avatarProvider?'':' (needs avatar API)'}</option>`).join('');
+}
+window.delCreator=(id)=>{if(confirm('Delete this creator?'))fetch('/api/creators/'+id,{method:'DELETE'}).then(loadCreators);};
+$('#goCreator').onclick=()=>{const f=$('#crPhoto').files[0];if(!f){alert('Add a clear front-facing photo.');return;}if(f.size>20*1024*1024){alert('Max 20 MB.');return;}
+  const rd=new FileReader();rd.onload=()=>{const b=$('#goCreator');b.disabled=true;fetch('/api/creators',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo:rd.result,name:$('#crName').value.trim()||'My Creator',personality:$('#crPersona').value.trim(),voice:$('#voice').value,language:$('#language').value})}).then(()=>{$('#crPhoto').value='';$('#crName').value='';$('#crPersona').value='';b.disabled=false;loadCreators();});};rd.readAsDataURL(f);};
 $('#goIdeas').onclick=async()=>{$('#goIdeas').disabled=true;$('#ideaList').innerHTML='<div class="muted"><span class="spin"></span> Brainstorming…</div>';try{const r=await(await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(),count:$('#ideaCount').value,language:$('#language').value,genre:$('#genre').value,country:$('#country').value,llmProvider:$('#llmPick').value})})).json();if(r.error)$('#ideaList').innerHTML=`<div class="err">${r.error}</div>`;else{window.__i=r.ideas||[];$('#ideaList').innerHTML=(r.ideas||[]).map((i,x)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="btn ghost" style="margin-top:8px" onclick="useIdea(${x})">Use in Shorts →</button></div>`).join('');loadStats();}}catch(e){$('#ideaList').innerHTML=`<div class="err">${e.message}</div>`;}$('#goIdeas').disabled=false;};
 window.useIdea=(x)=>{const i=window.__i[x];if(!i)return;$('#topic').value=i.title;document.querySelector('[data-nav=shorts]').click();};
 

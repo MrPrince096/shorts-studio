@@ -135,6 +135,27 @@ Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
   return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
 }
 
+// UGC ad ideas from a product/person image + optional context.
+export async function generateAdIdeas({ productDesc = "", product = "", audience = "", sellingPoint = "", offer = "", count = 5, language = "English", llmProvider }) {
+  const ctx = [
+    productDesc && `What the image shows: ${productDesc}`,
+    product && `Product name: ${product}`,
+    audience && `Target audience: ${audience}`,
+    sellingPoint && `Main selling point: ${sellingPoint}`,
+    offer && `Offer/discount: ${offer}`,
+  ].filter(Boolean).join("\n") || "A product the creator wants to advertise.";
+  const prompt = `You are a top-performing UGC (user-generated-content) ad strategist for short vertical video.
+Given this product, invent ${count} DISTINCT UGC ad concepts a creator could film.
+${ctx}
+
+Pick varied angles from: Honest Review, First Impression, Problem → Solution, Testimonial, Unboxing, Product Demo, Before/After, Personal Story, Recommendation, Educational, Comparison, Lifestyle, Reaction, Offer.
+For EACH concept return: "title" (<=8 words), "category" (the angle), "hook" (the spoken first 2-3 seconds, punchy), "concept" (one sentence on how the ad plays out), "audience" (who it's for), "style" (visual/tone), "cta" (short call to action).
+Write hooks and concepts${language && language.toLowerCase() !== "english" ? ` in ${language}` : ""} in a natural, casual creator voice.
+Return ONLY JSON: {"ideas":[{"title":"","category":"","hook":"","concept":"","audience":"","style":"","cta":""}]}`;
+  const data = parseLLMJson(await callLLM(prompt, llmProvider));
+  return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
+}
+
 export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl, ad, product, benefits, cta, tone, productImageDesc, llmProvider }) {
   const nScenes = SCENES_FOR[duration] || 7;
   const nonEnglish = language && language.toLowerCase() !== "english";

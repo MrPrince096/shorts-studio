@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
@@ -583,6 +583,77 @@ app.post("/api/ideas", async (req, res) => {
       error: e.message === "NO_LLM_KEY" ? "Add a Gemini key in Settings to generate ideas." : e.message,
     });
   }
+});
+
+// ---- UGC Ads: image -> product understanding -> 5 ad ideas ----
+app.post("/api/ads/ideas", async (req, res) => {
+  const b = req.body || {};
+  try {
+    let productDesc = "";
+    if (b.imageDataUrl) {
+      const upload = saveUploadFromDataUrl(b.imageDataUrl);
+      if (upload) {
+        try { productDesc = await describeImage({ imageB64: upload.analyzeB64, mime: upload.analyzeMime }); }
+        catch (e) { /* vision optional — fall back to text context */ }
+      }
+    }
+    if (!productDesc && !String(b.product || "").trim())
+      return res.status(400).json({ error: "Upload a product image or type the product name." });
+    const ideas = await generateAdIdeas({
+      productDesc,
+      product: String(b.product || "").trim(),
+      audience: String(b.audience || "").trim(),
+      sellingPoint: String(b.sellingPoint || "").trim(),
+      offer: String(b.offer || "").trim(),
+      count: Math.min(Math.max(parseInt(b.count) || 5, 3), 8),
+      language: resolveLang(b.language || "en").label,
+      llmProvider: b.llmProvider || "",
+    });
+    res.json({ productDesc, ideas });
+  } catch (e) {
+    res.status(String(e.message).startsWith("NO_LLM_KEY") ? 400 : 500).json({
+      error: String(e.message).startsWith("NO_LLM_KEY") ? "Add a Gemini key in Settings to generate ad ideas." : e.message,
+    });
+  }
+});
+
+// ---- Personal AI Creators (Track B scaffold: store profiles; avatar animation needs a provider) ----
+const CREATORS_DIR = join(ROOT, "creators");
+app.use("/creators", express.static(CREATORS_DIR));
+function avatarProvider() {
+  // which talking-avatar / lip-sync backend is configured. None free today.
+  if (getEnvValue("FAL_KEY")) return "fal";
+  if (getEnvValue("HEYGEN_API_KEY")) return "heygen";
+  if (getEnvValue("DID_API_KEY")) return "did";
+  return "";
+}
+app.get("/api/creators", (_req, res) => {
+  const list = existsSync(CREATORS_DIR)
+    ? readdirSync(CREATORS_DIR).filter((f) => f.endsWith(".json")).map((f) => { try { return JSON.parse(readFileSync(join(CREATORS_DIR, f), "utf8")); } catch { return null; } }).filter(Boolean).sort((a, b) => b.mtime - a.mtime)
+    : [];
+  res.json({ creators: list, avatarProvider: avatarProvider() });
+});
+app.post("/api/creators", (req, res) => {
+  const b = req.body || {};
+  const m = String(b.photo || "").match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: "Attach a clear front-facing photo." });
+  if (!existsSync(CREATORS_DIR)) mkdirSync(CREATORS_DIR, { recursive: true });
+  const id = "c" + Date.now().toString(36);
+  const ext = (m[1].split("/")[1] || "jpg").replace("jpeg", "jpg");
+  writeFileSync(join(CREATORS_DIR, id + "." + ext), Buffer.from(m[2], "base64"));
+  const creator = {
+    id, name: String(b.name || "My Creator").slice(0, 60), photo: id + "." + ext,
+    voice: b.voice || "en-US-AriaNeural", language: b.language || "en",
+    personality: String(b.personality || "").slice(0, 200), mtime: Date.now(),
+  };
+  writeFileSync(join(CREATORS_DIR, id + ".json"), JSON.stringify(creator));
+  res.json({ ok: true, creator });
+});
+app.delete("/api/creators/:id", (req, res) => {
+  const id = req.params.id.replace(/[^a-z0-9]/gi, "");
+  const meta = join(CREATORS_DIR, id + ".json");
+  if (existsSync(meta)) { try { const c = JSON.parse(readFileSync(meta, "utf8")); if (c.photo) { const p = join(CREATORS_DIR, c.photo); if (existsSync(p)) unlinkSync(p); } } catch {} unlinkSync(meta); }
+  res.json({ ok: true });
 });
 
 // ---- Series: start / continue / list ----
