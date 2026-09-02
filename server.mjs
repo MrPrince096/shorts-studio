@@ -2,13 +2,20 @@
 // Run: npm start   (opens http://localhost:4321)
 import express from "express";
 import { spawn, execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts, generateIdeas, generateAdIdeas } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
+
+// re-encode any image (HEIC, tiff, cmyk jpg, etc.) into a Chromium-decodable JPEG.
+function toJpeg(srcPath, dstPath) {
+  try { execFileSync("sips", ["-s", "format", "jpeg", srcPath, "--out", dstPath], { stdio: "ignore" }); if (existsSync(dstPath)) return true; } catch {}
+  try { execFileSync("ffmpeg", ["-y", "-i", srcPath, "-frames:v", "1", dstPath], { stdio: "ignore" }); if (existsSync(dstPath)) return true; } catch {}
+  return false;
+}
 
 // decode a base64 data URL, save under public/, return { uploadPath, uploadIsImage, analyzeB64, analyzeMime }
 function saveUploadFromDataUrl(dataUrl) {
@@ -17,16 +24,24 @@ function saveUploadFromDataUrl(dataUrl) {
   const mime = m[1];
   const isVideo = mime.startsWith("video");
   const buf = Buffer.from(m[2], "base64");
-  const ext = isVideo ? "mp4" : (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
-  const uploadPath = join(dirname(fileURLToPath(import.meta.url)), "public", `upload.${ext}`);
-  writeFileSync(uploadPath, buf);
-  let analyzeB64 = buf.toString("base64"), analyzeMime = mime;
+  const pub = join(dirname(fileURLToPath(import.meta.url)), "public");
   if (isVideo) {
-    const fr = join(dirname(fileURLToPath(import.meta.url)), "public", "upload_frame.jpg");
+    const uploadPath = join(pub, "upload.mp4");
+    writeFileSync(uploadPath, buf);
+    const fr = join(pub, "upload_frame.jpg");
     execFileSync("ffmpeg", ["-y", "-ss", "0.5", "-i", uploadPath, "-frames:v", "1", "-q:v", "2", fr], { stdio: "ignore" });
-    analyzeB64 = readFileSync(fr).toString("base64"); analyzeMime = "image/jpeg";
+    return { uploadPath, uploadIsImage: false, analyzeB64: readFileSync(fr).toString("base64"), analyzeMime: "image/jpeg" };
   }
-  return { uploadPath, uploadIsImage: !isVideo, analyzeB64, analyzeMime };
+  // image: write the raw upload, then ALWAYS normalize to a real JPEG so the
+  // renderer (and vision) can decode it — phones often send HEIC as .jpg.
+  const rawExt = (mime.split("/")[1] || "jpg").replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "") || "jpg";
+  const rawPath = join(pub, "upload_raw." + rawExt);
+  writeFileSync(rawPath, buf);
+  const jpgPath = join(pub, "upload.jpg");
+  let ok = toJpeg(rawPath, jpgPath);
+  if (!ok) { try { copyFileSync(rawPath, jpgPath); ok = true; } catch {} } // last resort: hope it was already jpeg
+  const finalPath = existsSync(jpgPath) ? jpgPath : rawPath;
+  return { uploadPath: finalPath, uploadIsImage: true, analyzeB64: readFileSync(finalPath).toString("base64"), analyzeMime: "image/jpeg" };
 }
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
