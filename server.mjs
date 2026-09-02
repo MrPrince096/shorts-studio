@@ -1,13 +1,14 @@
 // Local web app for the Shorts Engine: topic -> AI scripts -> render, or manual scenes.
 // Run: npm start   (opens http://localhost:4321)
 import express from "express";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts, generateIdeas } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
+import { visionScript } from "./scripts/vision.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = join(ROOT, "out");
@@ -15,7 +16,7 @@ const PORT = 4321;
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "80mb" })); // large limit for base64 media uploads
 app.use(express.static(join(ROOT, "web")));
 app.use("/out", express.static(OUT));
 
@@ -308,7 +309,13 @@ app.post("/api/settings", (req, res) => {
 app.get("/api/videos", (_req, res) => {
   const list = readdirSync(OUT)
     .filter((f) => f.endsWith(".mp4"))
-    .map((f) => { const s = statSync(join(OUT, f)); return { file: f, size: s.size, mtime: s.mtimeMs }; })
+    .map((f) => {
+      const s = statSync(join(OUT, f));
+      let meta = {};
+      const metaPath = join(OUT, f.replace(/\.mp4$/, ".json"));
+      if (existsSync(metaPath)) { try { meta = JSON.parse(readFileSync(metaPath, "utf8")); } catch {} }
+      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "" };
+    })
     .sort((a, b) => b.mtime - a.mtime);
   res.json(list);
 });
@@ -392,6 +399,53 @@ app.post("/api/render", (req, res) => {
   const job = newJob(1);
   res.json({ jobId: job.id, dims: `${width}x${height}` });
   runAll([config], job);
+});
+
+// ---- From Media: upload image/video -> analyze -> render a video about it ----
+app.post("/api/media", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const m = String(b.dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: "Attach an image or video first." });
+  const mime = m[1];
+  const isVideo = mime.startsWith("video");
+  const buf = Buffer.from(m[2], "base64");
+  const ext = isVideo ? "mp4" : (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
+  const uploadPath = join(ROOT, "public", `upload.${ext}`);
+  writeFileSync(uploadPath, buf);
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
+  const nScenes = { short: 5, medium: 7, long: 9 }[b.duration || "short"] || 5;
+
+  busy = true;
+  const job = newJob(1);
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      // get an image to analyze (a frame for video)
+      let analyzeB64, analyzeMime;
+      if (isVideo) {
+        const frame = join(ROOT, "public", "upload_frame.jpg");
+        execFileSync("ffmpeg", ["-y", "-ss", "0.5", "-i", uploadPath, "-frames:v", "1", "-q:v", "2", frame], { stdio: "ignore" });
+        analyzeB64 = readFileSync(frame).toString("base64"); analyzeMime = "image/jpeg";
+      } else { analyzeB64 = buf.toString("base64"); analyzeMime = mime; }
+
+      pushLog(job, "🔍 Analyzing your media with AI vision…");
+      const vs = await visionScript({ imageB64: analyzeB64, mime: analyzeMime, nScenes, language: lang.label });
+      pushLog(job, `✅ "${vs.title}" — rendering from your ${isVideo ? "video" : "image"}…`);
+      const config = {
+        title: vs.title, description: vs.description, tags: vs.tags,
+        voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%", music: "",
+        width, height, source: "upload", uploadFile: uploadPath, uploadIsImage: !isVideo,
+        font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl, imageStyle: "",
+        scenes: vs.scenes,
+      };
+      await runAll([config], job);
+    } catch (e) {
+      pushLog(job, "❌ " + (e.message === "NO_GEMINI_KEY" ? "Add a Gemini key in Settings — needed to analyze media." : e.message));
+      job.status = "error"; busy = false;
+    }
+  })();
 });
 
 // ---- Ideas (VidIQ-style: niche -> viral ideas + titles + tags) ----

@@ -59,6 +59,11 @@
   .idea .it { font-weight:700; font-size:14px; }
   .idea .ih { color:var(--muted); font-size:13px; margin:3px 0; }
   .tag { display:inline-block; background:#0a0c11; border:1px solid var(--line); color:#a9d3ff; border-radius:6px; padding:1px 7px; font-size:11px; margin:2px 3px 0 0; }
+  .meta { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
+  .mrow { margin-bottom:8px; }
+  .mrow b { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+  .mrow .cp { background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:6px; cursor:pointer; font-size:12px; padding:1px 6px; margin-left:6px; }
+  .mv { font-size:13px; margin-top:3px; white-space:pre-wrap; word-break:break-word; }
   .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center; }
   .overlay.open { display:flex; }
   .modal { width:min(520px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px; max-height:88vh; overflow:auto; }
@@ -102,6 +107,7 @@
       <button class="tab active" data-tab="shorts">🎬 Shorts</button>
       <button class="tab" data-tab="series">📖 Series</button>
       <button class="tab" data-tab="ads">📣 Ads</button>
+      <button class="tab" data-tab="media">🖼️ From Media</button>
       <button class="tab" data-tab="ideas">💡 Ideas</button>
     </div>
 
@@ -170,6 +176,16 @@
       </div>
       <div class="btnrow"><button class="action primary big" id="goAds">📣 Make Ad</button></div>
       <div class="hint">The AI writes a hook → problem → product → benefits → call-to-action ad, then renders it with your chosen voice & visuals.</div>
+    </div>
+
+    <!-- FROM MEDIA -->
+    <div class="tabpanel card" id="tab-media" hidden>
+      <h2>🖼️ From Media — turn a photo or clip into a video</h2>
+      <label>Your image or video</label>
+      <input id="mediaFile" type="file" accept="image/*,video/*" />
+      <div class="row"><div><label>Length</label><select id="mediaDuration"></select></div></div>
+      <div class="btnrow"><button class="action primary big" id="goMedia">🖼️ Make Video</button></div>
+      <div class="hint">The AI looks at your media, writes a short video about its subject, and builds the video using it as the visual — with your chosen voice, language & format. Needs a Gemini key. (Max ~70&nbsp;MB; use short clips.)</div>
     </div>
 
     <!-- IDEAS -->
@@ -280,7 +296,7 @@ async function loadConfig(){
   $('#language').onchange = () => populateVoices($('#language').value);
   c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
   c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
-  c.durations.forEach(d => { $('#duration').appendChild(opt(d.id, d.label)); $('#adDuration').appendChild(opt(d.id, d.label)); });
+  c.durations.forEach(d => { $('#duration').appendChild(opt(d.id, d.label)); $('#adDuration').appendChild(opt(d.id, d.label)); $('#mediaDuration').appendChild(opt(d.id, d.label)); });
   $('#genre').appendChild(opt('', '— any / none —'));
   (c.genres||[]).forEach(g => $('#genre').appendChild(opt(g.id, g.label)));
   $('#country').appendChild(opt('', '— any / none —'));
@@ -300,7 +316,7 @@ async function loadConfig(){
     $('#falModelBox').style.display = s==='fal' ? 'block':'none';
     $('#styleBox').style.display = ['image','hf','local','fal-image','fal'].includes(s) ? 'block':'none';
   };
-  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#adDuration').value='short'; $('#source').value='pexels';
+  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#adDuration').value='short'; $('#mediaDuration').value='short'; $('#source').value='pexels';
 }
 
 // ---- settings ----
@@ -368,13 +384,21 @@ async function refreshGallery(){
   g.innerHTML=''; list.forEach(v => {
     const mb=(v.size/1048576).toFixed(1);
     const el=document.createElement('div'); el.className='vid';
-    el.innerHTML=`<div class="t">${v.file.replace('.mp4','')}</div><div class="m">${mb} MB</div><video controls preload="none" src="/out/${encodeURIComponent(v.file)}"></video><div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div>`;
+    const esc = (s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const meta = (v.title||v.description||v.hashtags) ? `
+      <div class="meta">
+        ${v.title?`<div class="mrow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}
+        ${v.description?`<div class="mrow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}
+        ${v.hashtags?`<div class="mrow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}
+      </div>` : '';
+    el.innerHTML=`<div class="t">${v.file.replace('.mp4','')}</div><div class="m">${mb} MB</div><video controls preload="none" src="/out/${encodeURIComponent(v.file)}"></video>${meta}<div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div>`;
     g.appendChild(el);
   });
+  document.querySelectorAll('.cp').forEach(b=> b.onclick=()=>{ navigator.clipboard.writeText(b.dataset.c); const o=b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=o,1000); });
 }
 
 const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value });
-const ACT = ['#goAI','#goManual','#goSeries','#goAds'];
+const ACT = ['#goAI','#goManual','#goSeries','#goAds','#goMedia'];
 let polling=null;
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
 function endProgress(){ ACT.forEach(s=>$(s).disabled=false); }
@@ -435,6 +459,16 @@ $('#goAds').onclick = () => {
   const product=$('#adProduct').value.trim();
   if(!product){ alert('Enter the product or service to advertise.'); return; }
   run('/api/generate', { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, duration:$('#adDuration').value, ...fmt() });
+};
+
+// ---- from media ----
+$('#goMedia').onclick = () => {
+  const f = $('#mediaFile').files[0];
+  if(!f){ alert('Choose an image or video file first.'); return; }
+  if(f.size > 70*1024*1024){ alert('File too large (max ~70 MB). Use a shorter clip.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => run('/api/media', { dataUrl: reader.result, duration:$('#mediaDuration').value, ...fmt() });
+  reader.readAsDataURL(f);
 };
 
 // ---- ideas ----

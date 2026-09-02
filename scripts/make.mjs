@@ -1,6 +1,6 @@
 // One-shot: build (TTS + Pexels + timings) then render to a title-named MP4 in out/
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -29,4 +29,19 @@ execFileSync("npx", ["remotion", "render", "Short", outPath, "--props=public/pro
   stdio: "inherit",
   cwd: ROOT,
 });
+// sidecar metadata for easy copy-paste when uploading to YouTube
+const tags = Array.isArray(config.tags) ? config.tags : [];
+writeFileSync(
+  join(ROOT, `out/${name}.json`),
+  JSON.stringify(
+    {
+      title: config.title || "",
+      description: config.description || "",
+      tags,
+      hashtags: tags.map((t) => "#" + String(t).replace(/[^\p{L}\p{N}_]/gu, "")).join(" "),
+    },
+    null,
+    2
+  )
+);
 console.log(`\n✅ Saved: ${join(ROOT, outPath)}`);

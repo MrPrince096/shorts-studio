@@ -1,6 +1,6 @@
 // Build step: edge-tts voiceover -> Pexels stock download -> caption timings -> props.json
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -264,6 +264,13 @@ async function pollImage(scene, outFile) {
   }
 }
 
+// use the user's uploaded image/video as the visual for every scene
+async function uploadMedia(_scene, outFile) {
+  if (!config.uploadFile || !existsSync(config.uploadFile)) throw new Error("uploaded media file missing");
+  copyFileSync(config.uploadFile, outFile);
+  return { w: OUT_W, h: OUT_H };
+}
+
 const src = config.source || "pexels";
 const GEN = {
   pexels: (s, f) => pexelsVideo(s.query, f),
@@ -272,10 +279,11 @@ const GEN = {
   local: localImage,
   "fal-image": falImage,
   fal: falVideo,
+  upload: uploadMedia,
 };
-const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video" };
+const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video", upload: "🖼️ Your media" };
 const genFn = GEN[src] || GEN.pexels;
-const isImageSrc = src === "image" || src === "hf" || src === "local" || src === "fal-image";
+const isImageSrc = src === "image" || src === "hf" || src === "local" || src === "fal-image" || (src === "upload" && config.uploadIsImage);
 // key checks
 if ((src === "fal" || src === "fal-image") && !process.env.FAL_KEY) {
   console.error("❌ This source needs a fal.ai key (FAL_KEY). Add it in Settings.");
