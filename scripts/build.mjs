@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { generateTalkingVideo, avatarProviderName } from "./avatar.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -325,6 +326,23 @@ for (let i = 0; i < config.scenes.length; i++) {
   sceneOut.push({ video: file, start: sceneRanges[i].start, end: sceneRanges[i].end });
 }
 
+// --- 5b. Talking avatar: bring the creator photo to life (photo + voiceover -> talking clip) ---
+let talkingVideo = "";
+if (config.talkingAvatar && config.uploadFile && existsSync(config.uploadFile) && avatarProviderName()) {
+  try {
+    const ok = await generateTalkingVideo({
+      photoPath: config.uploadFile, audioPath, scriptText: fullText,
+      voice, width: config.width || 1080, height: config.height || 1920,
+      outFile: join(PUBLIC, "talking.mp4"), log: (m) => console.log(m),
+    });
+    if (ok) { talkingVideo = "talking.mp4"; console.log("✅ Talking creator generated."); }
+  } catch (e) {
+    console.log("⚠️  Talking avatar failed (" + e.message + ") — falling back to the still photo.");
+  }
+} else if (config.talkingAvatar && !avatarProviderName()) {
+  console.log("⚠️  Talking avatar requested but no avatar API key set — using the still photo. Add a fal.ai / D-ID / HeyGen key in Settings.");
+}
+
 // --- 6. Write props.json ---
 const props = {
   fps: FPS,
@@ -337,6 +355,7 @@ const props = {
   watermarkImage: config.watermarkImage || "",
   captionPos: config.captionPos || "bottom",
   motion: config.motion || "in",
+  talkingVideo,
   durationInSeconds: durationSec,
   audio: "voiceover.mp3",
   music: config.music || "",

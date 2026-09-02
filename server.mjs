@@ -414,7 +414,8 @@ app.get("/api/settings", (_req, res) => {
     ollamaUrl: getEnvValue("OLLAMA_URL") || "http://localhost:11434",
     ollamaModel: getEnvValue("OLLAMA_MODEL") || "llama3.1",
     localImageUrl: getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate",
-    keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN") },
+    avatarProvider: avatarProvider(),
+    keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY") },
   });
 });
 app.post("/api/settings", (req, res) => {
@@ -432,6 +433,8 @@ app.post("/api/settings", (req, res) => {
   setIf("ollamaModel", "OLLAMA_MODEL", "Ollama model");
   setIf("fal", "FAL_KEY", "fal.ai key");
   setIf("hf", "HF_TOKEN", "Hugging Face token");
+  setIf("did", "DID_API_KEY", "D-ID key");
+  setIf("heygen", "HEYGEN_API_KEY", "HeyGen key");
   setIf("localImageUrl", "LOCAL_IMAGE_URL", "Local image URL");
   res.json({ ok: true, saved });
 });
@@ -523,6 +526,7 @@ app.post("/api/generate", async (req, res) => {
         c.captionPos = b.captionPos || "bottom";
         c.motion = b.motion || "in";
         c.watermarkImage = b.watermarkImage ? watermarkFile() : "";
+        c.talkingAvatar = !!b.talkingAvatar; // bring the creator photo to life (needs an avatar API key)
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -636,10 +640,11 @@ app.post("/api/ads/ideas", async (req, res) => {
 const CREATORS_DIR = join(ROOT, "creators");
 app.use("/creators", express.static(CREATORS_DIR));
 function avatarProvider() {
-  // which talking-avatar / lip-sync backend is configured. None free today.
+  // which talking-avatar backend is configured (reads the .env file, like the rest
+  // of the server). Providers mirror scripts/avatar.mjs. None are free.
   if (getEnvValue("FAL_KEY")) return "fal";
-  if (getEnvValue("HEYGEN_API_KEY")) return "heygen";
   if (getEnvValue("DID_API_KEY")) return "did";
+  if (getEnvValue("HEYGEN_API_KEY")) return "heygen";
   return "";
 }
 app.get("/api/creators", (_req, res) => {

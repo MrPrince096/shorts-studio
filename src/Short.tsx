@@ -27,6 +27,7 @@ type Props = {
   watermarkImage?: string;
   captionPos?: "top" | "middle" | "bottom";
   motion?: "in" | "out" | "subtle" | "none" | "random";
+  talkingVideo?: string;
 };
 
 const MOTION_RANGE: Record<string, [number, number]> = {
@@ -123,7 +124,7 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean; captionPos
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in" }) => {
+export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "" }) => {
   const { fps, width, height } = useVideoConfig();
   const mOpts = ["in", "out", "subtle"];
   const sceneMotion = (i: number) => (motion === "random" ? mOpts[i % mOpts.length] : motion);
@@ -147,15 +148,21 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
-      {scenes.map((s, i) => {
-        const from = Math.floor(s.start * fps);
-        const durationInFrames = Math.max(1, Math.ceil((s.end - s.start) * fps));
-        return (
-          <Sequence key={i} from={from} durationInFrames={durationInFrames}>
-            <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} />
-          </Sequence>
-        );
-      })}
+      {talkingVideo ? (
+        <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "black" }}>
+          <OffthreadVideo src={staticFile(talkingVideo)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </AbsoluteFill>
+      ) : (
+        scenes.map((s, i) => {
+          const from = Math.floor(s.start * fps);
+          const durationInFrames = Math.max(1, Math.ceil((s.end - s.start) * fps));
+          return (
+            <Sequence key={i} from={from} durationInFrames={durationInFrames}>
+              <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} />
+            </Sequence>
+          );
+        })
+      )}
 
       {/* dark gradient for caption legibility */}
       <AbsoluteFill
@@ -200,7 +207,8 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
         </div>
       ) : null}
 
-      {audio ? <Audio src={staticFile(audio)} /> : null}
+      {/* talking clip carries the voice itself — skip the separate track to avoid an echo */}
+      {audio && !talkingVideo ? <Audio src={staticFile(audio)} /> : null}
       {music ? <Audio src={staticFile(music)} volume={0.18} /> : null}
     </AbsoluteFill>
   );

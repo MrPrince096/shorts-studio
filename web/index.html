@@ -122,6 +122,8 @@
   .note{background:rgba(79,140,255,.1);border:1px solid rgba(79,140,255,.3);border-radius:11px;padding:11px 13px;font-size:12.5px;color:#bcd3ff;margin-bottom:14px;line-height:1.45}
   .note b{color:#fff}
   .note.warn{background:rgba(255,210,63,.1);border-color:rgba(255,210,63,.3);color:#ffe9a6}
+  .chk{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--text);cursor:pointer;line-height:1.4}
+  .chk input{width:auto;margin-top:2px;accent-color:var(--accent);flex:0 0 auto}
   .ideacard{border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:10px;background:var(--panel2)}
   .ideacard .cat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;background:rgba(124,92,255,.18);color:#b9a8ff;border:1px solid rgba(124,92,255,.35);padding:2px 8px;border-radius:20px;margin-bottom:7px}
   .ideacard .itl{font-weight:700;font-size:14.5px}
@@ -254,6 +256,7 @@
               <hr />
               <div class="note" id="ugcChosen"></div>
               <div class="row"><div><label>Creator</label><select id="ugcCreator"><option value="">Product showcase (voiceover + captions)</option></select></div><div><label>Tone</label><select id="ugcTone"></select></div></div>
+              <label class="chk" style="margin-top:12px"><input type="checkbox" id="ugcTalking" /> <span><b>Bring creator to life</b> — make the photo talk & move <span class="muted" id="ugcTalkNote"></span></span></label>
               <button class="btn grad big" id="goUgc" style="width:100%;margin-top:14px"><span data-icon="mega"></span>Generate UGC ad</button>
             </div>
           </div>
@@ -442,6 +445,18 @@
         <input id="localUrl" placeholder="http://localhost:7801/generate" />
       </div>
 
+      <div class="setsec">
+        <div class="sechead"><span data-icon="mega"></span> Talking avatars <span class="badge opt">optional · paid</span></div>
+        <p class="muted" style="font-size:12px;margin:0 0 6px">Make a creator photo talk & move in UGC ads. Any ONE of these enables it — fal.ai reuses the key above. None are free.</p>
+        <label>D-ID API key <span class="muted">— talking-photo, free trial credits</span></label>
+        <div class="field"><input id="didKey" type="password" placeholder="paste Basic token…" /><span class="fstat" id="didState"></span></div>
+        <a class="getlink" href="https://studio.d-id.com/account-settings" target="_blank">Get a D-ID key →</a>
+        <label style="margin-top:16px">HeyGen API key <span class="muted">— most realistic</span></label>
+        <div class="field"><input id="heygenKey" type="password" placeholder="paste key…" /><span class="fstat" id="heygenState"></span></div>
+        <a class="getlink" href="https://app.heygen.com/settings?nav=API" target="_blank">Get a HeyGen key →</a>
+        <div id="avatarStatus" class="note" style="margin:14px 0 0"></div>
+      </div>
+
       <button class="btn grad big" id="saveSettings" style="width:100%">Save settings</button>
       <div id="saveMsg" style="text-align:center;font-size:13px;margin-top:10px"></div>
     </div>
@@ -539,7 +554,17 @@ async function loadSettings(){
   const s=await(await fetch('/api/settings')).json();
   $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';
   setStat($('#pexelsState'),s.keys.pexels);setStat($('#geminiState'),s.keys.gemini);setStat($('#openaiState'),s.keys.openai);setStat($('#hfState'),s.keys.hf);setStat($('#falState'),s.keys.fal);
+  setStat($('#didState'),s.keys.did);setStat($('#heygenState'),s.keys.heygen);
+  const ap=s.avatarProvider;
+  $('#avatarStatus').className='note '+(ap?'':'warn');
+  $('#avatarStatus').innerHTML=ap?`✅ Talking avatars ready via <b>${ap}</b>. Turn on “Bring creator to life” in a UGC ad.`:`No talking-avatar key yet — UGC creators stay as still photos until you add one above.`;
+  window.__avatar=ap||'';applyAvatarUI();
   toggleLlm();
+}
+function applyAvatarUI(){
+  const ap=window.__avatar||'';const c=$('#ugcTalking');if(!c)return;
+  c.disabled=!ap; if(!ap)c.checked=false;
+  $('#ugcTalkNote').textContent=ap?`(via ${ap})`:'(needs a fal.ai / D-ID / HeyGen key in Settings)';
 }
 $('#llmProvider').onchange=toggleLlm;
 const openS=()=>{loadSettings();$('#settingsOverlay').classList.add('open');};
@@ -547,10 +572,10 @@ $('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
 $('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
 $('#saveSettings').onclick=async()=>{
-  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),localImageUrl:$('#localUrl').value.trim()};
+  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim()};
   const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML=r.saved&&r.saved.length?'<span class="ok">Saved ✓</span>':'Nothing to save';
-  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey'].forEach(id=>$('#'+id).value='');loadSettings();
+  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey'].forEach(id=>$('#'+id).value='');loadSettings();
 };
 
 const IDEAS=['foods that boost your brain','habits of successful people','why you procrastinate','how sleep repairs your body','facts about the human heart','how to build discipline','morning routines that change your life','foods that fight inflammation'];
@@ -641,7 +666,9 @@ window.useUgc=(x)=>{const i=window.__ugc[x];if(!i)return;window.__ugcPick=i;
   $('#ugcMake').hidden=false;$('#ugcMake').scrollIntoView({behavior:'smooth',block:'nearest'});};
 $('#goUgc').onclick=()=>{const i=window.__ugcPick;if(!i){alert('Pick an idea first.');return;}
   const product=$('#ugcProduct').value.trim()||i.title||'this product';
-  const base={ad:true,product,benefits:[i.concept,i.hook,$('#ugcPoint').value.trim()].filter(Boolean).join(' — '),cta:i.cta||$('#ugcOffer').value.trim()||'Try it today',tone:$('#ugcTone').value,count:1,...fmt()};
+  const talk=$('#ugcTalking').checked&&!$('#ugcTalking').disabled;
+  if(talk&&!UGCIMG){alert('Talking avatar needs the uploaded photo — add an image first.');return;}
+  const base={ad:true,product,benefits:[i.concept,i.hook,$('#ugcPoint').value.trim()].filter(Boolean).join(' — '),cta:i.cta||$('#ugcOffer').value.trim()||'Try it today',tone:$('#ugcTone').value,talkingAvatar:talk,count:1,...fmt()};
   if(UGCIMG)run('/api/generate',{...base,imageDataUrl:UGCIMG});else run('/api/generate',base);};
 // ---- Social ad (preset over the product-ad pipeline) ----
 $('#goSocial').onclick=()=>{const product=$('#socProduct').value.trim();if(!product){alert('Enter the product.');return;}
@@ -700,7 +727,7 @@ async function showAssets(){
 window.delAsset=(f)=>{if(confirm('Delete this asset?'))fetch('/api/assets/'+f,{method:'DELETE'}).then(()=>showAssets());};
 $('#assetUp').onchange=()=>{const f=$('#assetUp').files[0];if(!f)return;if(f.size>20*1024*1024){alert('Max 20 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{$('#assetUp').value='';showAssets();});rd.readAsDataURL(f);};
 
-injectIcons();loadConfig();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
+injectIcons();loadConfig();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
 document.querySelector('[data-nav=dashboard]').click();
 </script>
 </body>

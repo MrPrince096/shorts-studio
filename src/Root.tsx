@@ -16,6 +16,7 @@ const fallback = {
   watermarkImage: "",
   captionPos: "bottom",
   motion: "in",
+  talkingVideo: "",
   scenes: [],
   words: [],
 };
