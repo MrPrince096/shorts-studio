@@ -328,6 +328,7 @@ for (let i = 0; i < config.scenes.length; i++) {
 
 // --- 5b. Talking avatar: bring the creator photo to life (photo + voiceover -> talking clip) ---
 let talkingVideo = "";
+let talkingSeconds = 0;
 if (config.talkingAvatar && config.uploadFile && existsSync(config.uploadFile) && avatarProviderName()) {
   try {
     const ok = await generateTalkingVideo({
@@ -335,7 +336,16 @@ if (config.talkingAvatar && config.uploadFile && existsSync(config.uploadFile) &
       voice, width: config.width || 1080, height: config.height || 1920,
       outFile: join(PUBLIC, "talking.mp4"), log: (m) => console.log(m),
     });
-    if (ok) { talkingVideo = "talking.mp4"; console.log("✅ Talking creator generated."); }
+    if (ok) {
+      talkingVideo = "talking.mp4";
+      // the talking clip has its own length (esp. D-ID/HeyGen TTS) — match the
+      // composition to it so the video doesn't freeze on the last frame or get cut.
+      try {
+        const d = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", join(PUBLIC, "talking.mp4")]).toString().trim());
+        if (d > 0.5) { talkingSeconds = d; }
+      } catch {}
+      console.log("✅ Talking creator generated.");
+    }
   } catch (e) {
     console.log("⚠️  Talking avatar failed (" + e.message + ") — falling back to the still photo.");
   }
@@ -356,7 +366,7 @@ const props = {
   captionPos: config.captionPos || "bottom",
   motion: config.motion || "in",
   talkingVideo,
-  durationInSeconds: durationSec,
+  durationInSeconds: talkingSeconds || durationSec,
   audio: "voiceover.mp3",
   music: config.music || "",
   title: config.title || "",

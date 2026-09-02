@@ -66,13 +66,17 @@ async function falTalking({ photoPath, audioPath, outFile, log }) {
 
 // ---------------- D-ID (talking-photo; Microsoft TTS from the script text) ----------------
 async function didTalking({ photoPath, scriptText, voice, outFile, log }) {
-  const key = env("DID_API_KEY"); // D-ID key is the Basic token (base64 of user:pass)
-  const auth = { Authorization: `Basic ${key}`, "Content-Type": "application/json" };
+  const raw = env("DID_API_KEY");
+  // D-ID uses HTTP Basic. Dashboard keys come as raw "email:api_key" (needs base64)
+  // OR as an already-encoded Basic token. Normalise both.
+  const token = raw.includes(":") ? Buffer.from(raw).toString("base64") : raw;
+  const basic = `Basic ${token}`;
+  const auth = { Authorization: basic, "Content-Type": "application/json" };
   log("🎭 D-ID — uploading photo & generating talking video…");
   // 1) upload the source image -> hosted url
   const form = new FormData();
   form.append("image", new Blob([readFileSync(photoPath)], { type: mimeFor(photoPath) }), "creator.jpg");
-  const up = await fetch("https://api.d-id.com/images", { method: "POST", headers: { Authorization: `Basic ${key}` }, body: form });
+  const up = await fetch("https://api.d-id.com/images", { method: "POST", headers: { Authorization: basic }, body: form });
   const upj = await up.json();
   if (!up.ok || !upj.url) throw new Error(`D-ID upload ${up.status}: ${JSON.stringify(upj).slice(0, 200)}`);
   // 2) create the talk (edge-tts voices ARE Microsoft neural voices -> same voice)
@@ -85,7 +89,7 @@ async function didTalking({ photoPath, scriptText, voice, outFile, log }) {
   // 3) poll until done
   for (let i = 0; i < 150; i++) {
     await sleep(4000);
-    const st = await (await fetch(`https://api.d-id.com/talks/${cj.id}`, { headers: { Authorization: `Basic ${key}` } })).json();
+    const st = await (await fetch(`https://api.d-id.com/talks/${cj.id}`, { headers: { Authorization: basic } })).json();
     if (st.status === "done" && st.result_url) { await download(st.result_url, outFile); return true; }
     if (st.status === "error" || st.status === "rejected") throw new Error("D-ID job failed: " + (st.error?.description || st.status));
     if (i % 5 === 0) log(`   …${st.status || "processing"}`);
