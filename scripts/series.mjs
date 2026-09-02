@@ -57,7 +57,7 @@ Return ONLY valid JSON: {"title":"","recap":"","tags":["",""],"scenes":[{"text":
     voice: series.voice, rate: series.rate || "0%", music: "",
     width: series.width, height: series.height,
     source: series.source || "pexels", videoModel: series.videoModel || "",
-    imageStyle: series.imageStyle || "",
+    imageStyle: series.imageStyle || "", watermark: series.watermark || "",
     font: series.font || "Arial Black", fontCss: series.fontCss || "", rtl: !!series.rtl,
     scenes,
   };

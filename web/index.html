@@ -11,7 +11,10 @@
     --grad:linear-gradient(135deg,#7c5cff,#4f8cff); --ok:#39d98a; --err:#ff5c6c; --gold:#ffd23f;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;background:radial-gradient(1200px 700px at 80% -10%,rgba(124,92,255,.10),transparent 60%),var(--bg);color:var(--text);font-size:14.5px;-webkit-font-smoothing:antialiased}
+  input,select,textarea{transition:border-color .12s}
+  .btn{transition:transform .1s,box-shadow .12s}
+  .btn.grad:hover:not(:disabled){transform:translateY(-1px)}
   a{color:var(--accent2);text-decoration:none}
   .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
   /* sidebar */
@@ -54,9 +57,23 @@
   @media(max-width:1050px){.workspace{grid-template-columns:1fr}}
   @media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap;overflow:auto}.sidefill,.plan{display:none}}
   .col{display:flex;flex-direction:column;gap:20px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 1px 0 rgba(255,255,255,.02),0 10px 30px rgba(0,0,0,.28)}
   .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 4px;display:flex;align-items:center;gap:8px}
   .card .cardsub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .card h2 svg{width:16px;height:16px;color:var(--accent)}
+  .card h2 span[data-icon]{display:inline-flex;align-items:center}
+  /* My Videos grid */
+  .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+  .vcard{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel2);transition:transform .12s,border-color .12s}
+  .vcard:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .vcard .thumb{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000;display:block;cursor:pointer}
+  .vcard .vinfo{padding:10px 11px 11px}
+  .vcard .vt{font-weight:600;font-size:12.5px;line-height:1.25;max-height:2.4em;overflow:hidden}
+  .vcard .vm{color:var(--muted);font-size:11px;margin-top:3px}
+  .vcard .vacts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .vcard .vacts a,.vcard .vacts button{font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer;text-decoration:none}
+  .vcard .vacts button:hover,.vcard .vacts a:hover{border-color:var(--accent)}
+  .empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px}
   label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px}
   input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
@@ -130,9 +147,11 @@
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
     <div class="navlabel">Library</div>
     <div class="nav" data-nav="library"><span class="ic" data-icon="video"></span> My Videos</div>
-    <div class="nav" id="navSettings"><span class="ic" data-icon="gear"></span> Settings</div>
+    <div class="nav" data-nav="projects"><span class="ic" data-icon="folder"></span> Projects</div>
+    <div class="nav" data-nav="drafts"><span class="ic" data-icon="file"></span> Drafts</div>
+    <div class="nav" data-nav="assets"><span class="ic" data-icon="image"></span> Assets</div>
     <div class="sidefill"></div>
-    <div class="plan"><div class="t"><span class="ic" data-icon="spark" style="color:var(--gold)"></span> Pro Plan <span class="b">Active</span></div><div class="m">Unlimited local renders · your keys</div></div>
+    <div class="nav" id="navSettings"><span class="ic" data-icon="gear"></span> Settings</div>
   </aside>
 
   <main class="main">
@@ -158,7 +177,7 @@
       <div class="col">
         <!-- SHORTS -->
         <div class="card tabpanel" id="tab-shorts">
-          <h2>✨ Create Short</h2>
+          <h2><span data-icon="spark"></span> Create Short</h2>
           <div class="cardsub">AI-powered short video in minutes</div>
           <label>Topic or idea <span class="muted">(optional with a genre/country)</span></label>
           <div class="withbtn"><input id="topic" class="big" placeholder="e.g. 5 morning habits for success" /><button class="btn ghost" id="surprise" title="Random">🎲</button></div>
@@ -176,7 +195,7 @@
         </div>
         <!-- SERIES -->
         <div class="card tabpanel" id="tab-series" hidden>
-          <h2>📖 Storyteller Series</h2>
+          <h2><span data-icon="book"></span> Storyteller Series</h2>
           <div class="cardsub">One story → connected, resumable parts</div>
           <label>Story / topic</label>
           <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana" />
@@ -186,7 +205,7 @@
         </div>
         <!-- ADS -->
         <div class="card tabpanel" id="tab-ads" hidden>
-          <h2>📣 Advertisement</h2>
+          <h2><span data-icon="mega"></span> Advertisement</h2>
           <div class="cardsub">Promote a product or service</div>
           <label>Product / service</label>
           <input id="adProduct" class="big" placeholder="FreshGlow vitamin C serum" />
@@ -199,7 +218,7 @@
         </div>
         <!-- IDEAS -->
         <div class="card tabpanel" id="tab-ideas" hidden>
-          <h2>💡 Idea Finder</h2>
+          <h2><span data-icon="bulb"></span> Idea Finder</h2>
           <div class="cardsub">Viral ideas, titles & tags (VidIQ-style)</div>
           <label>Your niche <span class="muted">(optional)</span></label>
           <input id="ideaNiche" class="big" placeholder="fitness · Indian mythology · finance" />
@@ -210,7 +229,7 @@
 
         <!-- QUICK SETTINGS -->
         <div class="card">
-          <h2>⚡ Quick settings <span class="muted" style="text-transform:none;letter-spacing:0">· applied to every tab</span></h2>
+          <h2><span data-icon="zap"></span> Quick settings <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
           <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
           <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
           <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
@@ -218,13 +237,15 @@
           <div class="row"><div><label>Visual source 🎥</label><select id="source"></select></div><div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div><div id="falModelBox" style="display:none"><label>Video model</label><select id="videoModel"></select></div></div>
           <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
           <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
+          <label>Watermark <span class="muted">— optional, shown on the video</span></label>
+          <input id="watermark" placeholder="@yourchannel" />
         </div>
       </div>
 
       <div class="col">
         <!-- OUTPUT PREVIEW -->
         <div class="card">
-          <h2>▶️ Output preview</h2>
+          <h2><span data-icon="play"></span> Output preview</h2>
           <div id="previewBox"><div class="previewempty">Your rendered video will appear here</div></div>
           <div id="status" class="status" style="margin-top:10px"></div>
           <div id="log" hidden></div>
@@ -232,12 +253,12 @@
         </div>
         <!-- RECENT -->
         <div class="card">
-          <h2>🗂️ Recent projects</h2>
+          <h2><span data-icon="folder"></span> Recent projects</h2>
           <div id="recentList"><div class="muted" style="font-size:12px">No projects yet.</div></div>
         </div>
         <!-- STATS -->
         <div class="card">
-          <h2>📊 Stats</h2>
+          <h2><span data-icon="chart"></span> Stats</h2>
           <div class="stats">
             <div class="stat"><div class="n" id="statVideos">0</div><div class="l">Videos created</div></div>
             <div class="stat"><div class="n" id="statSeries">0</div><div class="l">Series parts</div></div>
@@ -250,9 +271,16 @@
 
     <!-- LIBRARY (My Videos) -->
     <div class="gal" id="library">
-      <div class="card"><h2>🎞️ My Videos</h2><div id="gallery"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
+      <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2><div id="gallery" class="vgrid"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
     </div>
   </main>
+</div>
+
+<div class="overlay" id="vidOverlay">
+  <div class="modal" style="width:min(400px,94vw)">
+    <div class="mhead" style="padding:14px 18px"><h2 id="vidTitle" style="font-size:15px">Video</h2><div class="sp"></div><button class="close" id="vidClose">×</button></div>
+    <div class="mbody" style="padding:16px"><div id="vidPlay"></div><div id="vidMeta"></div></div>
+  </div>
 </div>
 
 <div class="overlay" id="settingsOverlay">
@@ -324,7 +352,13 @@ const ICONS={
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   film:'<rect width="20" height="20" x="2" y="2" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>',
-  spark:'<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>',
+  spark:'<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/>',
+  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  folder:'<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>',
+  chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+  image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  file:'<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/>',
+  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -338,8 +372,12 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.t
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
-  if(v==='library'){ $('#workspace').style.display='none'; $('#library').classList.add('show'); refreshGallery(); }
-  else switchTab(v);
+  if(['library','projects','drafts','assets'].includes(v)){
+    $('#workspace').style.display='none'; $('#library').classList.add('show');
+    if(v==='drafts'){$('#libTitle').textContent='Drafts';$('#gallery').className='';$('#gallery').innerHTML='<div class="empty">📝 Drafts coming soon — save scripts here before rendering.</div>';}
+    else if(v==='assets'){$('#libTitle').textContent='Assets';$('#gallery').className='';$('#gallery').innerHTML='<div class="empty">🖼️ Asset library coming soon — your uploaded images & thumbnails.</div>';}
+    else {$('#libTitle').textContent=(v==='projects'?'Projects':'My Videos');$('#gallery').className='vgrid';refreshGallery();}
+  } else switchTab(v);
 });
 
 let LANGS=[];
@@ -405,17 +443,25 @@ async function refreshRecent(){
   if(!l.length){el.innerHTML='<div class="muted" style="font-size:12px">No projects yet.</div>';return;}
   el.innerHTML=l.slice(0,5).map(v=>`<div class="proj" onclick="showPreview('${encodeURIComponent(v.file)}')">${v.thumb?`<img src="/out/${encodeURIComponent(v.thumb)}">`:'<div class="ph"></div>'}<div><div class="pt">${(v.title||v.file.replace('.mp4','')).slice(0,40)}</div><div class="pm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
 }
+let VIDEOS=[];
+const esc=(s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 async function refreshGallery(){
-  const l=await(await fetch('/api/videos')).json(); const g=$('#gallery');
-  if(!l.length){g.innerHTML='<div class="muted" style="font-size:12px">No videos yet.</div>';return;}
-  const esc=(s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-  g.innerHTML=l.map(v=>{const meta=(v.title||v.description||v.hashtags)?`<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">${v.title?`<div class="metarow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}${v.description?`<div class="metarow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}${v.hashtags?`<div class="metarow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}</div>`:'';
-    return `<div class="vid"><div style="font-weight:600">${v.file.replace('.mp4','')}</div><div class="muted" style="font-size:11px;margin:2px 0 8px">${(v.size/1048576).toFixed(1)} MB</div><video controls preload="none" ${v.thumb?`poster="/out/${encodeURIComponent(v.thumb)}"`:''} src="/out/${encodeURIComponent(v.file)}"></video>${meta}<div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div></div>`;}).join('');
-  document.querySelectorAll('.cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1000);});
+  VIDEOS=await(await fetch('/api/videos')).json(); const g=$('#gallery');
+  if(!VIDEOS.length){g.innerHTML='<div class="empty">No videos yet — make your first one!</div>';return;}
+  g.innerHTML=VIDEOS.map((v,i)=>`<div class="vcard"><img class="thumb" loading="lazy" ${v.thumb?`src="/out/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i})">📋 Meta</button></div></div></div>`).join('');
 }
+window.openVid=(i)=>{const v=VIDEOS[i];$('#vidTitle').textContent=v.title||v.file.replace('.mp4','');
+  $('#vidPlay').innerHTML=`<video class="preview" controls autoplay src="/out/${encodeURIComponent(v.file)}"></video>`;
+  const rows=(v.title||v.description||v.hashtags)?`<div style="margin-top:12px">${v.title?`<div class="metarow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}${v.description?`<div class="metarow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}${v.hashtags?`<div class="metarow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}<a class="getlink" href="/out/${encodeURIComponent(v.file)}" download>⬇ Download video</a></div>`:'';
+  $('#vidMeta').innerHTML=rows;
+  document.querySelectorAll('#vidMeta .cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1000);});
+  $('#vidOverlay').classList.add('open');};
+window.copyMeta=(i)=>{const v=VIDEOS[i];navigator.clipboard.writeText([v.title,v.description,v.hashtags].filter(Boolean).join('\n\n'));};
+$('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';};
+$('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim()});
 const ACT=['#goAI','#goManual','#goSeries','#goAds'];
 let polling=null;
 function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';ACT.forEach(s=>$(s).disabled=true);}

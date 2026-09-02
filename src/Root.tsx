@@ -12,6 +12,7 @@ const fallback = {
   font: "Arial Black",
   fontCss: "",
   rtl: false,
+  watermark: "",
   scenes: [],
   words: [],
 };

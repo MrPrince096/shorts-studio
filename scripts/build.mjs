@@ -325,6 +325,7 @@ const props = {
   font: config.font || "Arial Black",
   fontCss: config.fontCss || "",
   rtl: !!config.rtl,
+  watermark: config.watermark || "",
   durationInSeconds: durationSec,
   audio: "voiceover.mp3",
   music: config.music || "",

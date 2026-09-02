@@ -23,6 +23,7 @@ type Props = {
   font?: string;
   fontCss?: string;
   rtl?: boolean;
+  watermark?: string;
 };
 
 const SceneClip: React.FC<{ src: string; durationInFrames: number }> = ({ src, durationInFrames }) => {
@@ -115,8 +116,8 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean }> = ({ wor
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false }) => {
-  const { fps } = useVideoConfig();
+export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "" }) => {
+  const { fps, width, height } = useVideoConfig();
   const [handle] = useState(() => (fontCss ? delayRender("loading-font") : null));
 
   useEffect(() => {
@@ -156,6 +157,25 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
       />
 
       <Captions words={words} font={font} rtl={rtl} />
+
+      {watermark ? (
+        <div
+          style={{
+            position: "absolute",
+            bottom: Math.round(height * 0.035),
+            width: "100%",
+            textAlign: "center",
+            color: "rgba(255,255,255,0.72)",
+            fontFamily: "'Arial Black', Impact, sans-serif",
+            fontWeight: 800,
+            fontSize: Math.round(Math.min(width, height) * 0.032),
+            letterSpacing: 1,
+            textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+          }}
+        >
+          {watermark}
+        </div>
+      ) : null}
 
       {audio ? <Audio src={staticFile(audio)} /> : null}
       {music ? <Audio src={staticFile(music)} volume={0.18} /> : null}

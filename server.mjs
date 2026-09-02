@@ -439,6 +439,7 @@ app.post("/api/generate", async (req, res) => {
       });
       configs.forEach((c) => {
         c.imageStyle = b.imageStyle || "";
+        c.watermark = b.watermark || "";
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -477,6 +478,7 @@ app.post("/api/render", (req, res) => {
     source: b.source || "pexels",
     videoModel: b.videoModel || "",
     imageStyle: b.imageStyle || "",
+    watermark: b.watermark || "",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };
@@ -545,7 +547,7 @@ app.post("/api/series/start", (req, res) => {
         language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%",
         aspect: b.aspect || "9:16", quality: b.quality || "1080", duration: b.duration || "medium",
         source: b.source || "pexels", videoModel: b.videoModel || "", imageStyle: b.imageStyle || "",
-        llmProvider: b.llmProvider || "",
+        llmProvider: b.llmProvider || "", watermark: b.watermark || "",
         width, height, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         outline: o.outline, total, done: 0, files: [], recaps: [],
       };
