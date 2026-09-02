@@ -293,11 +293,19 @@ if (src === "hf" && !process.env.HF_TOKEN) {
   process.exit(1);
 }
 
-// if a product image was uploaded but no scene was flagged to show it, default to 2 key scenes
-if (config.uploadFile && !config.scenes.some((s) => s.showProduct)) {
+// when a product image/clip was uploaded, feature it PROMINENTLY across the ad:
+// keep scene 0 as the hook, then show the product on ~every other scene (and always
+// the last), merging with any scenes the script already flagged. Ensures the user's
+// image is clearly the star, not a 2-second cameo.
+if (config.uploadFile) {
   const n = config.scenes.length;
-  const idxs = new Set([Math.floor(n / 2), n - 1]);
-  config.scenes.forEach((s, i) => { s.showProduct = idxs.has(i); });
+  const flagged = config.scenes.filter((s) => s.showProduct).length;
+  if (flagged < Math.ceil(n / 2)) {
+    config.scenes.forEach((s, i) => {
+      if (i > 0 && (i % 2 === 1 || i === n - 1)) s.showProduct = true;
+    });
+    if (n === 1) config.scenes[0].showProduct = true;
+  }
 }
 
 const sceneOut = [];

@@ -21,7 +21,7 @@ function env(key, dflt = "") {
 }
 
 const SCENES_FOR = { short: 5, medium: 7, long: 9, xlong: 14, xxlong: 20, huge: 30 };
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
 
 // ---------- LLM providers: each takes a prompt, returns raw text ----------
 async function llmGemini(prompt) {
