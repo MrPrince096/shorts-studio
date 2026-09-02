@@ -165,13 +165,6 @@
       <button class="btn grad" onclick="document.querySelector('[data-nav=shorts]').click()"><span data-icon="plus"></span>New Project</button>
     </div>
 
-    <div class="tabs">
-      <button class="tab active" data-tab="shorts"><span data-icon="play"></span>Shorts</button>
-      <button class="tab" data-tab="series"><span data-icon="book"></span>Series</button>
-      <button class="tab" data-tab="ads"><span data-icon="mega"></span>Ads</button>
-      <button class="tab" data-tab="ideas"><span data-icon="bulb"></span>Ideas</button>
-    </div>
-
     <!-- WORKSPACE (create) -->
     <div class="workspace" id="workspace">
       <div class="col">
@@ -238,8 +231,15 @@
           <div class="row"><div><label>Visual source 🎥</label><select id="source"></select></div><div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div><div id="falModelBox" style="display:none"><label>Video model</label><select id="videoModel"></select></div></div>
           <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
           <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
-          <label>Watermark <span class="muted">— optional, shown on the video</span></label>
+          <div class="row">
+            <div><label>Caption position</label><select id="captionPos"></select></div>
+            <div><label>Motion / zoom</label><select id="motion"></select></div>
+          </div>
+          <label>Watermark text <span class="muted">— optional</span></label>
           <input id="watermark" placeholder="@yourchannel" />
+          <label>Watermark logo <span class="muted">— optional image</span></label>
+          <div class="withbtn"><input id="wmName" placeholder="no logo selected" readonly style="cursor:default" /><button class="btn ghost" id="wmPick">Upload</button><button class="btn ghost" id="wmClear" title="remove">✕</button></div>
+          <input type="file" id="wmFile" accept="image/*" hidden />
         </div>
       </div>
 
@@ -366,11 +366,9 @@ function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{cons
 
 // nav + tabs
 function switchTab(name){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#library').classList.remove('show'); $('#workspace').style.display='grid';
 }
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
@@ -403,6 +401,9 @@ async function loadConfig(){
   for(let i=1;i<=10;i++)$('#seriesBatch').appendChild(opt(i,i+(i===1?' part now':' parts now')));
   [6,8,10,12,15,20].forEach(n=>$('#ideaCount').appendChild(opt(n,n+' ideas')));
   ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>$('#adTone').appendChild(opt(t,t)));
+  [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
+  [['in','Zoom in (default)'],['out','Zoom out'],['subtle','Subtle zoom'],['none','Static (no motion)'],['random','Random per scene']].forEach(([v,l])=>$('#motion').appendChild(opt(v,l)));
+  $('#captionPos').value='bottom'; $('#motion').value='in';
   $('#seriesTotal').value='10';$('#seriesBatch').value='3';$('#ideaCount').value='8';
   $('#source').onchange=()=>{const s=$('#source').value;$('#falModelBox').style.display=s==='fal'?'block':'none';$('#styleBox').style.display=['image','hf','local','fal-image','fal'].includes(s)?'block':'none';};
   $('#voice').value='en-US-AriaNeural';$('#quality').value='1080';$('#lenPick').value='medium';$('#llmPick').value='';$('#source').value='pexels';
@@ -463,7 +464,10 @@ $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPla
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim()});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value});
+$('#wmPick').onclick=()=>$('#wmFile').click();
+$('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
+$('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
 const ACT=['#goAI','#goManual','#goSeries','#goAds'];
 let polling=null;
 function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';ACT.forEach(s=>$(s).disabled=true);}

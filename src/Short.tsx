@@ -24,11 +24,18 @@ type Props = {
   fontCss?: string;
   rtl?: boolean;
   watermark?: string;
+  watermarkImage?: string;
+  captionPos?: "top" | "middle" | "bottom";
+  motion?: "in" | "out" | "subtle" | "none" | "random";
 };
 
-const SceneClip: React.FC<{ src: string; durationInFrames: number }> = ({ src, durationInFrames }) => {
+const MOTION_RANGE: Record<string, [number, number]> = {
+  in: [1.06, 1.2], out: [1.2, 1.06], subtle: [1.03, 1.1], none: [1, 1],
+};
+const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: string }> = ({ src, durationInFrames, motion }) => {
   const frame = useCurrentFrame();
-  const scale = interpolate(frame, [0, durationInFrames], [1.06, 1.2], {
+  const [from, to] = MOTION_RANGE[motion] || MOTION_RANGE.in;
+  const scale = interpolate(frame, [0, durationInFrames], [from, to], {
     extrapolateRight: "clamp",
   });
   const isImage = /\.(jpe?g|png|webp)$/i.test(src);
@@ -42,7 +49,7 @@ const SceneClip: React.FC<{ src: string; durationInFrames: number }> = ({ src, d
 
 const GROUP = 3;
 
-const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean }> = ({ words, font, rtl }) => {
+const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean; captionPos: string }> = ({ words, font, rtl, captionPos }) => {
   const { fps, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const t = frame / fps;
@@ -53,7 +60,7 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean }> = ({ wor
   const stroke = Math.max(3, Math.round(base * 0.0075));
   const gap = Math.round(base * 0.02);
   const padX = Math.round(width * 0.07);
-  const shiftY = Math.round(height * 0.06); // nudge below middle
+  const shiftY = captionPos === "top" ? Math.round(-height * 0.30) : captionPos === "bottom" ? Math.round(height * 0.22) : 0;
 
   // index of the most recently started word
   let cur = -1;
@@ -116,8 +123,10 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean }> = ({ wor
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "" }) => {
+export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in" }) => {
   const { fps, width, height } = useVideoConfig();
+  const mOpts = ["in", "out", "subtle"];
+  const sceneMotion = (i: number) => (motion === "random" ? mOpts[i % mOpts.length] : motion);
   const [handle] = useState(() => (fontCss ? delayRender("loading-font") : null));
 
   useEffect(() => {
@@ -143,7 +152,7 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
         const durationInFrames = Math.max(1, Math.ceil((s.end - s.start) * fps));
         return (
           <Sequence key={i} from={from} durationInFrames={durationInFrames}>
-            <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} />
+            <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} />
           </Sequence>
         );
       })}
@@ -156,9 +165,23 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
         }}
       />
 
-      <Captions words={words} font={font} rtl={rtl} />
+      <Captions words={words} font={font} rtl={rtl} captionPos={captionPos} />
 
-      {watermark ? (
+      {watermarkImage ? (
+        <Img
+          src={staticFile(watermarkImage)}
+          style={{
+            position: "absolute",
+            bottom: Math.round(height * 0.03),
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: Math.round(Math.min(width, height) * 0.22),
+            height: "auto",
+            opacity: 0.9,
+            filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))",
+          }}
+        />
+      ) : watermark ? (
         <div
           style={{
             position: "absolute",

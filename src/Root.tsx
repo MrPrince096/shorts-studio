@@ -13,6 +13,9 @@ const fallback = {
   fontCss: "",
   rtl: false,
   watermark: "",
+  watermarkImage: "",
+  captionPos: "bottom",
+  motion: "in",
   scenes: [],
   words: [],
 };

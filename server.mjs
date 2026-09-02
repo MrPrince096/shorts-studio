@@ -31,6 +31,11 @@ function saveUploadFromDataUrl(dataUrl) {
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = join(ROOT, "out");
+const PUBLIC = join(ROOT, "public");
+function watermarkFile() {
+  if (!existsSync(PUBLIC)) return "";
+  return readdirSync(PUBLIC).find((f) => /^watermark\./i.test(f)) || "";
+}
 const PORT = 4321;
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
@@ -82,6 +87,20 @@ app.delete("/api/assets/:file", (req, res) => {
   const f = req.params.file.replace(/[^a-z0-9.]/gi, "");
   const p = join(ASSETS_DIR, f);
   if (existsSync(p) && p.startsWith(ASSETS_DIR)) unlinkSync(p);
+  res.json({ ok: true });
+});
+
+// ---- Watermark logo (saved to public/watermark.<ext>, used by renders) ----
+app.post("/api/watermark", (req, res) => {
+  const m = String((req.body || {}).dataUrl || "").match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: "Attach an image." });
+  const old = watermarkFile(); if (old) unlinkSync(join(PUBLIC, old));
+  const ext = (m[1].split("/")[1] || "png").replace("jpeg", "jpg");
+  writeFileSync(join(PUBLIC, "watermark." + ext), Buffer.from(m[2], "base64"));
+  res.json({ ok: true, file: "watermark." + ext });
+});
+app.delete("/api/watermark", (_req, res) => {
+  const old = watermarkFile(); if (old) unlinkSync(join(PUBLIC, old));
   res.json({ ok: true });
 });
 
@@ -486,6 +505,9 @@ app.post("/api/generate", async (req, res) => {
       configs.forEach((c) => {
         c.imageStyle = b.imageStyle || "";
         c.watermark = b.watermark || "";
+        c.captionPos = b.captionPos || "bottom";
+        c.motion = b.motion || "in";
+        c.watermarkImage = b.watermarkImage ? watermarkFile() : "";
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -525,6 +547,9 @@ app.post("/api/render", (req, res) => {
     videoModel: b.videoModel || "",
     imageStyle: b.imageStyle || "",
     watermark: b.watermark || "",
+    captionPos: b.captionPos || "bottom",
+    motion: b.motion || "in",
+    watermarkImage: b.watermarkImage ? watermarkFile() : "",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };
@@ -594,6 +619,7 @@ app.post("/api/series/start", (req, res) => {
         aspect: b.aspect || "9:16", quality: b.quality || "1080", duration: b.duration || "medium",
         source: b.source || "pexels", videoModel: b.videoModel || "", imageStyle: b.imageStyle || "",
         llmProvider: b.llmProvider || "", watermark: b.watermark || "",
+        captionPos: b.captionPos || "bottom", motion: b.motion || "in", watermarkImage: b.watermarkImage ? watermarkFile() : "",
         width, height, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         outline: o.outline, total, done: 0, files: [], recaps: [],
       };

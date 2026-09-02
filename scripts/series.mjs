@@ -58,6 +58,7 @@ Return ONLY valid JSON: {"title":"","recap":"","tags":["",""],"scenes":[{"text":
     width: series.width, height: series.height,
     source: series.source || "pexels", videoModel: series.videoModel || "",
     imageStyle: series.imageStyle || "", watermark: series.watermark || "",
+    captionPos: series.captionPos || "bottom", motion: series.motion || "in", watermarkImage: series.watermarkImage || "",
     font: series.font || "Arial Black", fontCss: series.fontCss || "", rtl: !!series.rtl,
     scenes,
   };
