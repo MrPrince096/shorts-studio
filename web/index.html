@@ -5,112 +5,127 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Shorts Studio</title>
 <style>
-  :root {
-    --bg:#0e1016; --panel:#171a22; --panel2:#1f232e; --line:#2a2f3c;
-    --text:#e8eaf0; --muted:#9aa3b2; --accent:#ffd23f; --accent2:#4f8cff; --ok:#39d98a; --err:#ff5c6c;
+  :root{
+    --bg:#0b0d12; --bg2:#0e1119; --panel:#141824; --panel2:#1b2030; --line:#252b3b;
+    --text:#eef1f7; --muted:#8b93a7; --accent:#7c5cff; --accent2:#4f8cff;
+    --grad:linear-gradient(135deg,#7c5cff,#4f8cff); --ok:#39d98a; --err:#ff5c6c; --gold:#ffd23f;
   }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:20px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
-  header h1 { font-size:20px; margin:0; letter-spacing:.3px; }
-  header .dot { width:10px;height:10px;border-radius:50%;background:var(--accent); box-shadow:0 0 12px var(--accent); }
-  .wrap { display:grid; grid-template-columns: 1.3fr 1fr; gap:24px; padding:24px 28px; max-width:1200px; margin:0 auto; }
-  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:20px; }
-  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 16px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
-  input, select, textarea { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
-    border-radius:9px; padding:10px 12px; font-size:14px; font-family:inherit; }
-  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent2); }
-  .row { display:flex; gap:12px; flex-wrap:wrap; }
-  .row > div { flex:1; min-width:130px; }
-  .scene { display:flex; gap:8px; margin-bottom:8px; align-items:flex-start; }
-  .scene textarea { min-height:44px; resize:vertical; }
-  .scene .num { color:var(--muted); font-size:12px; width:20px; padding-top:11px; text-align:center; flex:0 0 20px; }
-  .scene .q { flex:0 0 34%; }
-  .scene .del { flex:0 0 30px; background:var(--panel2); border:1px solid var(--line); color:var(--err); border-radius:8px; cursor:pointer; font-size:16px; height:44px; }
-  .btnrow { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
-  button.action { border:none; border-radius:10px; padding:12px 18px; font-size:14px; font-weight:700; cursor:pointer; }
-  .primary { background:var(--accent); color:#111; }
-  .primary:disabled { opacity:.5; cursor:not-allowed; }
-  .ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); font-weight:600; }
-  .rateval { color:var(--accent); font-weight:600; }
-  .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
-  .tab { background:var(--panel2); border:1px solid var(--line); color:var(--muted); border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; }
-  .tab.active { background:var(--accent); color:#111; border-color:var(--accent); }
-  details { margin-top:6px; border:1px solid var(--line); border-radius:12px; padding:0 16px; background:var(--panel); }
-  details[open]{ padding-bottom:16px; }
-  summary { cursor:pointer; padding:14px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
-  #progress { display:none; }
-  #log { background:#0a0c11; border:1px solid var(--line); border-radius:8px; padding:12px; font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#a9d3ff; height:150px; overflow:auto; white-space:pre-wrap; }
-  .status { font-size:14px; margin:8px 0; }
-  .spin { display:inline-block; width:14px;height:14px;border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:s .8s linear infinite; vertical-align:-2px; margin-right:6px; }
-  @keyframes s { to { transform:rotate(360deg); } }
-  video { width:100%; border-radius:10px; margin-top:10px; background:#000; }
-  .vid { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; background:var(--panel2); }
-  .vid .t { font-weight:600; font-size:14px; }
-  .vid .m { color:var(--muted); font-size:12px; margin:2px 0 8px; }
-  .vid a, #result a { color:var(--accent2); text-decoration:none; font-size:13px; }
-  .hint { color:var(--muted); font-size:12px; margin-top:8px; line-height:1.5; }
-  .hint a { color:var(--accent2); }
-  .err { color:var(--err); } .ok { color:var(--ok); }
-  .big { font-size:16px; padding:13px 14px; }
-  .idea { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:8px; background:var(--panel2); }
-  .idea .it { font-weight:700; font-size:14px; }
-  .idea .ih { color:var(--muted); font-size:13px; margin:3px 0; }
-  .tag { display:inline-block; background:#0a0c11; border:1px solid var(--line); color:#a9d3ff; border-radius:6px; padding:1px 7px; font-size:11px; margin:2px 3px 0 0; }
-  .meta { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
-  .mrow { margin-bottom:8px; }
-  .mrow b { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
-  .mrow .cp { background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:6px; cursor:pointer; font-size:12px; padding:1px 6px; margin-left:6px; }
-  .mv { font-size:13px; margin-top:3px; white-space:pre-wrap; word-break:break-word; }
-  .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center; }
-  .overlay.open { display:flex; }
-  .modal { width:min(520px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px; max-height:88vh; overflow:auto; }
-  .modal h2 { margin-top:0; }
-  .keystate { font-size:12px; margin:4px 0 0; }
-  .modal .close { float:right; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  a{color:var(--accent2);text-decoration:none}
+  .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  /* sidebar */
+  .sidebar{background:var(--bg2);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px}
+  .brand b{font-size:16px}
+  .brand .pro{font-size:10px;background:rgba(124,92,255,.2);color:#b9a8ff;border:1px solid rgba(124,92,255,.4);padding:1px 7px;border-radius:20px;margin-left:2px}
+  .navlabel{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:12px 10px 4px}
+  .nav{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--muted);cursor:pointer;font-weight:600;font-size:13.5px}
+  .nav:hover{background:var(--panel);color:var(--text)}
+  .nav.active{background:var(--panel2);color:var(--text)}
+  .nav.active .ic{filter:none}
+  .nav .ic{width:18px;text-align:center}
+  .sidefill{flex:1}
+  .plan{background:linear-gradient(135deg,rgba(124,92,255,.18),rgba(79,140,255,.12));border:1px solid rgba(124,92,255,.3);border-radius:12px;padding:12px}
+  .plan .t{display:flex;align-items:center;gap:8px;font-weight:700}
+  .plan .b{font-size:11px;background:var(--ok);color:#04120b;border-radius:20px;padding:1px 8px;margin-left:auto}
+  .plan .m{color:var(--muted);font-size:12px;margin-top:4px}
+  /* main */
+  .main{padding:24px 28px;max-width:1500px}
+  .topbar{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+  .topbar h1{font-size:26px;margin:0}
+  .topbar .sub{color:var(--muted);margin-top:3px}
+  .topbar .sp{flex:1}
+  .iconbtn{width:40px;height:40px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px}
+  .btn{border:none;border-radius:10px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
+  .btn.grad{background:var(--grad);color:#fff;box-shadow:0 6px 20px rgba(124,92,255,.35)}
+  .btn.grad:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+  .btn.ghost{background:var(--panel);border:1px solid var(--line);color:var(--text);font-weight:600}
+  .tabs{display:flex;gap:8px;margin-bottom:20px}
+  .tab{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer;font-size:13.5px}
+  .tab.active{background:#fff;color:#111;border-color:#fff}
+  .workspace{display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start}
+  @media(max-width:1050px){.workspace{grid-template-columns:1fr}}
+  @media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap;overflow:auto}.sidefill,.plan{display:none}}
+  .col{display:flex;flex-direction:column;gap:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .card .cardsub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  input[type=file]{padding:8px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:120px}
+  .big{font-size:15px;padding:13px}
+  .withbtn{display:flex;gap:8px}
+  .scene{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start}
+  .scene textarea{min-height:42px;resize:vertical}.scene .q{flex:0 0 34%}.scene .num{color:var(--muted);width:18px;padding-top:11px;font-size:12px}
+  .scene .del{flex:0 0 30px;background:var(--panel2);border:1px solid var(--line);color:var(--err);border-radius:8px;height:44px;cursor:pointer}
+  details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  summary{cursor:pointer;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .rateval{color:var(--gold);font-weight:700}
+  input[type=range]{padding:0;accent-color:var(--accent)}
+  .preview{background:#000;border-radius:12px;aspect-ratio:9/16;max-height:360px;width:100%;object-fit:contain;display:block;margin:0 auto}
+  .previewempty{background:var(--panel2);border:1px dashed var(--line);border-radius:12px;aspect-ratio:9/16;max-height:340px;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:20px;margin:0 auto;width:220px}
+  .proj{display:flex;gap:11px;align-items:center;padding:9px;border-radius:10px;cursor:pointer}
+  .proj:hover{background:var(--panel2)}
+  .proj img,.proj .ph{width:52px;height:52px;border-radius:9px;object-fit:cover;background:var(--panel2);flex:0 0 52px}
+  .proj .pt{font-weight:600;font-size:13px;line-height:1.2}
+  .proj .pm{color:var(--muted);font-size:11px;margin-top:2px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .stat .n{font-size:24px;font-weight:800}
+  .stat .l{color:var(--muted);font-size:11.5px;margin-top:2px}
+  #log{background:#07090e;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9fd0ff;max-height:150px;overflow:auto;white-space:pre-wrap;margin-top:8px}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .idea{border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:8px;background:var(--panel2)}
+  .idea .it{font-weight:700}.idea .ih{color:var(--muted);font-size:12.5px;margin:3px 0}
+  .tag{display:inline-block;background:#07090e;border:1px solid var(--line);color:#9fd0ff;border-radius:6px;padding:1px 7px;font-size:10.5px;margin:2px 3px 0 0}
+  .metarow{margin-bottom:8px}.metarow b{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .cp{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px;padding:1px 6px;margin-left:6px}
+  .mv{font-size:13px;margin-top:3px;white-space:pre-wrap;word-break:break-word}
+  .vid{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--panel2)}
+  .vid video{width:100%;border-radius:9px}
+  .gal{display:none}.gal.show{display:block}
+  .err{color:var(--err)}.ok{color:var(--ok)}.muted{color:var(--muted)}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:50;align-items:center;justify-content:center}
+  .overlay.open{display:flex}
+  .modal{width:min(520px,94vw);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;max-height:90vh;overflow:auto}
+  .modal .close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+  .keystate{font-size:11.5px;margin-top:4px}
+  hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </style>
 </head>
 <body>
-<header>
-  <span class="dot"></span>
-  <h1>Shorts Studio</h1>
-  <span style="color:var(--muted);font-size:13px;margin-left:auto;margin-right:14px">faceless video studio</span>
-  <button class="action ghost" id="openSettings">⚙️ Settings</button>
-</header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">🎬</span><b>Shorts Studio</b><span class="pro">Pro</span></div>
+    <div class="nav active" data-nav="shorts"><span class="ic">🏠</span> Dashboard</div>
+    <div class="nav" data-nav="shorts"><span class="ic">▶️</span> Shorts</div>
+    <div class="nav" data-nav="series"><span class="ic">📖</span> Series</div>
+    <div class="nav" data-nav="ads"><span class="ic">📣</span> Ads</div>
+    <div class="nav" data-nav="ideas"><span class="ic">💡</span> Ideas</div>
+    <div class="navlabel">Library</div>
+    <div class="nav" data-nav="library"><span class="ic">🎞️</span> My Videos</div>
+    <div class="nav" id="navSettings"><span class="ic">⚙️</span> Settings</div>
+    <div class="sidefill"></div>
+    <div class="plan"><div class="t">✨ Pro Plan <span class="b">Active</span></div><div class="m">Unlimited local renders · your keys</div></div>
+  </aside>
 
-<div class="wrap">
-  <div>
-    <!-- SHARED OUTPUT SETTINGS -->
-    <div class="card" id="outputCard">
-      <h2>🎛️ Output settings — apply to every tab</h2>
-      <div class="row">
-        <div><label>Language 🌐</label><select id="language"></select></div>
-        <div><label>Voice</label><select id="voice"></select></div>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>Welcome back, Creator 👋</h1>
+        <div class="sub">Create. Inspire. Go Viral.</div>
       </div>
-      <div class="row">
-        <div><label>Genre</label><select id="genre"></select></div>
-        <div><label>Country</label><select id="country"></select></div>
-      </div>
-      <div class="row">
-        <div><label>Script AI 🧠</label><select id="llmPick"></select></div>
-        <div><label>Length</label><select id="lenPick"></select></div>
-      </div>
-      <div class="row">
-        <div><label>Aspect ratio</label><select id="aspect"></select></div>
-        <div><label>Resolution</label><select id="quality"></select></div>
-      </div>
-      <div class="row">
-        <div><label>Visual source 🎥</label><select id="source"></select></div>
-        <div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div>
-        <div id="falModelBox" style="display:none"><label>Video model (Veo / Seedance…)</label><select id="videoModel"></select></div>
-      </div>
-      <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
-      <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
+      <div class="sp"></div>
+      <button class="iconbtn" id="navSettings2" title="Settings">⚙️</button>
+      <button class="btn grad" onclick="document.querySelector('[data-nav=shorts]').click()">+ New Project</button>
     </div>
 
-    <!-- TABS -->
     <div class="tabs">
       <button class="tab active" data-tab="shorts">🎬 Shorts</button>
       <button class="tab" data-tab="series">📖 Series</button>
@@ -118,362 +133,255 @@
       <button class="tab" data-tab="ideas">💡 Ideas</button>
     </div>
 
-    <!-- SHORTS -->
-    <div class="tabpanel card" id="tab-shorts">
-      <h2>🎬 Make a Short — topic, genre, country, or random</h2>
-      <label>Topic / idea <span style="color:var(--muted)">(optional if you pick a genre/country)</span></label>
-      <div style="display:flex;gap:8px">
-        <input id="topic" class="big" placeholder="e.g. foods good for the heart" />
-        <button class="action ghost" id="surprise" title="Random idea">🎲</button>
-      </div>
-      <div class="row">
-        <div><label>How many videos</label><select id="count"></select></div>
-      </div>
-      <div class="btnrow"><button class="action primary big" id="goAI">✨ Make Videos</button></div>
-      <div class="hint">Uses the language, genre, country, length, voice & visual source in Output Settings above.</div>
-      <details>
-        <summary>⚙️ Advanced — write the scenes yourself</summary>
-        <label>Title</label>
-        <input id="title" placeholder="e.g. Foods Your Heart Loves" />
-        <label>Scenes — narration + a search term per scene</label>
-        <div id="scenes"></div>
-        <div class="btnrow">
-          <button class="action ghost" id="addScene">+ Add scene</button>
-          <button class="action ghost" id="loadEx">Load example</button>
+    <!-- WORKSPACE (create) -->
+    <div class="workspace" id="workspace">
+      <div class="col">
+        <!-- SHORTS -->
+        <div class="card tabpanel" id="tab-shorts">
+          <h2>✨ Create Short</h2>
+          <div class="cardsub">AI-powered short video in minutes</div>
+          <label>Topic or idea <span class="muted">(optional with a genre/country)</span></label>
+          <div class="withbtn"><input id="topic" class="big" placeholder="e.g. 5 morning habits for success" /><button class="btn ghost" id="surprise" title="Random">🎲</button></div>
+          <div class="row"><div><label>How many videos</label><select id="count"></select></div></div>
+          <button class="btn grad big" id="goAI" style="width:100%;margin-top:16px">✨ Generate Short</button>
+          <details>
+            <summary>⚙️ Advanced — write scenes yourself</summary>
+            <label>Title</label><input id="title" placeholder="Foods Your Heart Loves" />
+            <label>Scenes — narration + search term</label>
+            <div id="scenes"></div>
+            <div class="row" style="margin-top:8px"><button class="btn ghost" id="addScene">+ Add scene</button><button class="btn ghost" id="loadEx">Load example</button></div>
+            <div class="row" style="margin-top:12px"><div><label>Description</label><input id="desc" /></div><div><label>Tags</label><input id="tags" placeholder="motivation, mindset" /></div></div>
+            <button class="btn ghost" id="goManual" style="margin-top:12px">Generate this video</button>
+          </details>
         </div>
-        <div class="row" style="margin-top:14px">
-          <div><label>Description</label><input id="desc" placeholder="optional" /></div>
-          <div><label>Tags (comma separated)</label><input id="tags" placeholder="motivation, mindset" /></div>
+        <!-- SERIES -->
+        <div class="card tabpanel" id="tab-series" hidden>
+          <h2>📖 Storyteller Series</h2>
+          <div class="cardsub">One story → connected, resumable parts</div>
+          <label>Story / topic</label>
+          <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana" />
+          <div class="row"><div><label>Total parts</label><select id="seriesTotal"></select></div><div><label>Make now</label><select id="seriesBatch"></select></div></div>
+          <button class="btn grad big" id="goSeries" style="width:100%;margin-top:16px">📖 Start Series</button>
+          <div id="seriesList" style="margin-top:14px"></div>
         </div>
-        <div class="btnrow"><button class="action ghost" id="goManual">Generate this video</button></div>
-      </details>
-    </div>
+        <!-- ADS -->
+        <div class="card tabpanel" id="tab-ads" hidden>
+          <h2>📣 Advertisement</h2>
+          <div class="cardsub">Promote a product or service</div>
+          <label>Product / service</label>
+          <input id="adProduct" class="big" placeholder="FreshGlow vitamin C serum" />
+          <label>Product image / clip <span class="muted">(optional — shows the real product)</span></label>
+          <input id="adImage" type="file" accept="image/*,video/*" />
+          <label>Key benefits</label>
+          <input id="adBenefits" placeholder="brightens skin, reduces dark spots" />
+          <div class="row"><div><label>Call to action</label><input id="adCta" placeholder="Order now 50% off" /></div><div><label>Tone</label><select id="adTone"></select></div></div>
+          <button class="btn grad big" id="goAds" style="width:100%;margin-top:16px">📣 Make Ad</button>
+        </div>
+        <!-- IDEAS -->
+        <div class="card tabpanel" id="tab-ideas" hidden>
+          <h2>💡 Idea Finder</h2>
+          <div class="cardsub">Viral ideas, titles & tags (VidIQ-style)</div>
+          <label>Your niche <span class="muted">(optional)</span></label>
+          <input id="ideaNiche" class="big" placeholder="fitness · Indian mythology · finance" />
+          <div class="row"><div><label>How many ideas</label><select id="ideaCount"></select></div></div>
+          <button class="btn grad big" id="goIdeas" style="width:100%;margin-top:16px">💡 Get Ideas</button>
+          <div id="ideaList" style="margin-top:14px"></div>
+        </div>
 
-    <!-- SERIES -->
-    <div class="tabpanel card" id="tab-series" hidden>
-      <h2>📖 Storyteller Series — one story, many connected parts</h2>
-      <label>Story / topic</label>
-      <input id="seriesTopic" class="big" placeholder="e.g. the story of Ramayana · history of Rome" />
-      <div class="row">
-        <div><label>Total parts</label><select id="seriesTotal"></select></div>
-        <div><label>Make now</label><select id="seriesBatch"></select></div>
+        <!-- QUICK SETTINGS -->
+        <div class="card">
+          <h2>⚡ Quick settings <span class="muted" style="text-transform:none;letter-spacing:0">· applied to every tab</span></h2>
+          <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
+          <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
+          <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
+          <div class="row"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
+          <div class="row"><div><label>Visual source 🎥</label><select id="source"></select></div><div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div><div id="falModelBox" style="display:none"><label>Video model</label><select id="videoModel"></select></div></div>
+          <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
+          <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
+        </div>
       </div>
-      <div class="btnrow"><button class="action primary" id="goSeries">📖 Start Series</button></div>
-      <div class="hint">Each part continues the story and ends on a hook. Resumable — make more parts anytime.</div>
-      <div id="seriesList" style="margin-top:14px"></div>
-    </div>
 
-    <!-- ADS -->
-    <div class="tabpanel card" id="tab-ads" hidden>
-      <h2>📣 Advertisement — promote a product or service</h2>
-      <label>Product / service</label>
-      <input id="adProduct" class="big" placeholder="e.g. FreshGlow vitamin C face serum" />
-      <label>Product image / clip <span style="color:var(--muted)">(optional — AI analyzes it and shows the real product)</span></label>
-      <input id="adImage" type="file" accept="image/*,video/*" />
-      <label>Key benefits <span style="color:var(--muted)">(comma separated)</span></label>
-      <input id="adBenefits" placeholder="brightens skin, reduces dark spots, all-natural" />
-      <div class="row">
-        <div><label>Call to action</label><input id="adCta" placeholder="Order now at 50% off" /></div>
-        <div><label>Tone</label><select id="adTone"></select></div>
+      <div class="col">
+        <!-- OUTPUT PREVIEW -->
+        <div class="card">
+          <h2>▶️ Output preview</h2>
+          <div id="previewBox"><div class="previewempty">Your rendered video will appear here</div></div>
+          <div id="status" class="status" style="margin-top:10px"></div>
+          <div id="log" hidden></div>
+          <div id="result"></div>
+        </div>
+        <!-- RECENT -->
+        <div class="card">
+          <h2>🗂️ Recent projects</h2>
+          <div id="recentList"><div class="muted" style="font-size:12px">No projects yet.</div></div>
+        </div>
+        <!-- STATS -->
+        <div class="card">
+          <h2>📊 Stats</h2>
+          <div class="stats">
+            <div class="stat"><div class="n" id="statVideos">0</div><div class="l">Videos created</div></div>
+            <div class="stat"><div class="n" id="statSeries">0</div><div class="l">Series parts</div></div>
+            <div class="stat"><div class="n" id="statIdeas">0</div><div class="l">Ideas generated</div></div>
+            <div class="stat"><div class="n" id="statLangs">34</div><div class="l">Languages</div></div>
+          </div>
+        </div>
       </div>
-      <div class="btnrow"><button class="action primary big" id="goAds">📣 Make Ad</button></div>
-      <div class="hint">The AI writes a hook → problem → product → benefits → call-to-action ad, then renders it with your chosen voice & visuals.</div>
     </div>
 
-    <!-- IDEAS -->
-    <div class="tabpanel card" id="tab-ideas" hidden>
-      <h2>💡 Idea Finder — viral ideas, titles & tags (VidIQ-style)</h2>
-      <label>Your niche <span style="color:var(--muted)">(optional)</span></label>
-      <input id="ideaNiche" class="big" placeholder="e.g. fitness · Indian mythology · personal finance" />
-      <div class="row">
-        <div><label>How many ideas</label><select id="ideaCount"></select></div>
-      </div>
-      <div class="btnrow"><button class="action primary" id="goIdeas">💡 Get Ideas</button></div>
-      <div id="ideaList" style="margin-top:14px"></div>
+    <!-- LIBRARY (My Videos) -->
+    <div class="gal" id="library">
+      <div class="card"><h2>🎞️ My Videos</h2><div id="gallery"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
     </div>
-
-    <!-- PROGRESS -->
-    <div class="card" id="progress">
-      <h2>Progress</h2>
-      <div class="status" id="status"></div>
-      <div id="log"></div>
-      <div id="result"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Your videos</h2>
-    <div id="gallery"><div class="hint">No videos yet — make your first one!</div></div>
-  </div>
+  </main>
 </div>
 
 <div class="overlay" id="settingsOverlay">
   <div class="modal">
     <button class="close" id="closeSettings">×</button>
-    <h2>⚙️ Settings</h2>
-    <p class="hint" style="margin-top:0">Stored locally in your <code>.env</code> file. Never leaves your machine.</p>
-    <label>Footage source — Pexels key <span style="color:var(--muted)">(required)</span></label>
+    <h2 style="text-transform:none;color:var(--text);font-size:18px">⚙️ Settings</h2>
+    <p class="muted" style="font-size:12px;margin-top:0">Stored locally in your <code>.env</code>. Never leaves your machine.</p>
+    <div class="navlabel">Footage source</div>
+    <label>Pexels API key <span class="muted">(required)</span></label>
     <input id="pexelsKey" type="password" placeholder="paste key…" />
     <div class="keystate" id="pexelsState"></div>
-    <div class="hint"><a href="https://www.pexels.com/api/" target="_blank">Get a free Pexels key →</a></div>
-
-    <hr style="border-color:var(--line);margin:18px 0" />
-    <h2 style="margin-bottom:8px">🧠 Script AI (LLM)</h2>
-    <label>Which AI writes the scripts</label>
-    <select id="llmProvider"></select>
-    <div id="geminiBox">
-      <label>Gemini API key</label>
-      <input id="geminiKey" type="password" placeholder="paste key…" />
-      <div class="keystate" id="geminiState"></div>
-      <div class="hint"><a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free Gemini key →</a></div>
-    </div>
-    <div id="openaiBox">
-      <label>OpenAI API key</label>
-      <input id="openaiKey" type="password" placeholder="sk-…" />
-      <div class="keystate" id="openaiState"></div>
-      <label>OpenAI model</label>
-      <input id="openaiModel" placeholder="gpt-4o-mini" />
-    </div>
-    <div id="ollamaBox">
-      <label>Ollama URL (local, offline)</label>
-      <input id="ollamaUrl" placeholder="http://localhost:11434" />
-      <label>Ollama model</label>
-      <input id="ollamaModel" placeholder="llama3.1" />
-    </div>
-
-    <hr style="border-color:var(--line);margin:18px 0" />
-    <h2 style="margin-bottom:8px">🎨 AI visuals (optional)</h2>
-    <label>Hugging Face token <span style="color:var(--muted)">(FLUX images — free credits)</span></label>
-    <input id="hfKey" type="password" placeholder="hf_…" />
-    <div class="keystate" id="hfState"></div>
-    <div class="hint"><a href="https://huggingface.co/settings/tokens" target="_blank">Get a free HF token →</a> (Inference permission)</div>
-    <label>fal.ai API key <span style="color:var(--muted)">(paid — best images + video)</span></label>
-    <input id="falKey" type="password" placeholder="paste key…" />
-    <div class="keystate" id="falState"></div>
-    <div class="hint"><a href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a></div>
-    <label>Local image server URL <span style="color:var(--muted)">(free & unlimited)</span></label>
+    <div class="muted" style="font-size:12px"><a href="https://www.pexels.com/api/" target="_blank">Get a free Pexels key →</a></div>
+    <hr />
+    <div class="navlabel">🧠 Script AI (LLM)</div>
+    <label>Which AI writes scripts</label><select id="llmProvider"></select>
+    <div id="geminiBox"><label>Gemini API key</label><input id="geminiKey" type="password" placeholder="paste key…" /><div class="keystate" id="geminiState"></div><div class="muted" style="font-size:12px"><a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free Gemini key →</a></div></div>
+    <div id="openaiBox"><label>OpenAI API key</label><input id="openaiKey" type="password" placeholder="sk-…" /><div class="keystate" id="openaiState"></div><label>OpenAI model</label><input id="openaiModel" placeholder="gpt-4o-mini" /></div>
+    <div id="ollamaBox"><label>Ollama URL</label><input id="ollamaUrl" placeholder="http://localhost:11434" /><label>Ollama model</label><input id="ollamaModel" placeholder="llama3.1" /></div>
+    <hr />
+    <div class="navlabel">🎨 AI visuals (optional)</div>
+    <label>Hugging Face token <span class="muted">(FLUX images)</span></label>
+    <input id="hfKey" type="password" placeholder="hf_…" /><div class="keystate" id="hfState"></div>
+    <div class="muted" style="font-size:12px"><a href="https://huggingface.co/settings/tokens" target="_blank">Get a free HF token →</a></div>
+    <label>fal.ai API key <span class="muted">(paid — best)</span></label>
+    <input id="falKey" type="password" placeholder="paste key…" /><div class="keystate" id="falState"></div>
+    <label>Local image server URL <span class="muted">(free & unlimited)</span></label>
     <input id="localUrl" placeholder="http://localhost:7801/generate" />
-    <div class="hint">Run FLUX on your Mac. Ask Claude to set up the local server.</div>
-
-    <div class="btnrow">
-      <button class="action primary" id="saveSettings">Save</button>
-      <span id="saveMsg" style="align-self:center;font-size:13px"></span>
-    </div>
+    <div class="row" style="margin-top:16px"><button class="btn grad" id="saveSettings">Save settings</button><span id="saveMsg" style="align-self:center;font-size:13px"></span></div>
   </div>
 </div>
 
 <script>
-const $ = (s) => document.querySelector(s);
-function opt(v,l){ const o=document.createElement('option'); o.value=v; o.textContent=l; return o; }
+const $=(s)=>document.querySelector(s);
+function opt(v,l){const o=document.createElement('option');o.value=v;o.textContent=l;return o;}
 
-// ---- tabs ----
+// nav + tabs
 function switchTab(name){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  document.querySelectorAll('.tabpanel').forEach(p=>p.hidden = p.id!=='tab-'+name);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
+  $('#library').classList.remove('show'); $('#workspace').style.display='grid';
 }
-document.querySelectorAll('.tab').forEach(t=> t.onclick=()=>switchTab(t.dataset.tab));
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
+document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
+  const v=n.dataset.nav;
+  if(v==='library'){ $('#workspace').style.display='none'; $('#library').classList.add('show'); refreshGallery(); }
+  else switchTab(v);
+});
 
-let LANGS = [];
-function populateVoices(langId){
-  const L = LANGS.find(x => x.id === langId) || LANGS[0];
-  $('#voice').innerHTML = '';
-  (L ? L.voices : []).forEach(v => $('#voice').appendChild(opt(v.id, v.label)));
-}
+let LANGS=[];
+function populateVoices(id){const L=LANGS.find(x=>x.id===id)||LANGS[0];$('#voice').innerHTML='';(L?L.voices:[]).forEach(v=>$('#voice').appendChild(opt(v.id,v.label)));}
 async function loadConfig(){
-  const c = await (await fetch('/api/config')).json();
-  LANGS = c.languages || [];
-  LANGS.forEach(l => $('#language').appendChild(opt(l.id, l.label)));
-  $('#language').value = 'en'; populateVoices('en');
-  $('#language').onchange = () => populateVoices($('#language').value);
-  c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
-  c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
-  c.durations.forEach(d => $('#lenPick').appendChild(opt(d.id, d.label)));
-  $('#llmPick').appendChild(opt('', 'Default (from Settings)'));
-  (c.llmProviders||[]).forEach(p => $('#llmPick').appendChild(opt(p.id, p.label)));
-  $('#genre').appendChild(opt('', '— any / none —'));
-  (c.genres||[]).forEach(g => $('#genre').appendChild(opt(g.id, g.label)));
-  $('#country').appendChild(opt('', '— any / none —'));
-  (c.countries||[]).forEach(x => $('#country').appendChild(opt(x.id, x.label)));
-  for(let i=1;i<=10;i++) $('#count').appendChild(opt(i, i + (i===1?' video':' videos')));
-  (c.videoSources||[]).forEach(s => $('#source').appendChild(opt(s.id, s.label)));
-  (c.falModels||[]).forEach(m => $('#videoModel').appendChild(opt(m.id, m.label)));
-  (c.imageStyles||[]).forEach(s => $('#imageStyle').appendChild(opt(s.id, s.label)));
-  (c.llmProviders||[]).forEach(p => $('#llmProvider').appendChild(opt(p.id, p.label)));
-  [3,5,10,15,20,30,50].forEach(n => $('#seriesTotal').appendChild(opt(n, n+' parts')));
-  for(let i=1;i<=10;i++) $('#seriesBatch').appendChild(opt(i, i+(i===1?' part now':' parts now')));
-  [6,8,10,12,15,20].forEach(n => $('#ideaCount').appendChild(opt(n, n+' ideas')));
+  const c=await(await fetch('/api/config')).json();
+  LANGS=c.languages||[]; LANGS.forEach(l=>$('#language').appendChild(opt(l.id,l.label)));
+  $('#language').value='en'; populateVoices('en'); $('#language').onchange=()=>populateVoices($('#language').value);
+  c.aspects.forEach(a=>$('#aspect').appendChild(opt(a.id,a.label)));
+  c.qualities.forEach(q=>$('#quality').appendChild(opt(q.id,q.label)));
+  c.durations.forEach(d=>$('#lenPick').appendChild(opt(d.id,d.label)));
+  $('#genre').appendChild(opt('','— any / none —')); (c.genres||[]).forEach(g=>$('#genre').appendChild(opt(g.id,g.label)));
+  $('#country').appendChild(opt('','— any / none —')); (c.countries||[]).forEach(x=>$('#country').appendChild(opt(x.id,x.label)));
+  for(let i=1;i<=10;i++)$('#count').appendChild(opt(i,i+(i===1?' video':' videos')));
+  (c.videoSources||[]).forEach(s=>$('#source').appendChild(opt(s.id,s.label)));
+  (c.falModels||[]).forEach(m=>$('#videoModel').appendChild(opt(m.id,m.label)));
+  (c.imageStyles||[]).forEach(s=>$('#imageStyle').appendChild(opt(s.id,s.label)));
+  (c.llmProviders||[]).forEach(p=>$('#llmProvider').appendChild(opt(p.id,p.label)));
+  $('#llmPick').appendChild(opt('','Default (from Settings)')); (c.llmProviders||[]).forEach(p=>$('#llmPick').appendChild(opt(p.id,p.label)));
+  [3,5,10,15,20,30,50].forEach(n=>$('#seriesTotal').appendChild(opt(n,n+' parts')));
+  for(let i=1;i<=10;i++)$('#seriesBatch').appendChild(opt(i,i+(i===1?' part now':' parts now')));
+  [6,8,10,12,15,20].forEach(n=>$('#ideaCount').appendChild(opt(n,n+' ideas')));
   ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>$('#adTone').appendChild(opt(t,t)));
-  $('#seriesTotal').value='10'; $('#seriesBatch').value='3'; $('#ideaCount').value='8';
-  $('#source').onchange = () => {
-    const s = $('#source').value;
-    $('#falModelBox').style.display = s==='fal' ? 'block':'none';
-    $('#styleBox').style.display = ['image','hf','local','fal-image','fal'].includes(s) ? 'block':'none';
-  };
-  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#lenPick').value='medium'; $('#llmPick').value=''; $('#source').value='pexels';
+  $('#seriesTotal').value='10';$('#seriesBatch').value='3';$('#ideaCount').value='8';
+  $('#source').onchange=()=>{const s=$('#source').value;$('#falModelBox').style.display=s==='fal'?'block':'none';$('#styleBox').style.display=['image','hf','local','fal-image','fal'].includes(s)?'block':'none';};
+  $('#voice').value='en-US-AriaNeural';$('#quality').value='1080';$('#lenPick').value='medium';$('#llmPick').value='';$('#source').value='pexels';
+  $('#statLangs').textContent=LANGS.length;
 }
 
-// ---- settings ----
-const stateHtml = (k, note) => k.set ? `<span class="ok">✔ set (${k.masked})</span>` : `<span class="err">✘ not set${note?' — '+note:''}</span>`;
-function toggleLlmBoxes(){
-  const p = $('#llmProvider').value;
-  $('#geminiBox').style.display = p==='gemini'?'block':'none';
-  $('#openaiBox').style.display = p==='openai'?'block':'none';
-  $('#ollamaBox').style.display = p==='ollama'?'block':'none';
-}
+// settings
+const stateHtml=(k,note)=>k.set?`<span class="ok">✔ set (${k.masked})</span>`:`<span class="err">✘ not set${note?' — '+note:''}</span>`;
+function toggleLlm(){const p=$('#llmProvider').value;$('#geminiBox').style.display=p==='gemini'?'block':'none';$('#openaiBox').style.display=p==='openai'?'block':'none';$('#ollamaBox').style.display=p==='ollama'?'block':'none';}
 async function loadSettings(){
-  const s = await (await fetch('/api/settings')).json();
-  $('#llmProvider').value = s.llmProvider || 'gemini';
-  $('#openaiModel').value = s.openaiModel || '';
-  $('#ollamaUrl').value = s.ollamaUrl || '';
-  $('#ollamaModel').value = s.ollamaModel || '';
-  $('#localUrl').value = s.localImageUrl || '';
-  $('#pexelsState').innerHTML = stateHtml(s.keys.pexels);
-  $('#geminiState').innerHTML = stateHtml(s.keys.gemini, 'needed for AI topics');
-  $('#openaiState').innerHTML = stateHtml(s.keys.openai);
-  $('#hfState').innerHTML = stateHtml(s.keys.hf, 'needed for HF images');
-  $('#falState').innerHTML = stateHtml(s.keys.fal, 'needed for fal images/video');
-  toggleLlmBoxes();
+  const s=await(await fetch('/api/settings')).json();
+  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';
+  $('#pexelsState').innerHTML=stateHtml(s.keys.pexels);$('#geminiState').innerHTML=stateHtml(s.keys.gemini,'needed for AI');$('#openaiState').innerHTML=stateHtml(s.keys.openai);$('#hfState').innerHTML=stateHtml(s.keys.hf,'HF images');$('#falState').innerHTML=stateHtml(s.keys.fal,'fal images/video');
+  toggleLlm();
 }
-$('#llmProvider') && ($('#llmProvider').onchange = toggleLlmBoxes);
-$('#openSettings').onclick = () => { loadSettings(); $('#settingsOverlay').classList.add('open'); };
-$('#closeSettings').onclick = () => $('#settingsOverlay').classList.remove('open');
-$('#settingsOverlay').onclick = (e) => { if(e.target.id==='settingsOverlay') $('#settingsOverlay').classList.remove('open'); };
-$('#saveSettings').onclick = async () => {
-  const body = {
-    llmProvider: $('#llmProvider').value,
-    pexels: $('#pexelsKey').value.trim(), gemini: $('#geminiKey').value.trim(),
-    openai: $('#openaiKey').value.trim(), openaiModel: $('#openaiModel').value.trim(),
-    ollamaUrl: $('#ollamaUrl').value.trim(), ollamaModel: $('#ollamaModel').value.trim(),
-    fal: $('#falKey').value.trim(), hf: $('#hfKey').value.trim(), localImageUrl: $('#localUrl').value.trim(),
-  };
-  const r = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-  $('#saveMsg').innerHTML = r.saved && r.saved.length ? `<span class="ok">Saved ✓</span>` : 'Nothing to save';
-  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey'].forEach(id=>$('#'+id).value='');
-  loadSettings();
+$('#llmProvider').onchange=toggleLlm;
+const openS=()=>{loadSettings();$('#settingsOverlay').classList.add('open');};
+$('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
+$('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
+$('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
+$('#saveSettings').onclick=async()=>{
+  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),localImageUrl:$('#localUrl').value.trim()};
+  const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  $('#saveMsg').innerHTML=r.saved&&r.saved.length?'<span class="ok">Saved ✓</span>':'Nothing to save';
+  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey'].forEach(id=>$('#'+id).value='');loadSettings();
 };
 
-// ---- random idea + scenes ----
-const IDEAS = ['foods that boost your brain','habits of successful people','why you procrastinate','the psychology of first impressions','how sleep repairs your body','facts about the human heart','how to build discipline','the science of happiness','morning routines that change your life','the truth about motivation','foods that fight inflammation','how to stop overthinking'];
-$('#surprise').onclick = (e) => { e.preventDefault(); $('#topic').value = IDEAS[Math.floor(Math.random()*IDEAS.length)]; };
-function sceneRow(text='', query=''){
-  const div = document.createElement('div'); div.className='scene';
-  div.innerHTML = `<span class="num"></span><textarea placeholder="Narration line...">${text}</textarea><input class="q" placeholder="Search term" value="${query.replace(/"/g,'&quot;')}" /><button class="del" title="remove">×</button>`;
-  div.querySelector('.del').onclick = () => { div.remove(); renumber(); };
-  $('#scenes').appendChild(div); renumber();
-}
-function renumber(){ [...document.querySelectorAll('.scene .num')].forEach((n,i)=> n.textContent=(i+1)); }
-$('#addScene').onclick = () => sceneRow();
-$('#rate').oninput = (e) => $('#rateval').textContent = (e.target.value>0?'+':'') + e.target.value + '%';
-$('#loadEx').onclick = () => {
-  $('#scenes').innerHTML=''; $('#title').value='Foods Your Heart Loves';
-  [['Your heart beats 100,000 times a day. Feed it well.','healthy food heart'],['Fatty fish protect your arteries.','salmon cooking'],['Berries fight inflammation.','fresh berries bowl'],['Leafy greens lower blood pressure.','spinach leaves'],['Love your heart, it beats for life.','person running sunrise']].forEach(([t,q]) => sceneRow(t,q));
-};
+const IDEAS=['foods that boost your brain','habits of successful people','why you procrastinate','how sleep repairs your body','facts about the human heart','how to build discipline','morning routines that change your life','foods that fight inflammation'];
+$('#surprise').onclick=(e)=>{e.preventDefault();$('#topic').value=IDEAS[Math.floor(Math.random()*IDEAS.length)];};
+function sceneRow(t='',q=''){const d=document.createElement('div');d.className='scene';d.innerHTML=`<span class="num"></span><textarea placeholder="Narration...">${t}</textarea><input class="q" placeholder="Search term" value="${q.replace(/"/g,'&quot;')}"><button class="del">×</button>`;d.querySelector('.del').onclick=()=>{d.remove();renumber();};$('#scenes').appendChild(d);renumber();}
+function renumber(){[...document.querySelectorAll('.scene .num')].forEach((n,i)=>n.textContent=i+1);}
+$('#addScene').onclick=()=>sceneRow();
+$('#rate').oninput=(e)=>$('#rateval').textContent=(e.target.value>0?'+':'')+e.target.value+'%';
+$('#loadEx').onclick=()=>{$('#scenes').innerHTML='';$('#title').value='Foods Your Heart Loves';[['Your heart beats 100,000 times a day.','healthy food heart'],['Fatty fish protect your arteries.','salmon cooking'],['Berries fight inflammation.','fresh berries'],['Leafy greens lower blood pressure.','spinach leaves'],['Love your heart, it beats for life.','person running sunrise']].forEach(([t,q])=>sceneRow(t,q));};
 
-// ---- gallery ----
+async function loadStats(){try{const s=await(await fetch('/api/stats')).json();$('#statVideos').textContent=s.videosCreated;$('#statSeries').textContent=s.seriesParts;$('#statIdeas').textContent=s.ideasGenerated;}catch(e){}}
+async function refreshRecent(){
+  const l=await(await fetch('/api/videos')).json();
+  const el=$('#recentList');
+  if(!l.length){el.innerHTML='<div class="muted" style="font-size:12px">No projects yet.</div>';return;}
+  el.innerHTML=l.slice(0,5).map(v=>`<div class="proj" onclick="showPreview('${encodeURIComponent(v.file)}')">${v.thumb?`<img src="/out/${encodeURIComponent(v.thumb)}">`:'<div class="ph"></div>'}<div><div class="pt">${(v.title||v.file.replace('.mp4','')).slice(0,40)}</div><div class="pm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
+}
 async function refreshGallery(){
-  const list = await (await fetch('/api/videos')).json();
-  const g = $('#gallery');
-  if(!list.length){ g.innerHTML='<div class="hint">No videos yet — make your first one!</div>'; return; }
-  g.innerHTML=''; list.forEach(v => {
-    const mb=(v.size/1048576).toFixed(1);
-    const el=document.createElement('div'); el.className='vid';
-    const esc = (s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-    const meta = (v.title||v.description||v.hashtags) ? `
-      <div class="meta">
-        ${v.title?`<div class="mrow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}
-        ${v.description?`<div class="mrow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}
-        ${v.hashtags?`<div class="mrow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}
-      </div>` : '';
-    el.innerHTML=`<div class="t">${v.file.replace('.mp4','')}</div><div class="m">${mb} MB</div><video controls preload="none" src="/out/${encodeURIComponent(v.file)}"></video>${meta}<div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div>`;
-    g.appendChild(el);
-  });
-  document.querySelectorAll('.cp').forEach(b=> b.onclick=()=>{ navigator.clipboard.writeText(b.dataset.c); const o=b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=o,1000); });
+  const l=await(await fetch('/api/videos')).json(); const g=$('#gallery');
+  if(!l.length){g.innerHTML='<div class="muted" style="font-size:12px">No videos yet.</div>';return;}
+  const esc=(s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  g.innerHTML=l.map(v=>{const meta=(v.title||v.description||v.hashtags)?`<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">${v.title?`<div class="metarow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}${v.description?`<div class="metarow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}${v.hashtags?`<div class="metarow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}</div>`:'';
+    return `<div class="vid"><div style="font-weight:600">${v.file.replace('.mp4','')}</div><div class="muted" style="font-size:11px;margin:2px 0 8px">${(v.size/1048576).toFixed(1)} MB</div><video controls preload="none" ${v.thumb?`poster="/out/${encodeURIComponent(v.thumb)}"`:''} src="/out/${encodeURIComponent(v.file)}"></video>${meta}<div style="margin-top:8px"><a href="/out/${encodeURIComponent(v.file)}" download>⬇ Download</a></div></div>`;}).join('');
+  document.querySelectorAll('.cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1000);});
 }
+window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value, duration:$('#lenPick').value, llmProvider:$('#llmPick').value, genre:$('#genre').value, country:$('#country').value });
-const ACT = ['#goAI','#goManual','#goSeries','#goAds'];
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value});
+const ACT=['#goAI','#goManual','#goSeries','#goAds'];
 let polling=null;
-function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
-function endProgress(){ ACT.forEach(s=>$(s).disabled=false); }
+function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';ACT.forEach(s=>$(s).disabled=true);}
+function endP(){ACT.forEach(s=>$(s).disabled=false);}
 async function poll(id){
-  const s = await (await fetch('/api/status/'+id)).json();
-  $('#log').textContent=(s.log||[]).join('\n'); $('#log').scrollTop=$('#log').scrollHeight;
-  if(s.status==='running'){
-    const of = s.total>1 ? ` (video ${s.current} of ${s.total})` : '';
-    $('#status').innerHTML=`<span class="spin"></span> Working${of} — <b>${s.title||'…'}</b>`;
-  } else {
-    clearInterval(polling); polling=null; endProgress();
-    if(s.status==='done'){
-      $('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s) rendered</span>`;
-      $('#result').innerHTML=(s.files||[]).map(f=>`<video controls src="/out/${encodeURIComponent(f)}"></video><div style="margin:4px 0 12px"><a href="/out/${encodeURIComponent(f)}" download>⬇ ${f}</a></div>`).join('');
-      refreshGallery(); refreshSeries();
-    } else { $('#status').innerHTML=`<span class="err">❌ Failed — see the log above.</span>`; if((s.files||[]).length){ refreshGallery(); refreshSeries(); } }
-  }
+  const s=await(await fetch('/api/status/'+id)).json();
+  $('#log').textContent=(s.log||[]).join('\n');$('#log').scrollTop=$('#log').scrollHeight;
+  if(s.status==='running'){const of=s.total>1?` (video ${s.current} of ${s.total})`:'';$('#status').innerHTML=`<span class="spin"></span> Working${of} — <b>${s.title||'…'}</b>`;}
+  else{clearInterval(polling);polling=null;endP();
+    if(s.status==='done'){$('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s)</span>`;
+      const f=(s.files||[])[0]; if(f) showPreview(encodeURIComponent(f));
+      refreshRecent();refreshGallery();refreshSeries();loadStats();}
+    else{$('#status').innerHTML=`<span class="err">❌ Failed — see log.</span>`;if((s.files||[]).length){refreshRecent();refreshGallery();loadStats();}}}
 }
-function run(url, body){
-  startProgress();
-  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(async r=>{ if(!r.ok){ const e=await r.json(); throw new Error(e.error||'Error'); } return r.json(); })
-    .then(({jobId})=>{ polling=setInterval(()=>poll(jobId),1500); poll(jobId); })
-    .catch(e=>{ $('#status').innerHTML=`<span class="err">${e.message}</span>`; endProgress(); });
-}
+function run(url,body){startP();fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{if(!r.ok){const e=await r.json();throw new Error(e.error||'Error');}return r.json();}).then(({jobId})=>{polling=setInterval(()=>poll(jobId),1500);poll(jobId);}).catch(e=>{$('#status').innerHTML=`<span class="err">${e.message}</span>`;endP();});}
 
-// ---- shorts ----
-$('#goAI').onclick = () => {
-  const topic=$('#topic').value.trim();
-  const random = !topic && !$('#genre').value && !$('#country').value;
-  run('/api/generate', { topic, random, count:$('#count').value, ...fmt() });
-};
-$('#goManual').onclick = () => {
-  const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(), query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);
-  if(!$('#title').value.trim()||scenes.length<2){ alert('Add a title and at least 2 scenes.'); return; }
-  run('/api/render', { title:$('#title').value.trim(), description:$('#desc').value.trim(), tags:$('#tags').value, scenes, ...fmt() });
-};
+$('#goAI').onclick=()=>{const topic=$('#topic').value.trim();const random=!topic&&!$('#genre').value&&!$('#country').value;run('/api/generate',{topic,random,count:$('#count').value,...fmt()});};
+$('#goManual').onclick=()=>{const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(),query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);if(!$('#title').value.trim()||scenes.length<2){alert('Add a title and 2+ scenes.');return;}run('/api/render',{title:$('#title').value.trim(),description:$('#desc').value.trim(),tags:$('#tags').value,scenes,...fmt()});};
+$('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic){alert('Enter a story topic.');return;}run('/api/series/start',{topic,total:$('#seriesTotal').value,batch:$('#seriesBatch').value,...fmt()});};
+async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
+window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
+$('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:1,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};
+$('#goIdeas').onclick=async()=>{$('#goIdeas').disabled=true;$('#ideaList').innerHTML='<div class="muted"><span class="spin"></span> Brainstorming…</div>';try{const r=await(await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(),count:$('#ideaCount').value,language:$('#language').value,genre:$('#genre').value,country:$('#country').value,llmProvider:$('#llmPick').value})})).json();if(r.error)$('#ideaList').innerHTML=`<div class="err">${r.error}</div>`;else{window.__i=r.ideas||[];$('#ideaList').innerHTML=(r.ideas||[]).map((i,x)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="btn ghost" style="margin-top:8px" onclick="useIdea(${x})">Use in Shorts →</button></div>`).join('');loadStats();}}catch(e){$('#ideaList').innerHTML=`<div class="err">${e.message}</div>`;}$('#goIdeas').disabled=false;};
+window.useIdea=(x)=>{const i=window.__i[x];if(!i)return;$('#topic').value=i.title;document.querySelector('[data-nav=shorts]').click();};
 
-// ---- series ----
-$('#goSeries').onclick = () => {
-  const topic = $('#seriesTopic').value.trim();
-  if(!topic){ alert('Enter a story topic for the series.'); return; }
-  run('/api/series/start', { topic, total:$('#seriesTotal').value, batch:$('#seriesBatch').value, ...fmt() });
-};
-async function refreshSeries(){
-  const list = await (await fetch('/api/series')).json();
-  const el = $('#seriesList');
-  if(!list.length){ el.innerHTML=''; return; }
-  el.innerHTML = '<div style="font-size:12px;color:var(--muted);margin:4px 0 6px">Your series</div>' + list.map(s=>{
-    const done = s.done>=s.total;
-    return `<div class="vid"><div class="t">${s.title}</div><div class="m">${s.language} · ${s.done}/${s.total} parts ${done?'· ✓ complete':''}</div>${done?'':`<button class="action ghost" onclick="continueSeries('${s.id}')">▶️ Make next parts</button>`}</div>`;
-  }).join('');
-}
-window.continueSeries = (id) => run('/api/series/continue', { id, batch:$('#seriesBatch').value });
-
-// ---- ads ----
-$('#goAds').onclick = () => {
-  const product=$('#adProduct').value.trim();
-  if(!product){ alert('Enter the product or service to advertise.'); return; }
-  const base = { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, ...fmt() };
-  const f = $('#adImage').files[0];
-  if(f){
-    if(f.size > 70*1024*1024){ alert('Image/clip too large (max ~70 MB).'); return; }
-    const reader = new FileReader();
-    reader.onload = () => run('/api/generate', { ...base, imageDataUrl: reader.result });
-    reader.readAsDataURL(f);
-  } else { run('/api/generate', base); }
-};
-
-// ---- ideas ----
-$('#goIdeas').onclick = async () => {
-  $('#goIdeas').disabled=true; $('#ideaList').innerHTML='<div class="hint"><span class="spin"></span> Brainstorming viral ideas…</div>';
-  try{
-    const r = await (await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(), count:$('#ideaCount').value, language:$('#language').value, genre:$('#genre').value, country:$('#country').value, llmProvider:$('#llmPick').value})})).json();
-    if(r.error){ $('#ideaList').innerHTML=`<div class="err">${r.error}</div>`; }
-    else { window.__ideas=r.ideas||[]; $('#ideaList').innerHTML = (r.ideas||[]).map((i,idx)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="action ghost" style="margin-top:8px" onclick="useIdea(${idx})">Use in Shorts →</button></div>`).join(''); }
-  }catch(e){ $('#ideaList').innerHTML=`<div class="err">${e.message}</div>`; }
-  $('#goIdeas').disabled=false;
-};
-window.useIdea = (idx) => { const i=window.__ideas[idx]; if(!i) return; $('#topic').value=i.title; switchTab('shorts'); window.scrollTo({top:0,behavior:'smooth'}); };
-
-loadConfig(); refreshGallery(); refreshSeries(); sceneRow(); sceneRow();
+loadConfig();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
 </script>
 </body>
 </html>

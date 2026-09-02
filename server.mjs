@@ -362,12 +362,33 @@ app.get("/api/videos", (_req, res) => {
     .map((f) => {
       const s = statSync(join(OUT, f));
       let meta = {};
-      const metaPath = join(OUT, f.replace(/\.mp4$/, ".json"));
+      const base = f.replace(/\.mp4$/, "");
+      const metaPath = join(OUT, base + ".json");
       if (existsSync(metaPath)) { try { meta = JSON.parse(readFileSync(metaPath, "utf8")); } catch {} }
-      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "" };
+      // lazy thumbnail (first ~1s frame)
+      const thumb = base + ".thumb.jpg";
+      if (!existsSync(join(OUT, thumb))) {
+        try { execFileSync("ffmpeg", ["-y", "-ss", "1", "-i", join(OUT, f), "-frames:v", "1", "-vf", "scale=320:-1", join(OUT, thumb)], { stdio: "ignore" }); } catch {}
+      }
+      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(OUT, thumb)) ? thumb : "" };
     })
     .sort((a, b) => b.mtime - a.mtime);
   res.json(list);
+});
+
+// stats for the dashboard
+app.get("/api/stats", (_req, res) => {
+  const videosCreated = readdirSync(OUT).filter((f) => f.endsWith(".mp4")).length;
+  let seriesParts = 0, seriesCount = 0;
+  if (existsSync(SERIES_DIR)) {
+    for (const f of readdirSync(SERIES_DIR).filter((f) => f.endsWith(".json"))) {
+      try { const s = JSON.parse(readFileSync(join(SERIES_DIR, f), "utf8")); seriesParts += s.done || 0; seriesCount++; } catch {}
+    }
+  }
+  let ideasGenerated = 0;
+  const sp = join(OUT, ".stats.json");
+  if (existsSync(sp)) { try { ideasGenerated = JSON.parse(readFileSync(sp, "utf8")).ideasGenerated || 0; } catch {} }
+  res.json({ videosCreated, seriesParts, seriesCount, ideasGenerated });
 });
 
 // ---- AI: topic -> scripts -> render N videos ----
@@ -476,6 +497,13 @@ app.post("/api/ideas", async (req, res) => {
       genre: String(b.genre || "").trim(), country: String(b.country || "").trim(),
       llmProvider: b.llmProvider || "",
     });
+    // bump the ideas counter for the dashboard stat
+    try {
+      const sp = join(OUT, ".stats.json");
+      const cur = existsSync(sp) ? JSON.parse(readFileSync(sp, "utf8")) : {};
+      cur.ideasGenerated = (cur.ideasGenerated || 0) + ideas.length;
+      writeFileSync(sp, JSON.stringify(cur));
+    } catch {}
     res.json({ ideas });
   } catch (e) {
     res.status(e.message === "NO_LLM_KEY" ? 400 : 500).json({
