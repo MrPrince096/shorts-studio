@@ -144,7 +144,8 @@ export async function generateScripts({ topic, genre, country, random, count = 1
   const adRules = ad
     ? `\nADVERTISEMENT RULES:
 - Structure across the scenes: strong HOOK → the problem/pain → introduce ${product || "the product"} as the solution → 2-3 concrete benefits → a clear CALL TO ACTION.
-${productImageDesc ? `- The REAL product (from its photo) looks like this — stay accurate to it: ${productImageDesc}` : ""}
+${productImageDesc ? `- The REAL product (from its photo) looks like this — stay accurate to it: ${productImageDesc}
+- Mark "showProduct": true on the 2-3 scenes that directly show/feature the product (product reveal, benefits, final CTA). Mark "showProduct": false on the hook, problem and lifestyle scenes (those get their own visual). For every scene's "query"/"imagePrompt", when showProduct is false describe a fitting DIFFERENT visual (e.g. a frustrated person, a cluttered room, a happy customer).` : ""}
 ${benefits ? `- Benefits to highlight: ${benefits}.` : ""}
 - The FINAL scene MUST be a clear call to action${cta ? `: "${cta}"` : ""}.
 - Tone: ${tone || "energetic, persuasive, trustworthy"}. Sound like a real ad, not a lecture.`
@@ -173,7 +174,7 @@ For EACH video:
 ${count > 1 ? `Make the ${count} videos cover clearly different angles so they do not repeat.` : ""}
 
 Return ONLY valid JSON, no markdown, of exactly this shape:
-{"videos":[{"title":"","slug":"","description":"","tags":["",""],"scenes":[{"text":"","query":"","imagePrompt":""}]}]}`;
+{"videos":[{"title":"","slug":"","description":"","tags":["",""],"scenes":[{"text":"","query":"","imagePrompt":"","showProduct":false}]}]}`;
 
   let raw;
   try {
@@ -199,7 +200,7 @@ Return ONLY valid JSON, no markdown, of exactly this shape:
       font: font || "Arial Black", fontCss: fontCss || "", rtl: !!rtl,
       scenes: (v.scenes || [])
         .filter((s) => s && s.text && s.query)
-        .map((s) => ({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || "") })),
+        .map((s) => ({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || ""), showProduct: !!s.showProduct })),
     }))
     .filter((v) => v.scenes.length >= 2);
   if (!videos.length) throw new Error("The LLM returned no usable scripts. Try a clearer topic.");

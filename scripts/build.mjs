@@ -279,12 +279,11 @@ const GEN = {
   local: localImage,
   "fal-image": falImage,
   fal: falVideo,
-  upload: uploadMedia,
 };
-const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video", upload: "🖼️ Your media" };
-const genFn = GEN[src] || GEN.pexels;
-const isImageSrc = src === "image" || src === "hf" || src === "local" || src === "fal-image" || (src === "upload" && config.uploadIsImage);
-// key checks
+const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video", upload: "🖼️ Your product" };
+const IMG_SOURCES = new Set(["image", "hf", "local", "fal-image"]);
+const srcIsImage = (s) => IMG_SOURCES.has(s);
+// key checks for the base (fallback) source
 if ((src === "fal" || src === "fal-image") && !process.env.FAL_KEY) {
   console.error("❌ This source needs a fal.ai key (FAL_KEY). Add it in Settings.");
   process.exit(1);
@@ -294,12 +293,22 @@ if (src === "hf" && !process.env.HF_TOKEN) {
   process.exit(1);
 }
 
+// if a product image was uploaded but no scene was flagged to show it, default to 2 key scenes
+if (config.uploadFile && !config.scenes.some((s) => s.showProduct)) {
+  const n = config.scenes.length;
+  const idxs = new Set([Math.floor(n / 2), n - 1]);
+  config.scenes.forEach((s, i) => { s.showProduct = idxs.has(i); });
+}
+
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
-  const file = `scene${i}.${isImageSrc ? "jpg" : "mp4"}`;
-  process.stdout.write(`${TAG[src] || "🎬"} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
+  const useUpload = !!config.uploadFile && !!config.scenes[i].showProduct;
+  const isImg = useUpload ? !!config.uploadIsImage : srcIsImage(src);
+  const file = `scene${i}.${isImg ? "jpg" : "mp4"}`;
+  const gen = useUpload ? uploadMedia : (GEN[src] || GEN.pexels);
+  process.stdout.write(`${useUpload ? TAG.upload : (TAG[src] || "🎬")} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
   try {
-    const b = await genFn(config.scenes[i], join(PUBLIC, file));
+    const b = await gen(config.scenes[i], join(PUBLIC, file));
     console.log(`ok (${b.w}x${b.h})`);
   } catch (e) {
     console.log("FAILED:", e.message);

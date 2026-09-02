@@ -161,6 +161,34 @@ const LANGUAGES = [
     { id: "zh-CN-XiaoxiaoNeural", label: "Xiaoxiao — Female" }, { id: "zh-CN-YunxiNeural", label: "Yunxi — Male" }] },
   { id: "id", label: "Indonesian", voices: [
     { id: "id-ID-GadisNeural", label: "Gadis — Female" }, { id: "id-ID-ArdiNeural", label: "Ardi — Male" }] },
+  { id: "ne", label: "Nepali", font: "Noto Sans Devanagari", voices: [
+    { id: "ne-NP-HemkalaNeural", label: "Hemkala — Female" }, { id: "ne-NP-SagarNeural", label: "Sagar — Male" }] },
+  { id: "si", label: "Sinhala", font: "Noto Sans Sinhala", voices: [
+    { id: "si-LK-ThiliniNeural", label: "Thilini — Female" }, { id: "si-LK-SameeraNeural", label: "Sameera — Male" }] },
+  { id: "fa", label: "Persian", font: "Noto Sans Arabic", rtl: true, voices: [
+    { id: "fa-IR-DilaraNeural", label: "Dilara — Female" }, { id: "fa-IR-FaridNeural", label: "Farid — Male" }] },
+  { id: "he", label: "Hebrew", font: "Noto Sans Hebrew", rtl: true, voices: [
+    { id: "he-IL-HilaNeural", label: "Hila — Female" }, { id: "he-IL-AvriNeural", label: "Avri — Male" }] },
+  { id: "th", label: "Thai", font: "Noto Sans Thai", voices: [
+    { id: "th-TH-PremwadeeNeural", label: "Premwadee — Female" }, { id: "th-TH-NiwatNeural", label: "Niwat — Male" }] },
+  { id: "vi", label: "Vietnamese", font: "Noto Sans", voices: [
+    { id: "vi-VN-HoaiMyNeural", label: "Hoai My — Female" }, { id: "vi-VN-NamMinhNeural", label: "Nam Minh — Male" }] },
+  { id: "tr", label: "Turkish", font: "Noto Sans", voices: [
+    { id: "tr-TR-EmelNeural", label: "Emel — Female" }, { id: "tr-TR-AhmetNeural", label: "Ahmet — Male" }] },
+  { id: "it", label: "Italian", voices: [
+    { id: "it-IT-ElsaNeural", label: "Elsa — Female" }, { id: "it-IT-DiegoNeural", label: "Diego — Male" }] },
+  { id: "pl", label: "Polish", font: "Noto Sans", voices: [
+    { id: "pl-PL-ZofiaNeural", label: "Zofia — Female" }, { id: "pl-PL-MarekNeural", label: "Marek — Male" }] },
+  { id: "nl", label: "Dutch", voices: [
+    { id: "nl-NL-ColetteNeural", label: "Colette — Female" }, { id: "nl-NL-MaartenNeural", label: "Maarten — Male" }] },
+  { id: "uk", label: "Ukrainian", font: "Noto Sans", voices: [
+    { id: "uk-UA-PolinaNeural", label: "Polina — Female" }, { id: "uk-UA-OstapNeural", label: "Ostap — Male" }] },
+  { id: "el", label: "Greek", font: "Noto Sans", voices: [
+    { id: "el-GR-AthinaNeural", label: "Athina — Female" }, { id: "el-GR-NestorasNeural", label: "Nestoras — Male" }] },
+  { id: "fil", label: "Filipino", voices: [
+    { id: "fil-PH-BlessicaNeural", label: "Blessica — Female" }, { id: "fil-PH-AngeloNeural", label: "Angelo — Male" }] },
+  { id: "sw", label: "Swahili", voices: [
+    { id: "sw-KE-ZuriNeural", label: "Zuri — Female" }, { id: "sw-KE-RafikiNeural", label: "Rafiki — Male" }] },
 ];
 function resolveLang(id) {
   const L = LANGUAGES.find((x) => x.id === id) || LANGUAGES[0];
@@ -390,7 +418,8 @@ app.post("/api/generate", async (req, res) => {
       });
       configs.forEach((c) => {
         c.imageStyle = b.imageStyle || "";
-        if (upload) { c.source = "upload"; c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
+        // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
+        if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
       job.total = configs.length;
       pushLog(job, `✅ ${configs.length} script(s) ready. Rendering…`);
