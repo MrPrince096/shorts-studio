@@ -20,7 +20,7 @@ function env(key, dflt = "") {
   return dflt;
 }
 
-const SCENES_FOR = { short: 5, medium: 7, long: 9 };
+const SCENES_FOR = { short: 5, medium: 7, long: 9, xlong: 14, xxlong: 20, huge: 30 };
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
 
 // ---------- LLM providers: each takes a prompt, returns raw text ----------
@@ -96,8 +96,8 @@ async function llmOllama(prompt) {
   return data?.response || "";
 }
 
-export async function callLLM(prompt) {
-  const provider = env("LLM_PROVIDER", "gemini").toLowerCase();
+export async function callLLM(prompt, providerOverride) {
+  const provider = (providerOverride || env("LLM_PROVIDER", "gemini")).toLowerCase();
   if (provider === "openai") return llmOpenAI(prompt);
   if (provider === "ollama") return llmOllama(prompt);
   return llmGemini(prompt);
@@ -126,15 +126,16 @@ function buildSubject({ topic, genre, country, random, count }) {
 }
 
 // VidIQ-style: brainstorm viral short ideas + titles + SEO tags for a niche.
-export async function generateIdeas({ niche, count = 8, language = "English" }) {
-  const prompt = `You are a YouTube growth strategist. Suggest ${count} fresh, high-potential SHORT-video ideas ${niche ? `in the niche: "${niche}"` : "for a broad audience"}.
+export async function generateIdeas({ niche, count = 8, language = "English", genre, country, llmProvider }) {
+  const focus = [niche && `in the niche: "${niche}"`, genre && `with a "${genre}" style`, country && `related to ${country}`].filter(Boolean).join(", ") || "for a broad audience";
+  const prompt = `You are a YouTube growth strategist. Suggest ${count} fresh, high-potential SHORT-video ideas ${focus}.
 For EACH idea give: a scroll-stopping "title" (<= 9 words${language && language.toLowerCase() !== "english" ? `, in ${language}` : ""}), a one-line "hook", a short "why" it can go viral, and 4-6 SEO "tags".
 Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
-  const data = parseLLMJson(await callLLM(prompt));
+  const data = parseLLMJson(await callLLM(prompt, llmProvider));
   return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
 }
 
-export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl, ad, product, benefits, cta, tone, productImageDesc }) {
+export async function generateScripts({ topic, genre, country, random, count = 1, duration = "medium", voice, rate = "0%", width, height, source, videoModel, language = "English", font, fontCss, rtl, ad, product, benefits, cta, tone, productImageDesc, llmProvider }) {
   const nScenes = SCENES_FOR[duration] || 7;
   const nonEnglish = language && language.toLowerCase() !== "english";
   const subject = ad
@@ -176,7 +177,7 @@ Return ONLY valid JSON, no markdown, of exactly this shape:
 
   let raw;
   try {
-    raw = await callLLM(prompt);
+    raw = await callLLM(prompt, llmProvider);
   } catch (e) {
     if (String(e.message).startsWith("NO_LLM_KEY")) throw new Error("NO_LLM_KEY");
     throw e;

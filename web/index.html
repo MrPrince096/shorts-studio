@@ -84,19 +84,27 @@
   <div>
     <!-- SHARED OUTPUT SETTINGS -->
     <div class="card" id="outputCard">
-      <h2>🎛️ Output settings</h2>
+      <h2>🎛️ Output settings — apply to every tab</h2>
       <div class="row">
         <div><label>Language 🌐</label><select id="language"></select></div>
         <div><label>Voice</label><select id="voice"></select></div>
+      </div>
+      <div class="row">
+        <div><label>Genre</label><select id="genre"></select></div>
+        <div><label>Country</label><select id="country"></select></div>
+      </div>
+      <div class="row">
+        <div><label>Script AI 🧠</label><select id="llmPick"></select></div>
+        <div><label>Length</label><select id="lenPick"></select></div>
       </div>
       <div class="row">
         <div><label>Aspect ratio</label><select id="aspect"></select></div>
         <div><label>Resolution</label><select id="quality"></select></div>
       </div>
       <div class="row">
-        <div><label>Visual source</label><select id="source"></select></div>
+        <div><label>Visual source 🎥</label><select id="source"></select></div>
         <div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div>
-        <div id="falModelBox" style="display:none"><label>AI video model</label><select id="videoModel"></select></div>
+        <div id="falModelBox" style="display:none"><label>Video model (Veo / Seedance…)</label><select id="videoModel"></select></div>
       </div>
       <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
       <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
@@ -119,14 +127,10 @@
         <button class="action ghost" id="surprise" title="Random idea">🎲</button>
       </div>
       <div class="row">
-        <div><label>Genre</label><select id="genre"></select></div>
-        <div><label>Country</label><select id="country"></select></div>
-      </div>
-      <div class="row">
         <div><label>How many videos</label><select id="count"></select></div>
-        <div><label>Duration</label><select id="duration"></select></div>
       </div>
       <div class="btnrow"><button class="action primary big" id="goAI">✨ Make Videos</button></div>
+      <div class="hint">Uses the language, genre, country, length, voice & visual source in Output Settings above.</div>
       <details>
         <summary>⚙️ Advanced — write the scenes yourself</summary>
         <label>Title</label>
@@ -171,9 +175,6 @@
       <div class="row">
         <div><label>Call to action</label><input id="adCta" placeholder="Order now at 50% off" /></div>
         <div><label>Tone</label><select id="adTone"></select></div>
-      </div>
-      <div class="row">
-        <div><label>Length</label><select id="adDuration"></select></div>
       </div>
       <div class="btnrow"><button class="action primary big" id="goAds">📣 Make Ad</button></div>
       <div class="hint">The AI writes a hook → problem → product → benefits → call-to-action ad, then renders it with your chosen voice & visuals.</div>
@@ -269,7 +270,6 @@ function opt(v,l){ const o=document.createElement('option'); o.value=v; o.textCo
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden = p.id!=='tab-'+name);
-  $('#outputCard').style.display = name==='ideas' ? 'none':'block';
 }
 document.querySelectorAll('.tab').forEach(t=> t.onclick=()=>switchTab(t.dataset.tab));
 
@@ -287,7 +287,9 @@ async function loadConfig(){
   $('#language').onchange = () => populateVoices($('#language').value);
   c.aspects.forEach(a => $('#aspect').appendChild(opt(a.id, a.label)));
   c.qualities.forEach(q => $('#quality').appendChild(opt(q.id, q.label)));
-  c.durations.forEach(d => { $('#duration').appendChild(opt(d.id, d.label)); $('#adDuration').appendChild(opt(d.id, d.label)); });
+  c.durations.forEach(d => $('#lenPick').appendChild(opt(d.id, d.label)));
+  $('#llmPick').appendChild(opt('', 'Default (from Settings)'));
+  (c.llmProviders||[]).forEach(p => $('#llmPick').appendChild(opt(p.id, p.label)));
   $('#genre').appendChild(opt('', '— any / none —'));
   (c.genres||[]).forEach(g => $('#genre').appendChild(opt(g.id, g.label)));
   $('#country').appendChild(opt('', '— any / none —'));
@@ -307,7 +309,7 @@ async function loadConfig(){
     $('#falModelBox').style.display = s==='fal' ? 'block':'none';
     $('#styleBox').style.display = ['image','hf','local','fal-image','fal'].includes(s) ? 'block':'none';
   };
-  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#duration').value='medium'; $('#adDuration').value='short'; $('#source').value='pexels';
+  $('#voice').value='en-US-AriaNeural'; $('#quality').value='1080'; $('#lenPick').value='medium'; $('#llmPick').value=''; $('#source').value='pexels';
 }
 
 // ---- settings ----
@@ -388,7 +390,7 @@ async function refreshGallery(){
   document.querySelectorAll('.cp').forEach(b=> b.onclick=()=>{ navigator.clipboard.writeText(b.dataset.c); const o=b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=o,1000); });
 }
 
-const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value });
+const fmt = () => ({ language:$('#language').value, voice:$('#voice').value, aspect:$('#aspect').value, quality:$('#quality').value, rate:$('#rate').value+'%', source:$('#source').value, videoModel:$('#videoModel').value, imageStyle:$('#imageStyle').value, duration:$('#lenPick').value, llmProvider:$('#llmPick').value, genre:$('#genre').value, country:$('#country').value });
 const ACT = ['#goAI','#goManual','#goSeries','#goAds'];
 let polling=null;
 function startProgress(){ $('#progress').style.display='block'; $('#result').innerHTML=''; $('#log').textContent=''; $('#status').innerHTML='<span class="spin"></span> Starting…'; ACT.forEach(s=>$(s).disabled=true); $('#progress').scrollIntoView({behavior:'smooth'}); }
@@ -418,9 +420,9 @@ function run(url, body){
 
 // ---- shorts ----
 $('#goAI').onclick = () => {
-  const topic=$('#topic').value.trim(), genre=$('#genre').value, country=$('#country').value;
-  const random = !topic && !genre && !country;
-  run('/api/generate', { topic, genre, country, random, count:$('#count').value, duration:$('#duration').value, ...fmt() });
+  const topic=$('#topic').value.trim();
+  const random = !topic && !$('#genre').value && !$('#country').value;
+  run('/api/generate', { topic, random, count:$('#count').value, ...fmt() });
 };
 $('#goManual').onclick = () => {
   const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(), query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);
@@ -449,7 +451,7 @@ window.continueSeries = (id) => run('/api/series/continue', { id, batch:$('#seri
 $('#goAds').onclick = () => {
   const product=$('#adProduct').value.trim();
   if(!product){ alert('Enter the product or service to advertise.'); return; }
-  const base = { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, duration:$('#adDuration').value, ...fmt() };
+  const base = { ad:true, product, benefits:$('#adBenefits').value.trim(), cta:$('#adCta').value.trim(), tone:$('#adTone').value, count:1, ...fmt() };
   const f = $('#adImage').files[0];
   if(f){
     if(f.size > 70*1024*1024){ alert('Image/clip too large (max ~70 MB).'); return; }
@@ -463,7 +465,7 @@ $('#goAds').onclick = () => {
 $('#goIdeas').onclick = async () => {
   $('#goIdeas').disabled=true; $('#ideaList').innerHTML='<div class="hint"><span class="spin"></span> Brainstorming viral ideas…</div>';
   try{
-    const r = await (await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(), count:$('#ideaCount').value, language:$('#language').value})})).json();
+    const r = await (await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(), count:$('#ideaCount').value, language:$('#language').value, genre:$('#genre').value, country:$('#country').value, llmProvider:$('#llmPick').value})})).json();
     if(r.error){ $('#ideaList').innerHTML=`<div class="err">${r.error}</div>`; }
     else { window.__ideas=r.ideas||[]; $('#ideaList').innerHTML = (r.ideas||[]).map((i,idx)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="action ghost" style="margin-top:8px" onclick="useIdea(${idx})">Use in Shorts →</button></div>`).join(''); }
   }catch(e){ $('#ideaList').innerHTML=`<div class="err">${e.message}</div>`; }

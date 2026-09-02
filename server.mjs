@@ -65,6 +65,9 @@ const DURATIONS = [
   { id: "short", label: "Short — ~20s (5 scenes)" },
   { id: "medium", label: "Medium — ~35s (7 scenes)" },
   { id: "long", label: "Long — ~50s (9 scenes)" },
+  { id: "xlong", label: "Extra long — ~80s (14 scenes)" },
+  { id: "xxlong", label: "Very long — ~2 min (20 scenes)" },
+  { id: "huge", label: "Max — ~3 min (30 scenes)" },
 ];
 const GENRES = [
   "Motivation", "Discipline", "Stoicism & Philosophy", "Success & Money Mindset",
@@ -383,6 +386,7 @@ app.post("/api/generate", async (req, res) => {
         videoModel: b.videoModel || "",
         language: lang.label, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         ad: !!b.ad, product: b.product || "", benefits: b.benefits || "", cta: b.cta || "", tone: b.tone || "", productImageDesc,
+        llmProvider: b.llmProvider || "",
       });
       configs.forEach((c) => {
         c.imageStyle = b.imageStyle || "";
@@ -440,6 +444,8 @@ app.post("/api/ideas", async (req, res) => {
       niche: String(b.niche || "").trim(),
       count: Math.min(Math.max(parseInt(b.count) || 8, 1), 20),
       language: resolveLang(b.language || "en").label,
+      genre: String(b.genre || "").trim(), country: String(b.country || "").trim(),
+      llmProvider: b.llmProvider || "",
     });
     res.json({ ideas });
   } catch (e) {
@@ -475,13 +481,14 @@ app.post("/api/series/start", (req, res) => {
   (async () => {
     try {
       pushLog(job, `📖 Planning "${b.topic}" as a ${total}-part series…`);
-      const o = await createOutline({ topic: String(b.topic).trim(), total });
+      const o = await createOutline({ topic: String(b.topic).trim(), total, genre: b.genre || "", country: b.country || "", llmProvider: b.llmProvider || "" });
       const series = {
         id: "s" + Date.now().toString(36),
         seriesTitle: o.seriesTitle, slug: o.slug, topic: String(b.topic).trim(),
         language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%",
         aspect: b.aspect || "9:16", quality: b.quality || "1080", duration: b.duration || "medium",
         source: b.source || "pexels", videoModel: b.videoModel || "", imageStyle: b.imageStyle || "",
+        llmProvider: b.llmProvider || "",
         width, height, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         outline: o.outline, total, done: 0, files: [], recaps: [],
       };

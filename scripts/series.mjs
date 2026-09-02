@@ -1,19 +1,21 @@
 // Storyteller series: split one story into connected, sequential episodes.
 import { callLLM, parseLLMJson } from "./generate.mjs";
 
-const SCENES_FOR = { short: 5, medium: 7, long: 9 };
+const SCENES_FOR = { short: 5, medium: 7, long: 9, xlong: 14, xxlong: 20, huge: 30 };
 
 function slugify(s) {
   return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
 // Break a topic/story into `total` sequential episode beats.
-export async function createOutline({ topic, total }) {
+export async function createOutline({ topic, total, genre, country, llmProvider }) {
+  const flavor = [genre && `Style/genre: ${genre}.`, country && `Set in / related to ${country}.`].filter(Boolean).join(" ");
   const prompt = `Break the story / topic "${topic}" into EXACTLY ${total} sequential episodes for a YouTube Shorts SERIES.
+${flavor}
 Each episode is ONE story beat that flows directly from the previous one — chronological, no repetition — together covering the whole story from beginning to end (episode 1 = the very start, episode ${total} = the conclusion).
 Return ONLY valid JSON, no markdown:
 {"seriesTitle":"<short English series name, 2-4 words>","outline":[{"part":1,"beat":"<one English line: what happens in this episode>"}]}`;
-  const data = parseLLMJson(await callLLM(prompt));
+  const data = parseLLMJson(await callLLM(prompt, llmProvider));
   const outline = (data.outline || []).map((o, i) => ({ part: i + 1, beat: String(o.beat || "") })).filter((o) => o.beat);
   if (!outline.length) throw new Error("Could not build a series outline. Try a clearer story topic.");
   return { seriesTitle: data.seriesTitle || topic, slug: slugify(data.seriesTitle || topic) || "series", outline };
@@ -43,7 +45,7 @@ ${langBlock}
 - Give a "title" (short, in the narration language) and 4-6 "tags".
 Return ONLY valid JSON: {"title":"","recap":"","tags":["",""],"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
 
-  const v = parseLLMJson(await callLLM(prompt));
+  const v = parseLLMJson(await callLLM(prompt, series.llmProvider));
   const scenes = (v.scenes || []).filter((s) => s && s.text && s.query).map((s) => ({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || "") }));
   if (scenes.length < 2) throw new Error(`Episode ${part}: model returned too few scenes.`);
   const partLabel = `Part ${part}`;
