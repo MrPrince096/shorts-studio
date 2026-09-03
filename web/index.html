@@ -328,6 +328,7 @@
           <h2><span data-icon="zap"></span> Quick settings <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
           <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
           <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option><option value="xtts">XTTS-v2 — offline, expressive 🎭</option><option value="eleven">ElevenLabs — cloud, most emotional 🎭</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
+          <div class="note warn" id="voiceWarn" style="display:none;margin-top:8px"></div>
           <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
           <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
           <div class="row"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
@@ -569,7 +570,7 @@ function populateVoices(id){const L=LANGS.find(x=>x.id===id)||LANGS[0];$('#voice
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
   LANGS=c.languages||[]; LANGS.forEach(l=>$('#language').appendChild(opt(l.id,l.label)));
-  $('#language').value='en'; populateVoices('en'); $('#language').onchange=()=>populateVoices($('#language').value);
+  $('#language').value='en'; populateVoices('en'); $('#language').onchange=()=>{populateVoices($('#language').value);voiceWarn();};
   c.aspects.forEach(a=>$('#aspect').appendChild(opt(a.id,a.label)));
   c.qualities.forEach(q=>$('#quality').appendChild(opt(q.id,q.label)));
   c.durations.forEach(d=>$('#lenPick').appendChild(opt(d.id,d.label)));
@@ -636,9 +637,17 @@ async function loadSettings(){
 }
 async function loadPiperVoices(){
   try{const r=await(await fetch('/api/piper-voices')).json();const sel=$('#piperVoice');sel.innerHTML='';(r.voices||[]).forEach(v=>sel.appendChild(opt(v.file,v.label)));if(r.current&&[...sel.options].some(o=>o.value===r.current))sel.value=r.current;}catch(e){}
+  voiceWarn();
 }
 function togglePiperVoice(){$('#piperVoiceBox').style.display=$('#voiceEngine').value==='piper'?'block':'none';}
-$('#voiceEngine').onchange=()=>{window.__voiceTouched=true;togglePiperVoice();};
+const XTTS_LANGS_UI=new Set(['en','es','fr','de','it','pt','pl','tr','ru','nl','cs','ar','zh','ja','hu','ko','hi']);
+function voiceWarn(){
+  const eng=$('#voiceEngine').value, lc=$('#language').value; let w='';
+  if(eng==='xtts'&&!XTTS_LANGS_UI.has(lc)) w='This language isn’t supported by XTTS — it’ll use edge-tts instead. The expressive voices cover English, Hindi, Spanish, French, German, Arabic & more.';
+  else if(eng==='piper'){const locs=[...$('#piperVoice').options].map(o=>o.value.slice(0,2).toLowerCase());if(locs.length&&!locs.includes(lc)) w='No Piper voice installed for this language — it’ll use edge-tts instead.';}
+  const el=$('#voiceWarn'); el.innerHTML=w?('⚠️ '+w):''; el.style.display=w?'block':'none';
+}
+$('#voiceEngine').onchange=()=>{window.__voiceTouched=true;togglePiperVoice();voiceWarn();};
 function applyAvatarUI(){
   const ap=window.__avatar||'';const c=$('#ugcTalking');if(!c)return;
   c.disabled=!ap; if(!ap)c.checked=false;
