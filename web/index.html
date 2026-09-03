@@ -318,7 +318,7 @@
           <div class="cardsub">Viral ideas, titles & tags (VidIQ-style)</div>
           <label>Your niche <span class="muted">(optional)</span></label>
           <input id="ideaNiche" class="big" placeholder="fitness · Indian mythology · finance" />
-          <div class="row"><div><label>How many ideas</label><select id="ideaCount"></select></div></div>
+          <div class="row"><div><label>Ideas for</label><select id="ideaFor"><option value="shorts">🎬 Shorts</option><option value="story">📖 Story</option><option value="ads">📣 Ads</option></select></div><div><label>How many ideas</label><select id="ideaCount"></select></div></div>
           <button class="btn grad big" id="goIdeas" style="width:100%;margin-top:16px"><span data-icon="bulb"></span>Get Ideas</button>
           <div id="ideaList" style="margin-top:14px"></div>
         </div>
@@ -599,7 +599,7 @@ async function loadConfig(){
   ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>{$('#adTone').appendChild(opt(t,t));$('#ugcTone').appendChild(opt(t,t));});
   [['short-form vertical','Short-form vertical'],['social story','Social story'],['product promo','Product promo'],['testimonial','Testimonial'],['offer','Offer / discount']].forEach(([v,l])=>$('#socPreset').appendChild(opt(v,l)));
   [1,2,3,5].forEach(n=>{const l=n===1?'1 ad':n+' variations';$('#adVariations').appendChild(opt(n,l));$('#ugcVariations').appendChild(opt(n,l));});
-  [['story','General story'],['bedtime','Bedtime story'],['scary','Scary story'],['biography','Biography'],['tech','Tech explainer'],['documentary','Documentary'],['motivational','Motivational']].forEach(([v,l])=>$('#storyType').appendChild(opt(v,l)));
+  [['story','General story'],['bedtime','Bedtime story'],['scary','Scary story'],['biography','Biography'],['history','History'],['war','War history'],['cooking','World cooking'],['fashion','Fashion & style'],['educational','Educational'],['tech','Tech explainer'],['documentary','Documentary'],['motivational','Motivational']].forEach(([v,l])=>$('#storyType').appendChild(opt(v,l)));
   [1,2,3,5,7,10].forEach(n=>$('#storyMinutes').appendChild(opt(n,n+' min')));
   $('#storyType').value='scary'; $('#storyMinutes').value='3';
   const STORY_THEME_DESC={
@@ -609,6 +609,11 @@ async function loadConfig(){
     tech:'💻 <b>Tech</b> — Andrew Chipper voice · clear brisk delivery · neutral music · sleek modern look',
     documentary:'🎬 <b>Documentary</b> — Viktor Menelaos voice · authoritative delivery · neutral music · epic cinematic look',
     motivational:'💪 <b>Motivational</b> — Craig Gutsy voice · bright energetic delivery · uplifting music · golden epic look',
+    cooking:'🍳 <b>World Cooking</b> — warm appetizing narration · uplifting music · vibrant food look',
+    fashion:'👗 <b>Fashion & Style</b> — stylish narration · uplifting music · vibrant editorial look',
+    educational:'🎓 <b>Educational</b> — clear curious narration · neutral music · clean bright look',
+    history:'🏛️ <b>History</b> — immersive narration · gentle music · aged cinematic look',
+    war:'⚔️ <b>War History</b> — gripping slow narration · tense music · gritty vintage look',
     story:'✨ <b>Story</b> — dramatic delivery · atmospheric music · cinematic look',
   };
   const updTheme=()=>{$('#storyTheme').innerHTML=(STORY_THEME_DESC[$('#storyType').value]||'')+'<br><span class="muted" style="font-size:11px">Theme is applied automatically. XTTS/ElevenLabs voices need the expressive engine; music & pacing work on any voice.</span>';};
@@ -621,13 +626,18 @@ async function loadConfig(){
     documentary:['the mystery of the Bermuda Triangle','how the pyramids were really built','the deepest place on Earth','the fall of the Roman Empire','the secrets of the ocean floor','the day the dinosaurs vanished'],
     motivational:['why you should never give up','the power of tiny daily habits','how discipline beats motivation','turning failure into your fuel','the mindset that changes everything','5am and the life it built'],
     story:['the traveler who found a hidden door','a letter that arrived 50 years late','the village that vanished overnight','two strangers on a rainy night','the shop that only opens at midnight'],
+    cooking:['how to make authentic Italian pasta','street food of Thailand','the secret to perfect Indian biryani','how sushi is really made in Japan','Mexican tacos from scratch','French croissants explained','how to cook a Moroccan tagine'],
+    fashion:['traditional dress around the world','how the sari became iconic','the history of denim','Japanese street fashion explained','what your outfit says about you','the rise of streetwear','elegant styles of the 1950s'],
+    educational:['how photography actually works','how the internet travels the world','why the sky is blue','how vaccines protect you','how money is really made','how your brain forms memories','how black holes work'],
+    history:['the rise and fall of the Roman Empire','the mystery of the lost city of Atlantis','how the Great Wall of China was built','the golden age of ancient Egypt','the story behind the Taj Mahal','the age of the samurai'],
+    war:['the turning point of World War II','the battle that changed history','inside the Cold War','the story of the 300 Spartans','the D-Day landings explained','the fall of Berlin'],
   };
   $('#storySurprise').onclick=(e)=>{e.preventDefault();const arr=STORY_IDEAS[$('#storyType').value]||STORY_IDEAS.story;$('#storyTopic').value=arr[Math.floor(Math.random()*arr.length)];};
   [['0','Off — one per scene'],['3','3 images'],['5','5 images'],['8','8 images']].forEach(([v,l])=>$('#reuseVisuals').appendChild(opt(v,l)));
   $('#musicMood').value='auto'; $('#reuseVisuals').value='0';
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
   [['in','Zoom in (default)'],['out','Zoom out'],['subtle','Subtle zoom'],['none','Static (no motion)'],['random','Random per scene']].forEach(([v,l])=>$('#motion').appendChild(opt(v,l)));
-  [['auto','Auto (match story)'],['none','None'],['tiltshift','Tilt-shift (miniature) 🔭'],['vintage','Vintage film 🎞️'],['noir','Noir (B&W) 🖤'],['dreamy','Dreamy glow ✨'],['vibrant','Vibrant 🌈'],['cold','Cold cinematic ❄️'],['warm','Warm 🌇']].forEach(([v,l])=>$('#effect').appendChild(opt(v,l)));
+  [['auto','Auto (match story)'],['none','None'],['tiltshift','Tilt-shift (miniature) 🔭'],['vintage','Vintage film 🎞️'],['noir','Noir (B&W) 🖤'],['dreamy','Dreamy glow ✨'],['vibrant','Vibrant 🌈'],['cold','Cold cinematic ❄️'],['warm','Warm 🌇'],['vhs','VHS / retro 📼'],['lightleak','Light leak 🔆'],['letterbox','Cinema bars 🎬']].forEach(([v,l])=>$('#effect').appendChild(opt(v,l)));
   $('#effect').value='auto';
   $('#captionPos').value='bottom'; $('#motion').value='in';
   $('#seriesTotal').value='10';$('#seriesBatch').value='3';$('#ideaCount').value='8';
@@ -799,8 +809,13 @@ async function loadCreators(){
 window.delCreator=(id)=>{if(confirm('Delete this creator?'))fetch('/api/creators/'+id,{method:'DELETE'}).then(loadCreators);};
 $('#goCreator').onclick=()=>{const f=$('#crPhoto').files[0];if(!f){alert('Add a clear front-facing photo.');return;}if(f.size>20*1024*1024){alert('Max 20 MB.');return;}
   const rd=new FileReader();rd.onload=()=>{const b=$('#goCreator');b.disabled=true;fetch('/api/creators',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo:rd.result,name:$('#crName').value.trim()||'My Creator',personality:$('#crPersona').value.trim(),voice:$('#voice').value,language:$('#language').value})}).then(()=>{$('#crPhoto').value='';$('#crName').value='';$('#crPersona').value='';b.disabled=false;loadCreators();});};rd.readAsDataURL(f);};
-$('#goIdeas').onclick=async()=>{$('#goIdeas').disabled=true;$('#ideaList').innerHTML='<div class="muted"><span class="spin"></span> Brainstorming…</div>';try{const r=await(await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(),count:$('#ideaCount').value,language:$('#language').value,genre:$('#genre').value,country:$('#country').value,llmProvider:$('#llmPick').value})})).json();if(r.error)$('#ideaList').innerHTML=`<div class="err">${r.error}</div>`;else{window.__i=r.ideas||[];$('#ideaList').innerHTML=(r.ideas||[]).map((i,x)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="btn ghost" style="margin-top:8px" onclick="useIdea(${x})">Use in Shorts →</button></div>`).join('');loadStats();}}catch(e){$('#ideaList').innerHTML=`<div class="err">${e.message}</div>`;}$('#goIdeas').disabled=false;};
-window.useIdea=(x)=>{const i=window.__i[x];if(!i)return;$('#topic').value=i.title;document.querySelector('[data-nav=shorts]').click();};
+const IDEA_CTA={shorts:'Use in Shorts →',story:'Turn into Story →',ads:'Make an Ad →'};
+$('#goIdeas').onclick=async()=>{$('#goIdeas').disabled=true;const forType=$('#ideaFor').value;$('#ideaList').innerHTML='<div class="muted"><span class="spin"></span> Brainstorming…</div>';try{const r=await(await fetch('/api/ideas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:$('#ideaNiche').value.trim(),count:$('#ideaCount').value,language:$('#language').value,genre:$('#genre').value,country:$('#country').value,forType,llmProvider:$('#llmPick').value})})).json();if(r.error)$('#ideaList').innerHTML=`<div class="err">${r.error}</div>`;else{window.__i=r.ideas||[];window.__iFor=forType;const cta=IDEA_CTA[forType]||IDEA_CTA.shorts;$('#ideaList').innerHTML=(r.ideas||[]).map((i,x)=>`<div class="idea"><div class="it">${i.title}</div><div class="ih">${i.hook||''}</div><div class="ih" style="color:var(--ok)">💡 ${i.why||''}</div><div>${(i.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><button class="btn ghost" style="margin-top:8px" onclick="useIdea(${x})">${cta}</button></div>`).join('');loadStats();}}catch(e){$('#ideaList').innerHTML=`<div class="err">${e.message}</div>`;}$('#goIdeas').disabled=false;};
+window.useIdea=(x)=>{const i=window.__i[x];if(!i)return;const f=window.__iFor||'shorts';
+  if(f==='story'){$('#storyTopic').value=i.title;document.querySelector('[data-nav=story]').click();}
+  else if(f==='ads'){$('#adProduct').value=i.title;document.querySelector('[data-nav=ads]').click();const pb=document.querySelector('#adSeg button[data-ad=product]');if(pb)pb.click();}
+  else{$('#topic').value=i.title;document.querySelector('[data-nav=shorts]').click();}
+};
 
 // ---- drafts ----
 $('#saveDraft').onclick=()=>{

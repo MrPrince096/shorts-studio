@@ -305,7 +305,7 @@ function maskKey(v) {
   return v.length <= 4 ? "••••" : "••••••" + v.slice(-4);
 }
 
-const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", story: "neutral" };
+const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", cooking: "uplifting", fashion: "uplifting", educational: "neutral", history: "neutral", war: "scary", story: "neutral" };
 // a full VISUAL THEME per story type — imageStyle (AI images), motion, captions —
 // so a scary story and a bedtime story actually look different, not just sound it.
 const STORY_THEMES = {
@@ -315,10 +315,15 @@ const STORY_THEMES = {
   tech: { imageStyle: "sleek modern technology, clean minimal, cool blue tones, futuristic, crisp, high-tech", motion: "in", captionPos: "bottom", effect: "cold" },
   documentary: { imageStyle: "epic cinematic documentary, natural lighting, sweeping wide shots, rich detail, film look", motion: "in", captionPos: "bottom", effect: "none" },
   motivational: { imageStyle: "epic inspiring cinematic, golden-hour light, dramatic, uplifting, high contrast", motion: "in", captionPos: "middle", effect: "vibrant" },
+  cooking: { imageStyle: "vibrant appetizing food photography, warm kitchen light, fresh ingredients, steam, close-up, delicious", motion: "in", captionPos: "bottom", effect: "warm" },
+  fashion: { imageStyle: "high-fashion editorial photography, stylish, rich color, elegant, magazine look, detailed", motion: "in", captionPos: "bottom", effect: "vibrant" },
+  educational: { imageStyle: "clean bright explainer visuals, clear, colorful, friendly, well-lit, detailed", motion: "in", captionPos: "bottom", effect: "none" },
+  history: { imageStyle: "epic historical documentary still, aged film look, dramatic lighting, sweeping, richly detailed", motion: "in", captionPos: "bottom", effect: "vintage" },
+  war: { imageStyle: "gritty war documentary, desaturated, dramatic smoke and shadow, cinematic, intense", motion: "in", captionPos: "bottom", effect: "vintage" },
   story: { imageStyle: "cinematic film still, dramatic lighting, highly detailed, atmospheric", motion: "in", captionPos: "bottom", effect: "none" },
 };
 // best-fit XTTS-v2 built-in voice per story type (safe: server falls back if missing)
-const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", story: "Damien Black" };
+const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", cooking: "Sofia Hellen", fashion: "Alison Dietlinde", educational: "Andrew Chipper", history: "Viktor Menelaos", war: "Damien Black", story: "Damien Black" };
 // emotional delivery per story type: edge-tts rate/pitch + Piper length-scale (pace)
 const PROSODY = {
   scary: { rate: "-12%", pitch: "-6Hz", length: 1.18 },
@@ -327,6 +332,11 @@ const PROSODY = {
   tech: { rate: "+3%", pitch: "0Hz", length: 0.98 },
   documentary: { rate: "-5%", pitch: "-2Hz", length: 1.08 },
   motivational: { rate: "+6%", pitch: "+3Hz", length: 0.95 },
+  cooking: { rate: "+1%", pitch: "0Hz", length: 1.0 },
+  fashion: { rate: "+2%", pitch: "+1Hz", length: 0.98 },
+  educational: { rate: "+2%", pitch: "0Hz", length: 0.98 },
+  history: { rate: "-4%", pitch: "-2Hz", length: 1.08 },
+  war: { rate: "-5%", pitch: "-3Hz", length: 1.1 },
   story: { rate: "-4%", pitch: "0Hz", length: 1.08 },
 };
 function resolveMood(sel, ctx = {}) {
@@ -721,6 +731,7 @@ app.post("/api/ideas", async (req, res) => {
       count: Math.min(Math.max(parseInt(b.count) || 8, 1), 20),
       language: resolveLang(b.language || "en").label,
       genre: String(b.genre || "").trim(), country: String(b.country || "").trim(),
+      forType: String(b.forType || "shorts"),
       llmProvider: b.llmProvider || "",
     });
     // bump the ideas counter for the dashboard stat

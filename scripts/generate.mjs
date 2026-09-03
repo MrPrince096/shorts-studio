@@ -138,9 +138,11 @@ function buildSubject({ topic, genre, country, random, count }) {
 }
 
 // VidIQ-style: brainstorm viral short ideas + titles + SEO tags for a niche.
-export async function generateIdeas({ niche, count = 8, language = "English", genre, country, llmProvider }) {
+const IDEA_TYPE_PHRASE = { shorts: "short-form vertical video", story: "3-to-10-minute narrated story/explainer video", ads: "product or service advertisement" };
+export async function generateIdeas({ niche, count = 8, language = "English", genre, country, forType = "shorts", llmProvider }) {
+  const what = IDEA_TYPE_PHRASE[forType] || IDEA_TYPE_PHRASE.shorts;
   const focus = [niche && `in the niche: "${niche}"`, genre && `with a "${genre}" style`, country && `related to ${country}`].filter(Boolean).join(", ") || "for a broad audience";
-  const prompt = `You are a YouTube growth strategist. Suggest ${count} fresh, high-potential SHORT-video ideas ${focus}.
+  const prompt = `You are a YouTube growth strategist. Suggest ${count} fresh, high-potential ${what} ideas ${focus}.
 For EACH idea give: a scroll-stopping "title" (<= 9 words${language && language.toLowerCase() !== "english" ? `, in ${language}` : ""}), a one-line "hook", a short "why" it can go viral, and 4-6 SEO "tags".
 Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
   const data = parseLLMJson(await callLLM(prompt, llmProvider));
@@ -157,6 +159,11 @@ export const STORY_STYLES = {
   tech: "Clear, engaging tech-explainer tone — explain the idea simply with concrete real-world examples and why it matters.",
   documentary: "Authoritative, vivid documentary narration — factual, well-structured, cinematic.",
   motivational: "Powerful, uplifting motivational tone — build energy toward an inspiring call to action.",
+  cooking: "Warm, mouth-watering world-cuisine narration — vivid sensory food description, the country's culture and the feel of each step, appetizing throughout.",
+  fashion: "Stylish, trend-savvy narration on dressing styles and fashion across cultures — descriptive, aspirational, culturally rich.",
+  educational: "Clear, curious explainer narration — break down how it works with concrete examples and satisfying 'aha' moments.",
+  history: "Vivid, immersive historical narration — set the scene, the people, the stakes and the turning points like a great documentary.",
+  war: "Gripping, respectful war-history narration — the tension, the strategy, the human cost and the turning points of the conflict.",
   story: "Engaging narrative storytelling with a clear beginning, middle and satisfying end.",
 };
 export async function generateStory({ topic, storyType = "story", minutes = 3, language = "English", voice, rate = "0%", width, height, source, videoModel, font, fontCss, rtl, llmProvider, instructions, onProgress }) {
@@ -285,7 +292,7 @@ For EACH video:
   - "imagePrompt": a rich 15-25 word ENGLISH description of the exact scene for an AI image generator — NAME the specific people/characters and describe their appearance, clothing, the action, the setting and mood. Be concrete and accurate (e.g. "Ravana, a fearsome ten-headed demon king in golden armor, seizing princess Sita beside a forest hut").
 - Scene 1 is a strong scroll-stopping hook. The final scene is a memorable closing line.
 - Keep it factual, vivid and positive. Do NOT put hashtags inside "text".
-- Provide "title" (3 to 6 words), "description" (one line ending with 2 to 4 hashtags), and 4 to 6 "tags".${langBlock}${adRules}${instrBlock}
+- Provide "title" (3 to 6 words, scroll-stopping), an engaging "description" (2 short sentences that hook the viewer, then 2-3 hashtags), and 8 to 10 SEO "tags" (lowercase keywords, no # sign).${langBlock}${adRules}${instrBlock}
 ${count > 1 ? `Make the ${count} videos cover clearly different angles so they do not repeat.` : ""}
 
 Return ONLY valid JSON, no markdown, of exactly this shape:

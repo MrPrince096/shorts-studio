@@ -44,6 +44,9 @@ const EFFECT_FILTER: Record<string, string> = {
   vibrant: "saturate(1.55) contrast(1.12)",
   cold: "saturate(1.12) brightness(1.02) hue-rotate(-8deg)",
   warm: "sepia(0.22) saturate(1.22) brightness(1.03)",
+  vhs: "saturate(1.35) contrast(1.08) brightness(1.02)",
+  lightleak: "brightness(1.04) saturate(1.18)",
+  letterbox: "contrast(1.06) saturate(1.06)",
 };
 const VIGNETTE_EFFECTS = new Set(["tiltshift", "vintage", "noir", "dreamy"]);
 // top/bottom visible, middle transparent → reveals a blurred copy only at the edges
@@ -200,6 +203,21 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
             mixBlendMode: "overlay",
           }}
         />
+      ) : null}
+      {effect === "vhs" ? (
+        <>
+          <AbsoluteFill style={{ background: "repeating-linear-gradient(to bottom, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 2px, transparent 4px)", pointerEvents: "none" }} />
+          <AbsoluteFill style={{ background: "linear-gradient(90deg, rgba(255,0,80,0.05), transparent 6%, transparent 94%, rgba(0,200,255,0.05))", mixBlendMode: "screen" }} />
+        </>
+      ) : null}
+      {effect === "lightleak" ? (
+        <AbsoluteFill style={{ background: "radial-gradient(120% 90% at 92% 8%, rgba(255,150,40,0.45), rgba(255,80,60,0.12) 32%, transparent 60%)", mixBlendMode: "screen" }} />
+      ) : null}
+      {effect === "letterbox" ? (
+        <>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "11%", background: "#000" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "11%", background: "#000" }} />
+        </>
       ) : null}
 
       {/* dark gradient for caption legibility */}
