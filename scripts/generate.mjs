@@ -166,9 +166,31 @@ export const STORY_STYLES = {
   war: "Gripping, respectful war-history narration — the tension, the strategy, the human cost and the turning points of the conflict.",
   story: "Engaging narrative storytelling with a clear beginning, middle and satisfying end.",
 };
-export async function generateStory({ topic, storyType = "story", minutes = 3, language = "English", voice, rate = "0%", width, height, source, videoModel, font, fontCss, rtl, llmProvider, instructions, onProgress }) {
+// build a rich subject when a country is chosen (great for cooking / history / culture per country)
+function countrySubject(storyType, country) {
+  const m = {
+    cooking: `the traditional cuisine and most iconic dishes of ${country}`,
+    fashion: `the traditional dress and fashion styles of ${country}`,
+    history: `the history of ${country}`,
+    war: `the great wars and battles in the history of ${country}`,
+    biography: `an iconic figure from ${country}`,
+    documentary: `the culture, land and people of ${country}`,
+    educational: `fascinating facts about ${country}`,
+    bedtime: `a gentle folk tale from ${country}`,
+    scary: `a chilling legend or ghost story from ${country}`,
+    motivational: `an inspiring true story from ${country}`,
+    story: `a captivating story set in ${country}`,
+  };
+  return m[storyType] || `${country}`;
+}
+export async function generateStory({ topic, country = "", storyType = "story", minutes = 3, language = "English", voice, rate = "0%", width, height, source, videoModel, font, fontCss, rtl, llmProvider, instructions, onProgress }) {
   const style = STORY_STYLES[storyType] || STORY_STYLES.story;
   const nonEnglish = language && language.toLowerCase() !== "english";
+  // subject weaves the country in (country-only, topic-only, or both)
+  const subject = topic && country ? `${topic} — ${storyType === "cooking" ? `authentic ${country} cuisine` : country}`
+    : topic ? topic
+      : countrySubject(storyType, country);
+  topic = subject;
   const beats = Math.max(4, Math.min(16, Math.round(minutes * 2)));            // story sections
   const scenesPerBeat = Math.max(2, Math.round((minutes * 140) / beats / 28)); // ~28 words/scene
   const log = (m) => { try { onProgress && onProgress(m); } catch {} };

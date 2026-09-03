@@ -457,6 +457,12 @@ const MOOD_FILTERS = {
   scary: { inputs: ["sine=frequency=110:duration=20", "sine=frequency=146.83:duration=20", "sine=frequency=220:duration=20", "anoisesrc=d=20:c=pink:a=0.05"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.12:d=0.5,aecho=0.8:0.85:800:0.3,highpass=f=90,lowpass=f=2200,volume=2.0" },
   calm: { inputs: ["sine=frequency=196:duration=20", "sine=frequency=261.63:duration=20", "sine=frequency=349.23:duration=20", "anoisesrc=d=20:c=pink:a=0.03"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.1:d=0.5,aecho=0.8:0.85:800:0.3,highpass=f=90,lowpass=f=1800,volume=1.7" },
   uplifting: { inputs: ["sine=frequency=261.63:duration=20", "sine=frequency=329.63:duration=20", "sine=frequency=392:duration=20", "anoisesrc=d=20:c=pink:a=0.03"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.1:d=0.4,aecho=0.8:0.85:600:0.25,highpass=f=110,lowpass=f=3200,volume=1.7" },
+  rain: { inputs: ["anoisesrc=d=20:c=pink:a=0.5"], filter: "highpass=f=400,lowpass=f=9000,tremolo=f=8:d=0.15,volume=2.5,alimiter=limit=0.9" },
+  ocean: { inputs: ["anoisesrc=d=20:c=brown:a=0.7"], filter: "lowpass=f=1600,tremolo=f=0.12:d=0.85,volume=2.2,alimiter=limit=0.9" },
+  wind: { inputs: ["anoisesrc=d=20:c=pink:a=0.5"], filter: "highpass=f=200,lowpass=f=1400,tremolo=f=0.25:d=0.7,volume=2.2,alimiter=limit=0.9" },
+  stream: { inputs: ["anoisesrc=d=20:c=white:a=0.4"], filter: "highpass=f=800,lowpass=f=6000,tremolo=f=5:d=0.1,volume=2.2,alimiter=limit=0.9" },
+  fire: { inputs: ["anoisesrc=d=20:c=brown:a=0.6", "anoisesrc=d=20:c=white:a=0.08"], filter: "amix=inputs=2:normalize=0,lowpass=f=2000,tremolo=f=11:d=0.4,volume=2.2,alimiter=limit=0.9" },
+  forest: { inputs: ["anoisesrc=d=20:c=pink:a=0.28"], filter: "highpass=f=300,lowpass=f=5000,tremolo=f=0.3:d=0.5,volume=2.0,alimiter=limit=0.9" },
 };
 function ensureMoodBed(mood) {
   const m = MOOD_FILTERS[mood];

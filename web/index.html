@@ -234,6 +234,7 @@
           <label>What's the story about? <span class="muted">— or roll the dice 🎲</span></label>
           <div class="withbtn"><input id="storyTopic" class="big" placeholder="e.g. the abandoned lighthouse keeper" /><button class="btn ghost" id="storySurprise" title="Surprise me">🎲</button></div>
           <div class="row"><div><label>Story type</label><select id="storyType"></select></div><div><label>Length</label><select id="storyMinutes"></select></div></div>
+          <div class="row"><div><label>Country <span class="muted">— optional, for cooking / history / culture</span></label><select id="storyCountry"></select></div></div>
           <div class="note" id="storyTheme" style="margin-top:10px"></div>
           <label>Instructions <span class="muted">— optional, how it should go</span></label>
           <textarea id="storyInstr" rows="2" placeholder="e.g. first-person, slow suspense build, twist ending"></textarea>
@@ -343,7 +344,7 @@
           </div>
           <div class="row" id="qsEffect"><div><label>Visual effect 🎬 <span class="muted">— camera look</span></label><select id="effect"></select></div></div>
           <div class="row" id="qsMusicReuse">
-            <div><label>Background music 🎵</label><select id="musicMood"><option value="none">None</option><option value="auto">Auto (match mood)</option><option value="calm">Calm</option><option value="scary">Suspense</option><option value="uplifting">Uplifting</option><option value="neutral">Neutral</option></select></div>
+            <div><label>Background music 🎵</label><select id="musicMood"><option value="none">None</option><option value="auto">Auto (match mood)</option><optgroup label="Music"><option value="calm">Calm</option><option value="scary">Suspense</option><option value="uplifting">Uplifting</option></optgroup><optgroup label="Nature ambience"><option value="rain">🌧️ Rain</option><option value="ocean">🌊 Ocean waves</option><option value="wind">🍃 Wind</option><option value="stream">💧 Stream</option><option value="fire">🔥 Fire crackle</option><option value="forest">🌲 Forest</option></optgroup></select></div>
             <div><label>Reuse visuals <span class="muted">— faster long videos</span></label><select id="reuseVisuals"></select></div>
           </div>
           <div id="qsWatermark"><label>Watermark text <span class="muted">— optional</span></label>
@@ -624,6 +625,7 @@ async function loadConfig(){
   c.durations.forEach(d=>$('#lenPick').appendChild(opt(d.id,d.label)));
   $('#genre').appendChild(opt('','— any / none —')); (c.genres||[]).forEach(g=>$('#genre').appendChild(opt(g.id,g.label)));
   $('#country').appendChild(opt('','— any / none —')); (c.countries||[]).forEach(x=>$('#country').appendChild(opt(x.id,x.label)));
+  $('#storyCountry').appendChild(opt('','— any / none —')); (c.countries||[]).forEach(x=>$('#storyCountry').appendChild(opt(x.id,x.label)));
   for(let i=1;i<=10;i++)$('#count').appendChild(opt(i,i+(i===1?' video':' videos')));
   (c.videoSources||[]).forEach(s=>$('#source').appendChild(opt(s.id,s.label)));
   (c.falModels||[]).forEach(m=>$('#videoModel').appendChild(opt(m.id,m.label)));
@@ -807,7 +809,7 @@ function run(url,body){startP();fetch(url,{method:'POST',headers:{'Content-Type'
 $('#goAI').onclick=()=>{const topic=$('#topic').value.trim();const random=!topic&&!$('#genre').value&&!$('#country').value;run('/api/generate',{topic,random,count:$('#count').value,instructions:$('#instructions').value.trim(),...fmt()});};
 $('#goManual').onclick=()=>{const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(),query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);if(!$('#title').value.trim()||scenes.length<2){alert('Add a title and 2+ scenes.');return;}run('/api/render',{title:$('#title').value.trim(),description:$('#desc').value.trim(),tags:$('#tags').value,scenes,...fmt()});};
 $('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic){alert('Enter a story topic.');return;}run('/api/series/start',{topic,total:$('#seriesTotal').value,batch:$('#seriesBatch').value,...fmt()});};
-$('#goStory').onclick=()=>{const topic=$('#storyTopic').value.trim();if(!topic){alert('Enter what the story is about.');return;}run('/api/story',{topic,storyType:$('#storyType').value,minutes:$('#storyMinutes').value,instructions:$('#storyInstr').value.trim(),...fmt()});};
+$('#goStory').onclick=()=>{const topic=$('#storyTopic').value.trim();const country=$('#storyCountry').value;if(!topic&&!country){alert('Enter a topic or pick a country.');return;}run('/api/story',{topic,country,storyType:$('#storyType').value,minutes:$('#storyMinutes').value,instructions:$('#storyInstr').value.trim(),...fmt()});};
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:$('#adVariations').value,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};

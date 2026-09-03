@@ -69,6 +69,13 @@ const BED_FILTERS = {
   scary: { inputs: ["sine=frequency=110:duration=30", "sine=frequency=146.83:duration=30", "sine=frequency=220:duration=30", "anoisesrc=d=30:c=pink:a=0.05"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.12:d=0.5,aecho=0.8:0.85:800:0.3,highpass=f=90,lowpass=f=2200,volume=2.0" },
   calm: { inputs: ["sine=frequency=196:duration=30", "sine=frequency=261.63:duration=30", "sine=frequency=349.23:duration=30", "anoisesrc=d=30:c=pink:a=0.03"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.1:d=0.5,aecho=0.8:0.85:800:0.3,highpass=f=90,lowpass=f=1800,volume=1.7" },
   uplifting: { inputs: ["sine=frequency=261.63:duration=30", "sine=frequency=329.63:duration=30", "sine=frequency=392:duration=30", "anoisesrc=d=30:c=pink:a=0.03"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.1:d=0.4,aecho=0.8:0.85:600:0.25,highpass=f=110,lowpass=f=3200,volume=1.7" },
+  // nature soundscapes (noise-shaped — realistic ambience)
+  rain: { inputs: ["anoisesrc=d=30:c=pink:a=0.5"], filter: "highpass=f=400,lowpass=f=9000,tremolo=f=8:d=0.15,volume=2.5,alimiter=limit=0.9" },
+  ocean: { inputs: ["anoisesrc=d=30:c=brown:a=0.7"], filter: "lowpass=f=1600,tremolo=f=0.12:d=0.85,volume=2.2,alimiter=limit=0.9" },
+  wind: { inputs: ["anoisesrc=d=30:c=pink:a=0.5"], filter: "highpass=f=200,lowpass=f=1400,tremolo=f=0.25:d=0.7,volume=2.2,alimiter=limit=0.9" },
+  stream: { inputs: ["anoisesrc=d=30:c=white:a=0.4"], filter: "highpass=f=800,lowpass=f=6000,tremolo=f=5:d=0.1,volume=2.2,alimiter=limit=0.9" },
+  fire: { inputs: ["anoisesrc=d=30:c=brown:a=0.6", "anoisesrc=d=30:c=white:a=0.08"], filter: "amix=inputs=2:normalize=0,lowpass=f=2000,tremolo=f=11:d=0.4,volume=2.2,alimiter=limit=0.9" },
+  forest: { inputs: ["anoisesrc=d=30:c=pink:a=0.28"], filter: "highpass=f=300,lowpass=f=5000,tremolo=f=0.3:d=0.5,volume=2.0,alimiter=limit=0.9" },
 };
 function ensureBeds() {
   if (!existsSync(MUSIC_DIR)) mkdirSync(MUSIC_DIR, { recursive: true });
@@ -82,7 +89,7 @@ function ensureBeds() {
   }
 }
 const AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg|flac)$/i;
-const BED_LABEL = { scary: "Suspense (built-in)", calm: "Calm (built-in)", uplifting: "Uplifting (built-in)", neutral: "Neutral (built-in)" };
+const BED_LABEL = { scary: "Suspense", calm: "Calm", uplifting: "Uplifting", neutral: "Neutral", rain: "🌧️ Rain", ocean: "🌊 Ocean waves", wind: "🍃 Wind", stream: "💧 Stream", fire: "🔥 Fire crackle", forest: "🌲 Forest" };
 app.get("/api/music", (_req, res) => {
   ensureBeds();
   const list = readdirSync(MUSIC_DIR).filter((f) => AUDIO_RE.test(f)).map((f) => {
@@ -426,7 +433,7 @@ function resolveMood(sel, ctx = {}) {
   let s = String(sel || "").trim();
   if (!s || s === "none") return "";
   if (s === "neutral") s = "calm"; // no separate neutral bed — calm covers it
-  if (["scary", "calm", "uplifting"].includes(s)) return s;
+  if (["scary", "calm", "uplifting", "rain", "ocean", "wind", "stream", "fire", "forest"].includes(s)) return s;
   if (s === "auto") {
     if (ctx.storyType) return MOOD_FOR_STORY[ctx.storyType] || "neutral";
     const g = String(ctx.genre || "").toLowerCase();
@@ -735,7 +742,8 @@ app.post("/api/story", (req, res) => {
   if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
   const b = req.body || {};
   const topic = String(b.topic || "").trim();
-  if (!topic) return res.status(400).json({ error: "Enter what the story is about." });
+  const country = String(b.country || "").trim();
+  if (!topic && !country) return res.status(400).json({ error: "Enter a topic or pick a country." });
   const minutes = Math.min(Math.max(parseInt(b.minutes) || 3, 1), 10);
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
   const lang = resolveLang(b.language || "en");
@@ -746,7 +754,7 @@ app.post("/api/story", (req, res) => {
     try {
       const pr = PROSODY[b.storyType] || PROSODY.story;
       const config = await generateStory({
-        topic, storyType: b.storyType || "story", minutes,
+        topic, country, storyType: b.storyType || "story", minutes,
         language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: pr.rate,
         width, height, source: b.source || "pexels", videoModel: b.videoModel || "",
         font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
