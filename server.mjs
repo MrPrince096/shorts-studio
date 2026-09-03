@@ -305,6 +305,21 @@ function maskKey(v) {
   return v.length <= 4 ? "••••" : "••••••" + v.slice(-4);
 }
 
+const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", story: "neutral" };
+function resolveMood(sel, ctx = {}) {
+  const s = String(sel || "").trim();
+  if (!s || s === "none") return "";
+  if (["scary", "calm", "uplifting", "neutral"].includes(s)) return s;
+  if (s === "auto") {
+    if (ctx.storyType) return MOOD_FOR_STORY[ctx.storyType] || "neutral";
+    const g = String(ctx.genre || "").toLowerCase();
+    if (/horror|mystery|scary|unsolved/.test(g)) return "scary";
+    if (/motivation|success|discipline|stoic/.test(g)) return "uplifting";
+    return "neutral";
+  }
+  return "";
+}
+
 function dims(aspect, quality) {
   const [aw, ah] = String(aspect).split(":").map(Number);
   const short = Number(quality) || 1080;
@@ -560,6 +575,8 @@ app.post("/api/generate", async (req, res) => {
         c.talkingAvatar = !!b.talkingAvatar; // bring the creator photo to life (needs an avatar API key)
         c.voiceEngine = b.voiceEngine || "edge"; // "edge" (cloud) or "piper" (offline)
         c.piperVoice = b.piperVoice || ""; // chosen local Piper voice file (optional)
+        c.musicMood = resolveMood(b.musicMood, { genre });
+        c.reuseVisuals = b.reuseVisuals || 0;
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -608,6 +625,8 @@ app.post("/api/story", (req, res) => {
       config.watermarkImage = b.watermarkImage ? watermarkFile() : "";
       config.voiceEngine = b.voiceEngine || "edge";
       config.piperVoice = b.piperVoice || "";
+      config.musicMood = resolveMood(b.musicMood || "auto", { storyType: b.storyType || "story" });
+      config.reuseVisuals = b.reuseVisuals || 0;
       pushLog(job, `🎬 Rendering a ${minutes}-min ${b.storyType || "story"} — ${config.scenes.length} scenes. This is a long render; hang tight…`);
       await runAll([config], job);
     } catch (e) {
@@ -642,6 +661,8 @@ app.post("/api/render", (req, res) => {
     watermarkImage: b.watermarkImage ? watermarkFile() : "",
     voiceEngine: b.voiceEngine || "edge",
     piperVoice: b.piperVoice || "",
+    musicMood: resolveMood(b.musicMood, {}),
+    reuseVisuals: b.reuseVisuals || 0,
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };

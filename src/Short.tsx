@@ -209,7 +209,7 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
 
       {/* talking clip carries the voice itself — skip the separate track to avoid an echo */}
       {audio && !talkingVideo ? <Audio src={staticFile(audio)} /> : null}
-      {music ? <Audio src={staticFile(music)} volume={0.18} /> : null}
+      {music ? <Audio src={staticFile(music)} volume={0.14} loop /> : null}
     </AbsoluteFill>
   );
 };

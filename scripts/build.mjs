@@ -320,19 +320,30 @@ if (config.uploadFile) {
   }
 }
 
+// "reuse visuals" mode: generate only N unique clips and cycle them across all
+// scenes — makes long (and offline-AI-image) videos far faster. Off for product ads.
+const reuseN = Math.max(0, parseInt(config.reuseVisuals) || 0);
+const doReuse = reuseN >= 2 && reuseN < config.scenes.length && !config.uploadFile;
+if (doReuse) console.log(`♻️  Reuse mode: ${reuseN} unique visuals across ${config.scenes.length} scenes`);
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
   const useUpload = !!config.uploadFile && !!config.scenes[i].showProduct;
   const isImg = useUpload ? !!config.uploadIsImage : srcIsImage(src);
-  const file = `scene${i}.${isImg ? "jpg" : "mp4"}`;
-  const gen = useUpload ? uploadMedia : (GEN[src] || GEN.pexels);
-  process.stdout.write(`${useUpload ? TAG.upload : (TAG[src] || "🎬")} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
-  try {
-    const b = await gen(config.scenes[i], join(PUBLIC, file));
-    console.log(`ok (${b.w}x${b.h})`);
-  } catch (e) {
-    console.log("FAILED:", e.message);
-    process.exit(1);
+  const slot = doReuse ? (i % reuseN) : i;
+  const file = `scene${slot}.${isImg ? "jpg" : "mp4"}`;
+  const needGen = !doReuse || i < reuseN;
+  if (needGen) {
+    const gen = useUpload ? uploadMedia : (GEN[src] || GEN.pexels);
+    process.stdout.write(`${useUpload ? TAG.upload : (TAG[src] || "🎬")} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
+    try {
+      const b = await gen(config.scenes[i], join(PUBLIC, file));
+      console.log(`ok (${b.w}x${b.h})`);
+    } catch (e) {
+      console.log("FAILED:", e.message);
+      process.exit(1);
+    }
+  } else {
+    console.log(`♻️  [${i + 1}/${config.scenes.length}] reusing ${file}`);
   }
   sceneOut.push({ video: file, start: sceneRanges[i].start, end: sceneRanges[i].end });
 }
@@ -364,6 +375,30 @@ if (config.talkingAvatar && config.uploadFile && existsSync(config.uploadFile) &
   console.log("⚠️  Talking avatar requested but no avatar API key set — using the still photo. Add a fal.ai / D-ID / HeyGen key in Settings.");
 }
 
+// --- 5c. Background music: procedural ambient bed by mood (royalty-free, offline) ---
+const MOOD_FILTERS = {
+  scary: { inputs: ["sine=frequency=55:duration=20", "sine=frequency=82.41:duration=20", "anoisesrc=d=20:c=pink:a=0.04"], filter: "amix=inputs=3:normalize=0,tremolo=f=0.15:d=0.6,aecho=0.8:0.88:900:0.35,lowpass=f=350,volume=1.8" },
+  calm: { inputs: ["sine=frequency=220:duration=20", "sine=frequency=329.63:duration=20"], filter: "amix=inputs=2:normalize=0,tremolo=f=0.1:d=0.4,aecho=0.8:0.9:1200:0.3,lowpass=f=900,volume=1.2" },
+  uplifting: { inputs: ["sine=frequency=261.63:duration=20", "sine=frequency=329.63:duration=20", "sine=frequency=392:duration=20"], filter: "amix=inputs=3:normalize=0,tremolo=f=0.12:d=0.3,aecho=0.8:0.9:800:0.2,lowpass=f=2200,volume=1.1" },
+  neutral: { inputs: ["sine=frequency=196:duration=20", "sine=frequency=293.66:duration=20"], filter: "amix=inputs=2:normalize=0,tremolo=f=0.08:d=0.3,aecho=0.8:0.9:1000:0.25,lowpass=f=700,volume=1.1" },
+};
+function ensureMoodBed(mood) {
+  const m = MOOD_FILTERS[mood];
+  if (!m) return "";
+  const file = `bg_${mood}.mp3`;
+  const out = join(PUBLIC, file);
+  if (!existsSync(out)) {
+    const args = ["-y"];
+    m.inputs.forEach((i) => args.push("-f", "lavfi", "-i", i));
+    const labels = m.inputs.map((_, k) => `[${k}]`).join("");
+    args.push("-filter_complex", labels + m.filter, "-ac", "2", "-q:a", "4", out);
+    try { execFileSync("ffmpeg", args, { stdio: "ignore" }); } catch { return ""; }
+  }
+  return existsSync(out) ? file : "";
+}
+const musicFile = config.musicMood ? ensureMoodBed(config.musicMood) : (config.music || "");
+if (config.musicMood && musicFile) console.log(`🎵 Background music: ${config.musicMood}`);
+
 // --- 6. Write props.json ---
 const props = {
   fps: FPS,
@@ -379,7 +414,7 @@ const props = {
   talkingVideo,
   durationInSeconds: talkingSeconds || durationSec,
   audio: "voiceover.mp3",
-  music: config.music || "",
+  music: musicFile,
   title: config.title || "",
   scenes: sceneOut,
   words,

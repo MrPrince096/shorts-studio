@@ -24,3 +24,5 @@ public/props.json
 .DS_Store
 public/watermark.*
 creators/
+public/bg_*.mp3
+public/voiceover.wav
