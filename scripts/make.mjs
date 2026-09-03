@@ -1,6 +1,6 @@
 // One-shot: build (TTS + Pexels + timings) then render to a title-named MP4 in out/
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -29,6 +29,9 @@ execFileSync("npx", ["remotion", "render", "Short", outPath, "--props=public/pro
   stdio: "inherit",
   cwd: ROOT,
 });
+// keep the voice-only track so the Editor can swap music / remix without re-rendering
+try { if (existsSync(join(ROOT, "public/voiceover.mp3"))) copyFileSync(join(ROOT, "public/voiceover.mp3"), join(ROOT, `out/${name}.voice.mp3`)); } catch {}
+
 // sidecar metadata for easy copy-paste when uploading to YouTube
 const tags = Array.isArray(config.tags) ? config.tags : [];
 writeFileSync(

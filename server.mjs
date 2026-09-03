@@ -2,7 +2,7 @@
 // Run: npm start   (opens http://localhost:4321)
 import express from "express";
 import { spawn, execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync, copyFileSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync, copyFileSync, renameSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
@@ -61,6 +61,89 @@ app.use("/out", express.static(OUT));
 const DRAFTS_DIR = join(ROOT, "drafts");
 const ASSETS_DIR = join(ROOT, "assets");
 app.use("/assets", express.static(ASSETS_DIR));
+const MUSIC_DIR = join(ROOT, "music");
+app.use("/music", express.static(MUSIC_DIR));
+
+// ---- Music library (upload your own tracks) + built-in ambient beds + Editor ----
+const BED_FILTERS = {
+  scary: { inputs: ["sine=frequency=110:duration=30", "sine=frequency=146.83:duration=30", "sine=frequency=220:duration=30", "anoisesrc=d=30:c=pink:a=0.05"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.12:d=0.5,aecho=0.8:0.85:800:0.3,highpass=f=90,lowpass=f=2200,volume=2.0" },
+  calm: { inputs: ["sine=frequency=196:duration=30", "sine=frequency=261.63:duration=30", "sine=frequency=349.23:duration=30", "anoisesrc=d=30:c=pink:a=0.03"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.1:d=0.5,aecho=0.8:0.85:800:0.3,highpass=f=90,lowpass=f=1800,volume=1.7" },
+  uplifting: { inputs: ["sine=frequency=261.63:duration=30", "sine=frequency=329.63:duration=30", "sine=frequency=392:duration=30", "anoisesrc=d=30:c=pink:a=0.03"], filter: "amix=inputs=4:normalize=0,tremolo=f=0.1:d=0.4,aecho=0.8:0.85:600:0.25,highpass=f=110,lowpass=f=3200,volume=1.7" },
+};
+function ensureBeds() {
+  if (!existsSync(MUSIC_DIR)) mkdirSync(MUSIC_DIR, { recursive: true });
+  for (const [mood, m] of Object.entries(BED_FILTERS)) {
+    const out = join(MUSIC_DIR, `bed_${mood}.mp3`);
+    if (existsSync(out)) continue;
+    const args = ["-y"];
+    m.inputs.forEach((i) => args.push("-f", "lavfi", "-i", i));
+    args.push("-filter_complex", m.inputs.map((_, k) => `[${k}]`).join("") + m.filter, "-ac", "2", "-q:a", "4", out);
+    try { execFileSync("ffmpeg", args, { stdio: "ignore" }); } catch {}
+  }
+}
+const AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg|flac)$/i;
+const BED_LABEL = { scary: "Suspense (built-in)", calm: "Calm (built-in)", uplifting: "Uplifting (built-in)", neutral: "Neutral (built-in)" };
+app.get("/api/music", (_req, res) => {
+  ensureBeds();
+  const list = readdirSync(MUSIC_DIR).filter((f) => AUDIO_RE.test(f)).map((f) => {
+    const bed = f.match(/^bed_(\w+)\.mp3$/i);
+    return { file: f, url: "/music/" + encodeURIComponent(f), label: bed ? (BED_LABEL[bed[1]] || bed[1]) : f.replace(AUDIO_RE, ""), kind: bed ? "bed" : "upload" };
+  }).sort((a, b) => (a.kind === b.kind ? a.label.localeCompare(b.label) : a.kind === "bed" ? -1 : 1));
+  res.json(list);
+});
+app.post("/api/music", (req, res) => {
+  const m = String((req.body || {}).dataUrl || "").match(/^data:audio\/[^;]+;base64,(.+)$/);
+  const nm = String((req.body || {}).name || "track").replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 50) || "track";
+  if (!m) return res.status(400).json({ error: "Attach an audio file (mp3/wav/m4a)." });
+  if (!existsSync(MUSIC_DIR)) mkdirSync(MUSIC_DIR, { recursive: true });
+  const file = nm.replace(/\s+/g, "_") + "_" + Date.now().toString(36) + ".mp3";
+  writeFileSync(join(MUSIC_DIR, file), Buffer.from(m[1], "base64"));
+  res.json({ ok: true, file });
+});
+app.delete("/api/music/:file", (req, res) => {
+  const f = req.params.file.replace(/[^a-z0-9._-]/gi, "");
+  const p = join(MUSIC_DIR, f);
+  if (existsSync(p) && p.startsWith(MUSIC_DIR)) unlinkSync(p);
+  res.json({ ok: true });
+});
+
+// Editor: swap background music / adjust voice & music volume on a rendered video —
+// fast ffmpeg remux (no re-render) using the saved voice-only track.
+app.post("/api/edit/remix", (req, res) => {
+  const b = req.body || {};
+  const file = String(b.file || "").replace(/[^a-z0-9._-]/gi, "");
+  const videoPath = join(OUT, file);
+  if (!file.endsWith(".mp4") || !existsSync(videoPath)) return res.status(404).json({ error: "Video not found." });
+  const base = file.replace(/\.mp4$/, "");
+  const voicePath = join(OUT, base + ".voice.mp3");
+  if (!existsSync(voicePath)) return res.status(400).json({ error: "This video was made before the Editor existed — re-render it once to enable music editing." });
+  const voiceVol = Math.max(0, Math.min(2, parseFloat(b.voiceVol) || 1));
+  const musicVol = Math.max(0, Math.min(1.5, parseFloat(b.musicVol) != null ? parseFloat(b.musicVol) : 0.25));
+  let musicPath = "";
+  if (b.music && b.music !== "none") {
+    const mf = String(b.music).replace(/[^a-z0-9._-]/gi, "");
+    const mp = join(MUSIC_DIR, mf);
+    if (existsSync(mp) && mp.startsWith(MUSIC_DIR)) musicPath = mp;
+  }
+  const tmp = join(OUT, base + ".remix.mp4");
+  try {
+    if (musicPath) {
+      execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", voicePath, "-stream_loop", "-1", "-i", musicPath,
+        "-filter_complex", `[1:a]volume=${voiceVol}[v];[2:a]volume=${musicVol}[m];[v][m]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+        "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-shortest", tmp], { stdio: "ignore" });
+    } else {
+      execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", voicePath,
+        "-filter_complex", `[1:a]volume=${voiceVol}[aout]`,
+        "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-shortest", tmp], { stdio: "ignore" });
+    }
+    renameSync(tmp, videoPath);
+    try { const th = join(OUT, base + ".thumb.jpg"); if (existsSync(th)) unlinkSync(th); } catch {}
+    res.json({ ok: true, file });
+  } catch (e) {
+    try { if (existsSync(tmp)) unlinkSync(tmp); } catch {}
+    res.status(500).json({ error: "Remix failed: " + (e.message || "ffmpeg error").slice(0, 160) });
+  }
+});
 
 // ---- Drafts (save/load create-form setups) ----
 app.post("/api/drafts", (req, res) => {
@@ -305,7 +388,7 @@ function maskKey(v) {
   return v.length <= 4 ? "••••" : "••••••" + v.slice(-4);
 }
 
-const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", cooking: "uplifting", fashion: "uplifting", educational: "neutral", history: "neutral", war: "scary", story: "neutral" };
+const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "calm", tech: "calm", documentary: "calm", motivational: "uplifting", cooking: "uplifting", fashion: "uplifting", educational: "calm", history: "calm", war: "scary", story: "calm" };
 // a full VISUAL THEME per story type — imageStyle (AI images), motion, captions —
 // so a scary story and a bedtime story actually look different, not just sound it.
 const STORY_THEMES = {
@@ -340,15 +423,16 @@ const PROSODY = {
   story: { rate: "-4%", pitch: "0Hz", length: 1.08 },
 };
 function resolveMood(sel, ctx = {}) {
-  const s = String(sel || "").trim();
+  let s = String(sel || "").trim();
   if (!s || s === "none") return "";
-  if (["scary", "calm", "uplifting", "neutral"].includes(s)) return s;
+  if (s === "neutral") s = "calm"; // no separate neutral bed — calm covers it
+  if (["scary", "calm", "uplifting"].includes(s)) return s;
   if (s === "auto") {
     if (ctx.storyType) return MOOD_FOR_STORY[ctx.storyType] || "neutral";
     const g = String(ctx.genre || "").toLowerCase();
     if (/horror|mystery|scary|unsolved/.test(g)) return "scary";
     if (/motivation|success|discipline|stoic/.test(g)) return "uplifting";
-    return "neutral";
+    return "calm";
   }
   return "";
 }

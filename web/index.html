@@ -182,6 +182,7 @@
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
     <div class="navlabel">Library</div>
     <div class="nav" data-nav="library"><span class="ic" data-icon="video"></span> My Videos</div>
+    <div class="nav" data-nav="editor"><span class="ic" data-icon="sliders"></span> Editor</div>
     <div class="nav" data-nav="projects"><span class="ic" data-icon="folder"></span> Projects</div>
     <div class="nav" data-nav="drafts"><span class="ic" data-icon="file"></span> Drafts</div>
     <div class="nav" data-nav="assets"><span class="ic" data-icon="image"></span> Assets</div>
@@ -407,6 +408,36 @@
       </div>
     </div>
 
+    <!-- EDITOR (swap music, mix voice/music — no re-render) -->
+    <div class="gal" id="editor">
+      <div class="workspace">
+        <div class="col">
+          <div class="card">
+            <h2><span data-icon="sliders"></span> Editor <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· swap music & remix, no re-render</span></h2>
+            <div class="cardsub">Change the background music and balance the voice — applied in seconds.</div>
+            <label>Choose a video</label>
+            <select id="edVideo"></select>
+            <label>Background music</label>
+            <div class="withbtn"><select id="edMusic"></select><button class="btn ghost" id="edMusicUp">Upload</button></div>
+            <input type="file" id="edMusicFile" accept="audio/*" hidden />
+            <div class="note" style="margin-top:8px">🎵 For great music, add your own tracks (free from the <b>YouTube Audio Library</b> or <b>Pixabay Music</b>) — the built-in beds are just simple ambience.</div>
+            <label style="margin-top:14px">Music volume: <span class="rateval" id="edMusicVolV">25%</span></label>
+            <input type="range" id="edMusicVol" min="0" max="100" step="5" value="25" />
+            <label>Voice volume: <span class="rateval" id="edVoiceVolV">100%</span></label>
+            <input type="range" id="edVoiceVol" min="0" max="150" step="5" value="100" />
+            <button class="btn grad big" id="edApply" style="width:100%;margin-top:16px"><span data-icon="save"></span>Apply & save</button>
+            <div id="edStatus" style="margin-top:10px;font-size:13px"></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card">
+            <h2><span data-icon="play"></span> Preview</h2>
+            <div id="edPreviewBox"><div class="previewempty">Pick a video to preview & edit</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- LIBRARY (My Videos) -->
     <div class="gal" id="library">
       <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2><div id="gallery" class="vgrid"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
@@ -551,7 +582,7 @@ function applyTabSettings(tab){
   ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
 }
 function switchTab(name){
-  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show');
+  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#workspace').style.display='grid';
   applyTabSettings(name);
@@ -559,8 +590,9 @@ function switchTab(name){
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
-  if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
-  $('#dashboard').classList.remove('show');
+  if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
+  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');
+  if(v==='editor'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.add('show');showEditor();return;}
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
     if(v==='drafts'){$('#libTitle').textContent='Drafts';showDrafts();}
@@ -857,6 +889,35 @@ async function showAssets(){
 }
 window.delAsset=(f)=>{if(confirm('Delete this asset?'))fetch('/api/assets/'+f,{method:'DELETE'}).then(()=>showAssets());};
 $('#assetUp').onchange=()=>{const f=$('#assetUp').files[0];if(!f)return;if(f.size>20*1024*1024){alert('Max 20 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{$('#assetUp').value='';showAssets();});rd.readAsDataURL(f);};
+
+// ---- Editor (swap music / remix, no re-render) ----
+async function showEditor(){
+  const vids=await(await fetch('/api/videos')).json();
+  const sel=$('#edVideo'); sel.innerHTML='';
+  if(!vids.length){sel.appendChild(opt('','No videos yet — make one first'));$('#edPreviewBox').innerHTML='<div class="previewempty">Make a video first</div>';}
+  else vids.forEach(v=>sel.appendChild(opt(v.file,(v.title||v.file.replace('.mp4','')).slice(0,52))));
+  await loadEdMusic(); edLoadPreview();
+}
+async function loadEdMusic(){
+  const l=await(await fetch('/api/music')).json(); const sel=$('#edMusic'); const cur=sel.value; sel.innerHTML='';
+  sel.appendChild(opt('none','None (voice only)'));
+  (l||[]).forEach(m=>sel.appendChild(opt(m.file,(m.kind==='upload'?'🎵 ':'♪ ')+m.label)));
+  if(cur&&[...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+function edLoadPreview(){const f=$('#edVideo').value; if(!f){return;} $('#edPreviewBox').innerHTML=`<video class="preview" controls src="/out/${encodeURIComponent(f)}?t=${Date.now()}"></video>`;}
+$('#edVideo').onchange=edLoadPreview;
+$('#edMusicVol').oninput=e=>$('#edMusicVolV').textContent=e.target.value+'%';
+$('#edVoiceVol').oninput=e=>$('#edVoiceVolV').textContent=e.target.value+'%';
+$('#edMusicUp').onclick=()=>$('#edMusicFile').click();
+$('#edMusicFile').onchange=()=>{const f=$('#edMusicFile').files[0];if(!f)return;if(f.size>25*1024*1024){alert('Max 25 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/music',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result,name:f.name.replace(/\.[^.]+$/,'')})}).then(r=>r.json()).then(async j=>{await loadEdMusic();if(j.file)$('#edMusic').value=j.file;$('#edMusicFile').value='';});rd.readAsDataURL(f);};
+$('#edApply').onclick=async()=>{const f=$('#edVideo').value;if(!f){alert('Pick a video.');return;}
+  const b=$('#edApply');b.disabled=true;$('#edStatus').innerHTML='<span class="spin"></span> Remixing…';
+  try{const r=await(await fetch('/api/edit/remix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:f,music:$('#edMusic').value,musicVol:$('#edMusicVol').value/100,voiceVol:$('#edVoiceVol').value/100})})).json();
+    if(r.error)$('#edStatus').innerHTML=`<span class="err">${r.error}</span>`;
+    else{$('#edStatus').innerHTML='<span class="ok">✅ Saved — preview updated.</span>';edLoadPreview();refreshRecent();}
+  }catch(e){$('#edStatus').innerHTML=`<span class="err">${e.message}</span>`;}
+  b.disabled=false;
+};
 
 injectIcons();loadConfig();loadPiperVoices();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
 document.querySelector('[data-nav=dashboard]').click();
