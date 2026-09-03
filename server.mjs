@@ -306,6 +306,17 @@ function maskKey(v) {
 }
 
 const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", story: "neutral" };
+// a full VISUAL THEME per story type — imageStyle (AI images), motion, captions —
+// so a scary story and a bedtime story actually look different, not just sound it.
+const STORY_THEMES = {
+  scary: { imageStyle: "dark cinematic horror still, eerie, desaturated, deep shadows, moody low-key lighting, film grain, unsettling", motion: "in", captionPos: "bottom" },
+  bedtime: { imageStyle: "soft dreamy storybook illustration, warm pastel colors, gentle glow, cozy, whimsical, calming", motion: "subtle", captionPos: "bottom" },
+  biography: { imageStyle: "cinematic documentary photograph, warm natural light, timeless, dignified, detailed", motion: "in", captionPos: "bottom" },
+  tech: { imageStyle: "sleek modern technology, clean minimal, cool blue tones, futuristic, crisp, high-tech", motion: "in", captionPos: "bottom" },
+  documentary: { imageStyle: "epic cinematic documentary, natural lighting, sweeping wide shots, rich detail, film look", motion: "in", captionPos: "bottom" },
+  motivational: { imageStyle: "epic inspiring cinematic, golden-hour light, dramatic, uplifting, high contrast", motion: "in", captionPos: "middle" },
+  story: { imageStyle: "cinematic film still, dramatic lighting, highly detailed, atmospheric", motion: "in", captionPos: "bottom" },
+};
 // best-fit XTTS-v2 built-in voice per story type (safe: server falls back if missing)
 const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", story: "Damien Black" };
 // emotional delivery per story type: edge-tts rate/pitch + Piper length-scale (pace)
@@ -637,10 +648,11 @@ app.post("/api/story", (req, res) => {
         llmProvider: b.llmProvider || "", instructions: b.instructions || "",
         onProgress: (m) => pushLog(job, m),
       });
-      config.imageStyle = b.imageStyle || "";
+      const theme = STORY_THEMES[b.storyType] || STORY_THEMES.story;
+      config.imageStyle = b.imageStyle || theme.imageStyle; // themed AI-image look per genre
       config.watermark = b.watermark || "";
-      config.captionPos = b.captionPos || "bottom";
-      config.motion = b.motion || "in";
+      config.captionPos = theme.captionPos;
+      config.motion = theme.motion;
       config.watermarkImage = b.watermarkImage ? watermarkFile() : "";
       config.voiceEngine = b.voiceEngine || "edge";
       config.piperVoice = b.piperVoice || "";

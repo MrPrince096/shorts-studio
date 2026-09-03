@@ -232,6 +232,7 @@
           <label>What's the story about?</label>
           <input id="storyTopic" class="big" placeholder="e.g. the abandoned lighthouse keeper" />
           <div class="row"><div><label>Story type</label><select id="storyType"></select></div><div><label>Length</label><select id="storyMinutes"></select></div></div>
+          <div class="note" id="storyTheme" style="margin-top:10px"></div>
           <label>Instructions <span class="muted">— optional, how it should go</span></label>
           <textarea id="storyInstr" rows="2" placeholder="e.g. first-person, slow suspense build, twist ending"></textarea>
           <button class="btn grad big" id="goStory" style="width:100%;margin-top:16px"><span data-icon="film"></span>Create Story</button>
@@ -589,6 +590,17 @@ async function loadConfig(){
   [['story','General story'],['bedtime','Bedtime story'],['scary','Scary story'],['biography','Biography'],['tech','Tech explainer'],['documentary','Documentary'],['motivational','Motivational']].forEach(([v,l])=>$('#storyType').appendChild(opt(v,l)));
   [1,2,3,5,7,10].forEach(n=>$('#storyMinutes').appendChild(opt(n,n+' min')));
   $('#storyType').value='scary'; $('#storyMinutes').value='3';
+  const STORY_THEME_DESC={
+    scary:'🔪 <b>Scary</b> — Damien Black voice · slow & low delivery · suspense music · dark cinematic look',
+    bedtime:'🌙 <b>Bedtime</b> — Sofia Hellen voice · soft slow delivery · calm music · dreamy storybook look',
+    biography:'📖 <b>Biography</b> — Royston Min voice · measured delivery · gentle music · warm documentary look',
+    tech:'💻 <b>Tech</b> — Andrew Chipper voice · clear brisk delivery · neutral music · sleek modern look',
+    documentary:'🎬 <b>Documentary</b> — Viktor Menelaos voice · authoritative delivery · neutral music · epic cinematic look',
+    motivational:'💪 <b>Motivational</b> — Craig Gutsy voice · bright energetic delivery · uplifting music · golden epic look',
+    story:'✨ <b>Story</b> — dramatic delivery · atmospheric music · cinematic look',
+  };
+  const updTheme=()=>{$('#storyTheme').innerHTML=(STORY_THEME_DESC[$('#storyType').value]||'')+'<br><span class="muted" style="font-size:11px">Theme is applied automatically. XTTS/ElevenLabs voices need the expressive engine; music & pacing work on any voice.</span>';};
+  $('#storyType').onchange=updTheme; updTheme();
   [['0','Off — one per scene'],['3','3 images'],['5','5 images'],['8','8 images']].forEach(([v,l])=>$('#reuseVisuals').appendChild(opt(v,l)));
   $('#musicMood').value='auto'; $('#reuseVisuals').value='0';
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
