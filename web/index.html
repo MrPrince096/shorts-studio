@@ -428,8 +428,15 @@
             <input type="range" id="edMusicVol" min="0" max="100" step="5" value="25" />
             <label>Voice volume: <span class="rateval" id="edVoiceVolV">100%</span></label>
             <input type="range" id="edVoiceVol" min="0" max="150" step="5" value="100" />
-            <button class="btn grad big" id="edApply" style="width:100%;margin-top:16px"><span data-icon="save"></span>Apply & save</button>
+            <button class="btn grad big" id="edApply" style="width:100%;margin-top:16px"><span data-icon="save"></span>Apply music & volume</button>
             <div id="edStatus" style="margin-top:10px;font-size:13px"></div>
+            <hr />
+            <div class="sechead" style="margin-bottom:10px"><span data-icon="mega"></span> Change voice &amp; language <span class="badge opt">re-renders</span></div>
+            <div class="row"><div><label>Language 🌐</label><select id="edLang"></select></div><div><label>Voice</label><select id="edVoice"></select></div></div>
+            <div class="row"><div><label>Voice engine</label><select id="edVoiceEngine"></select></div><div id="edPiperBox" style="display:none"><label>Piper voice</label><select id="edPiperVoice"></select></div></div>
+            <button class="btn ghost big" id="edRevoice" style="width:100%;margin-top:12px"><span data-icon="play"></span>Re-voice &amp; re-render</button>
+            <div class="note" style="margin-top:8px">Keeps your script — only the voice/language changes. Captions re-render to match, so this takes about as long as a normal render.</div>
+            <div id="edRevoiceStatus" style="margin-top:8px;font-size:13px"></div>
           </div>
         </div>
         <div class="col">
@@ -616,10 +623,13 @@ async function showDashboard(){
 
 let LANGS=[];
 function populateVoices(id){const L=LANGS.find(x=>x.id===id)||LANGS[0];$('#voice').innerHTML='';(L?L.voices:[]).forEach(v=>$('#voice').appendChild(opt(v.id,v.label)));}
+function populateEdVoices(id){const L=LANGS.find(x=>x.id===id)||LANGS[0];$('#edVoice').innerHTML='';(L?L.voices:[]).forEach(v=>$('#edVoice').appendChild(opt(v.id,v.label)));}
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
   LANGS=c.languages||[]; LANGS.forEach(l=>$('#language').appendChild(opt(l.id,l.label)));
   $('#language').value='en'; populateVoices('en'); $('#language').onchange=()=>{populateVoices($('#language').value);voiceWarn();};
+  LANGS.forEach(l=>$('#edLang').appendChild(opt(l.id,l.label))); $('#edLang').value='en'; populateEdVoices('en'); $('#edLang').onchange=()=>populateEdVoices($('#edLang').value);
+  $('#edVoiceEngine').innerHTML=$('#voiceEngine').innerHTML; $('#edVoiceEngine').value='edge'; $('#edVoiceEngine').onchange=()=>{$('#edPiperBox').style.display=$('#edVoiceEngine').value==='piper'?'block':'none';};
   c.aspects.forEach(a=>$('#aspect').appendChild(opt(a.id,a.label)));
   c.qualities.forEach(q=>$('#quality').appendChild(opt(q.id,q.label)));
   c.durations.forEach(d=>$('#lenPick').appendChild(opt(d.id,d.label)));
@@ -708,7 +718,7 @@ async function loadSettings(){
   toggleLlm();
 }
 async function loadPiperVoices(){
-  try{const r=await(await fetch('/api/piper-voices')).json();const sel=$('#piperVoice');sel.innerHTML='';(r.voices||[]).forEach(v=>sel.appendChild(opt(v.file,v.label)));if(r.current&&[...sel.options].some(o=>o.value===r.current))sel.value=r.current;}catch(e){}
+  try{const r=await(await fetch('/api/piper-voices')).json();const fill=(id)=>{const sel=$(id);if(!sel)return;sel.innerHTML='';(r.voices||[]).forEach(v=>sel.appendChild(opt(v.file,v.label)));if(r.current&&[...sel.options].some(o=>o.value===r.current))sel.value=r.current;};fill('#piperVoice');fill('#edPiperVoice');}catch(e){}
   voiceWarn();
 }
 function togglePiperVoice(){$('#piperVoiceBox').style.display=$('#voiceEngine').value==='piper'?'block':'none';}
@@ -936,6 +946,20 @@ $('#edApply').onclick=async()=>{const f=$('#edVideo').value;if(!f){alert('Pick a
     else{$('#edStatus').innerHTML='<span class="ok">✅ Saved — preview updated.</span>';edLoadPreview();refreshRecent();}
   }catch(e){$('#edStatus').innerHTML=`<span class="err">${e.message}</span>`;}
   b.disabled=false;
+};
+async function edPoll(id){
+  try{const s=await(await fetch('/api/status/'+id)).json();
+    if(s.status==='running'){$('#edRevoiceStatus').innerHTML=`<span class="spin"></span> ${(s.log||[]).slice(-1)[0]||'Working…'}`;setTimeout(()=>edPoll(id),1500);}
+    else if(s.status==='done'){$('#edRevoiceStatus').innerHTML='<span class="ok">✅ Re-voiced — preview updated.</span>';$('#edRevoice').disabled=false;edLoadPreview();refreshRecent();refreshGallery();}
+    else{$('#edRevoiceStatus').innerHTML=`<span class="err">❌ Failed — ${(s.log||[]).slice(-1)[0]||'see logs'}</span>`;$('#edRevoice').disabled=false;}
+  }catch(e){$('#edRevoiceStatus').innerHTML=`<span class="err">${e.message}</span>`;$('#edRevoice').disabled=false;}
+}
+$('#edRevoice').onclick=async()=>{const f=$('#edVideo').value;if(!f){alert('Pick a video.');return;}
+  const b=$('#edRevoice');b.disabled=true;$('#edRevoiceStatus').innerHTML='<span class="spin"></span> Starting re-voice…';
+  try{const r=await(await fetch('/api/edit/revoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:f,language:$('#edLang').value,voice:$('#edVoice').value,voiceEngine:$('#edVoiceEngine').value,piperVoice:$('#edPiperVoice')?$('#edPiperVoice').value:''})})).json();
+    if(r.error){$('#edRevoiceStatus').innerHTML=`<span class="err">${r.error}</span>`;b.disabled=false;}
+    else edPoll(r.jobId);
+  }catch(e){$('#edRevoiceStatus').innerHTML=`<span class="err">${e.message}</span>`;b.disabled=false;}
 };
 
 injectIcons();loadConfig();loadPiperVoices();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();

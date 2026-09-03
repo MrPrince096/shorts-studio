@@ -30,3 +30,4 @@ public/vpart*.wav
 public/vlist.txt
 music/
 out/*.voice.mp3
+out/*.config.json

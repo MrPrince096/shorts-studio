@@ -31,6 +31,8 @@ execFileSync("npx", ["remotion", "render", "Short", outPath, "--props=public/pro
 });
 // keep the voice-only track so the Editor can swap music / remix without re-rendering
 try { if (existsSync(join(ROOT, "public/voiceover.mp3"))) copyFileSync(join(ROOT, "public/voiceover.mp3"), join(ROOT, `out/${name}.voice.mp3`)); } catch {}
+// keep the render config so the Editor can re-voice / change language later
+try { copyFileSync(join(ROOT, "scenes.json"), join(ROOT, `out/${name}.config.json`)); } catch {}
 
 // sidecar metadata for easy copy-paste when uploading to YouTube
 const tags = Array.isArray(config.tags) ? config.tags : [];

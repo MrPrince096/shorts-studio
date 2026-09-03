@@ -152,6 +152,33 @@ app.post("/api/edit/remix", (req, res) => {
   }
 });
 
+// Editor: change VOICE / LANGUAGE — re-runs the render with the saved script (no
+// AI re-writing), because new words/timing require the captions to be re-rendered.
+app.post("/api/edit/revoice", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const file = String(b.file || "").replace(/[^a-z0-9._-]/gi, "");
+  const base = file.replace(/\.mp4$/, "");
+  const cfgPath = join(OUT, base + ".config.json");
+  if (!file.endsWith(".mp4") || !existsSync(cfgPath)) return res.status(400).json({ error: "This video was made before re-voicing existed — re-render it once to enable it." });
+  let config;
+  try { config = JSON.parse(readFileSync(cfgPath, "utf8")); } catch { return res.status(500).json({ error: "Could not read this video's saved script." }); }
+  const lang = resolveLang(b.language || config.langCode || "en");
+  config.langCode = b.language || config.langCode || "en";
+  if (b.voice) config.voice = b.voice;
+  config.voiceEngine = b.voiceEngine || config.voiceEngine || "edge";
+  if (typeof b.piperVoice === "string") config.piperVoice = b.piperVoice;
+  config.font = lang.font; config.fontCss = lang.fontCss; config.rtl = lang.rtl;
+  config.slug = base; // keep the same filename so it overwrites this video
+  busy = true;
+  const job = newJob(1);
+  res.json({ jobId: job.id });
+  (async () => {
+    try { pushLog(job, `🎙️ Re-voicing "${config.title || base}" in ${lang.label}…`); await runAll([config], job); }
+    catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
 // ---- Drafts (save/load create-form setups) ----
 app.post("/api/drafts", (req, res) => {
   const b = req.body || {};
