@@ -86,7 +86,9 @@ async function llmOllama(prompt) {
     res = await fetch(`${base}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, stream: false, format: "json", options: { temperature: 0.9 } }),
+      // NB: no Ollama format:"json" — it collapses gemma3 to "{}". We prompt for
+      // JSON and parse robustly (parseLLMJson) instead, which works across models.
+      body: JSON.stringify({ model, prompt, stream: false, options: { temperature: 0.8 } }),
     });
   } catch (e) {
     throw new Error(`Ollama not reachable at ${base} — is it running? (${e.message})`);
@@ -103,10 +105,20 @@ export async function callLLM(prompt, providerOverride) {
   return llmGemini(prompt);
 }
 
-// parse JSON possibly wrapped in ```json fences
+// Robustly pull JSON out of an LLM reply — tolerant of ```fences```, preamble
+// text, and trailing commas (small local models like gemma/llama do all three).
 export function parseLLMJson(raw) {
-  let text = String(raw).trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-  return JSON.parse(text);
+  let text = String(raw).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  try { return JSON.parse(text); } catch {}
+  // grab the outermost {...} or [...] block and drop trailing commas
+  const starts = ["{", "["].map((c) => text.indexOf(c)).filter((i) => i >= 0);
+  const first = starts.length ? Math.min(...starts) : -1;
+  const last = Math.max(text.lastIndexOf("}"), text.lastIndexOf("]"));
+  if (first >= 0 && last > first) {
+    const cand = text.slice(first, last + 1).replace(/,(\s*[}\]])/g, "$1");
+    return JSON.parse(cand);
+  }
+  return JSON.parse(text); // let it throw with the original error
 }
 
 // ---------- prompt building ----------
@@ -207,9 +219,8 @@ Return ONLY valid JSON, no markdown, of exactly this shape:
     if (String(e.message).startsWith("NO_LLM_KEY")) throw new Error("NO_LLM_KEY");
     throw e;
   }
-  let text = String(raw).trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
   let parsed;
-  try { parsed = JSON.parse(text); }
+  try { parsed = parseLLMJson(raw); }
   catch { throw new Error("The LLM did not return valid JSON. Try again or switch model."); }
 
   const videos = (parsed.videos || parsed.scripts || (Array.isArray(parsed) ? parsed : []))
