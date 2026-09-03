@@ -782,7 +782,10 @@ document.querySelectorAll('#galFilter button').forEach(b=>b.onclick=()=>{documen
 window.editVideo=(f)=>{window.__edPre=decodeURIComponent(f);document.querySelector('[data-nav=editor]').click();};
 window.openVid=(i)=>{const v=VIDEOS[i];$('#vidTitle').textContent=v.title||v.file.replace('.mp4','');
   $('#vidPlay').innerHTML=`<video class="preview" controls autoplay src="/out/${encodeURIComponent(v.file)}"></video>`;
-  const rows=(v.title||v.description||v.hashtags)?`<div style="margin-top:12px">${v.title?`<div class="metarow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}${v.description?`<div class="metarow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}${v.hashtags?`<div class="metarow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}<a class="getlink" href="/out/${encodeURIComponent(v.file)}" download>⬇ Download video</a></div>`:'';
+  const mr=(label,val)=>val?`<div class="metarow"><b>${label}</b><button class="cp" data-c="${esc(val)}">📋</button><div class="mv">${esc(val)}</div></div>`:'';
+  let rows='<div style="margin-top:12px">'+mr('Title',v.title)+mr('Description',v.description)+mr('Hashtags',v.hashtags);
+  if(v.titleLocal||v.descriptionLocal||v.hashtagsLocal){rows+=`<div class="metarow" style="margin-top:12px"><b style="color:var(--accent2)">— In ${esc(v.language||'your language')} —</b></div>`+mr('Title',v.titleLocal)+mr('Description',v.descriptionLocal)+mr('Hashtags',v.hashtagsLocal);}
+  rows+=`<a class="getlink" href="/out/${encodeURIComponent(v.file)}" download>⬇ Download video</a></div>`;
   $('#vidMeta').innerHTML=rows;
   document.querySelectorAll('#vidMeta .cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1000);});
   $('#vidOverlay').classList.add('open');};

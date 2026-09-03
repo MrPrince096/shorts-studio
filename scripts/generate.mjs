@@ -200,7 +200,7 @@ export async function generateStory({ topic, country = "", storyType = "story", 
   // keep the outline JSON SMALL so small local models return valid JSON reliably
   const outPrompt = `You are a master ${storyType} storyteller. Plan a ${minutes}-minute ${storyType} video about: ${topic}.
 Style: ${style}
-Give a compelling "title"${nonEnglish ? ` (in ${language})` : ""} and EXACTLY ${beats} sequential story "beats" (one short sentence each, in order, forming a complete arc with a satisfying ending).${instructions ? `\nCreator instructions: ${instructions}` : ""}
+Give a compelling ENGLISH "title" and EXACTLY ${beats} sequential story "beats" (one short sentence each, in order, forming a complete arc with a satisfying ending).${instructions ? `\nCreator instructions: ${instructions}` : ""}
 Return ONLY JSON: {"title":"","beats":["",""]}`;
   const tryOutline = async (prompt, n = 3) => {
     for (let a = 0; a < n; a++) {
@@ -246,17 +246,27 @@ Return ONLY JSON: {"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
 
   const slug = (title || "story").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "story";
   log(`✅ Story ready — ${scenes.length} scenes.`);
-  // SEO metadata as a SEPARATE small call (best-effort — never blocks the story)
+  // SEO metadata as a SEPARATE small call (best-effort — never blocks the story). English always.
   let meta = {};
   try {
-    meta = parseLLMJson(await callLLM(`For a ${storyType} YouTube video titled "${title}" about ${topic}, write a "description" (2-3 engaging sentences that hook the viewer${nonEnglish ? `, in ${language}` : ""}) and 10-12 "tags" (lowercase keywords, no # sign). Return ONLY JSON: {"description":"","tags":["",""]}`, llmProvider)) || {};
+    meta = parseLLMJson(await callLLM(`For a ${storyType} YouTube video titled "${title}" about ${topic}, write an ENGLISH "description" (2-3 engaging sentences that hook the viewer) and 10-12 ENGLISH "tags" (lowercase keywords, no # sign). Return ONLY JSON: {"description":"","tags":["",""]}`, llmProvider)) || {};
   } catch { /* keep going with fallbacks */ }
-  const tags = (Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [storyType, "story", "storytime", "narration"])
-    .map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 14);
+  const cleanTags = (t, fb) => (Array.isArray(t) && t.length ? t : fb).map((x) => String(x).replace(/^#/, "").trim()).filter(Boolean).slice(0, 14);
+  const tags = cleanTags(meta.tags, [storyType, "story", "storytime", "narration"]);
+  const description = (meta.description && String(meta.description).trim()) || `${title} — a ${minutes}-minute ${storyType}.`;
+  // if a non-English narration, ALSO produce the native-language metadata for later use
+  let local = null;
+  if (nonEnglish) {
+    try {
+      const lm = parseLLMJson(await callLLM(`Translate/adapt this YouTube metadata into ${language} (native script). Title: "${title}". Description: "${description}". Give "title", "description" and 8-12 "tags" (no # sign), all in ${language}. Return ONLY JSON: {"title":"","description":"","tags":["",""]}`, llmProvider)) || {};
+      if (lm.title || lm.description) local = { language, title: String(lm.title || title).trim(), description: String(lm.description || description).trim(), tags: cleanTags(lm.tags, tags) };
+    } catch { /* native metadata is optional */ }
+  }
   return {
     title, slug,
-    description: (meta.description && String(meta.description).trim()) || `${title} — a ${minutes}-minute ${storyType}.`,
+    description,
     tags,
+    metaLocal: local,
     voice, rate, music: "", width, height,
     source: source || "pexels", videoModel: videoModel || "",
     font: font || "Arial Black", fontCss: fontCss || "", rtl: !!rtl,
@@ -307,7 +317,8 @@ ${benefits ? `- Benefits to highlight: ${benefits}.` : ""}
   const langBlock = nonEnglish
     ? `\nLANGUAGE RULES (very important):
 - Write EVERY "text" (the spoken narration) in ${language}, using its native script — natural, fluent, native-speaker quality.
-- Write "title" and "description" in ${language} too.
+- Keep "title", "description" and "tags" in ENGLISH (for global discovery/SEO).
+- ALSO add "titleLocal", "descriptionLocal" and "tagsLocal" — the SAME title/description/tags written in ${language}.
 - BUT keep EVERY "query" in simple ENGLISH (2-4 words) — it is used to search a stock-footage library.
 - Also add an English "slug": 3-5 lowercase ASCII words, hyphenated, describing the video (used for the filename).`
     : `\n- Also add a short English "slug": 3-5 lowercase ASCII words, hyphenated (used for the filename).`;
@@ -346,6 +357,7 @@ Return ONLY valid JSON, no markdown, of exactly this shape:
       slug: v.slug || "",
       description: v.description || "",
       tags: Array.isArray(v.tags) ? v.tags : [],
+      metaLocal: (nonEnglish && (v.titleLocal || v.descriptionLocal)) ? { language, title: String(v.titleLocal || v.title || "").trim(), description: String(v.descriptionLocal || v.description || "").trim(), tags: (Array.isArray(v.tagsLocal) ? v.tagsLocal : (Array.isArray(v.tags) ? v.tags : [])).map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 14) } : null,
       voice, rate, music: "", width, height,
       source: source || "pexels",
       videoModel: videoModel || "",

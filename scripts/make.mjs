@@ -37,19 +37,24 @@ try { if (existsSync(join(ROOT, "public/voiceover.mp3"))) copyFileSync(join(ROOT
 // keep the render config so the Editor can re-voice / change language later
 try { copyFileSync(join(ROOT, "scenes.json"), join(DATA, `${name}.config.json`)); } catch {}
 
-// sidecar metadata for easy copy-paste when uploading to YouTube
+// sidecar metadata for easy copy-paste when uploading to YouTube (English default;
+// the chosen-language version is stored alongside for later use)
 const tags = Array.isArray(config.tags) ? config.tags : [];
-writeFileSync(
-  join(DATA, `${name}.json`),
-  JSON.stringify(
-    {
-      title: config.title || "",
-      description: config.description || "",
-      tags,
-      hashtags: tags.map((t) => "#" + String(t).replace(/[^\p{L}\p{N}_]/gu, "")).join(" "),
-    },
-    null,
-    2
-  )
-);
+const hashify = (ts) => ts.map((t) => "#" + String(t).replace(/[^\p{L}\p{N}_]/gu, "")).join(" ");
+const sidecar = {
+  title: config.title || "",
+  description: config.description || "",
+  tags,
+  hashtags: hashify(tags),
+};
+const ml = config.metaLocal;
+if (ml && (ml.title || ml.description)) {
+  const lt = Array.isArray(ml.tags) ? ml.tags : [];
+  sidecar.language = ml.language || "";
+  sidecar.titleLocal = ml.title || "";
+  sidecar.descriptionLocal = ml.description || "";
+  sidecar.tagsLocal = lt;
+  sidecar.hashtagsLocal = hashify(lt);
+}
+writeFileSync(join(DATA, `${name}.json`), JSON.stringify(sidecar, null, 2));
 console.log(`\n✅ Saved: ${join(ROOT, outPath)}`);

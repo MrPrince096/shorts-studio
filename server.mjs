@@ -679,7 +679,7 @@ app.get("/api/videos", (_req, res) => {
       if (!existsSync(join(DATA, thumb))) {
         try { execFileSync("ffmpeg", ["-y", "-ss", "1", "-i", join(OUT, f), "-frames:v", "1", "-vf", "scale=320:-1", join(DATA, thumb)], { stdio: "ignore" }); } catch {}
       }
-      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(DATA, thumb)) ? thumb : "", w: w || 0, h: h || 0 };
+      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(DATA, thumb)) ? thumb : "", w: w || 0, h: h || 0, language: meta.language || "", titleLocal: meta.titleLocal || "", descriptionLocal: meta.descriptionLocal || "", hashtagsLocal: meta.hashtagsLocal || "" };
     })
     .sort((a, b) => b.mtime - a.mtime);
   res.json(list);
