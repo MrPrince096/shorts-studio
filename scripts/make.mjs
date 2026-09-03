@@ -40,7 +40,7 @@ try { copyFileSync(join(ROOT, "scenes.json"), join(DATA, `${name}.config.json`))
 // sidecar metadata for easy copy-paste when uploading to YouTube (English default;
 // the chosen-language version is stored alongside for later use)
 const tags = Array.isArray(config.tags) ? config.tags : [];
-const hashify = (ts) => ts.map((t) => "#" + String(t).replace(/[^\p{L}\p{N}_]/gu, "")).join(" ");
+const hashify = (ts) => ts.map((t) => "#" + String(t).replace(/[^\p{L}\p{N}_]/gu, "")).filter((h) => h.length > 1).join(" ");
 const sidecar = {
   title: config.title || "",
   description: config.description || "",
