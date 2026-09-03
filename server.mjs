@@ -616,12 +616,21 @@ app.get("/api/videos", (_req, res) => {
       const base = f.replace(/\.mp4$/, "");
       const metaPath = join(OUT, base + ".json");
       if (existsSync(metaPath)) { try { meta = JSON.parse(readFileSync(metaPath, "utf8")); } catch {} }
+      // video dimensions (cached in the sidecar so we only ffprobe once)
+      let w = meta.w, h = meta.h;
+      if (!w || !h) {
+        try {
+          const out = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", join(OUT, f)]).toString().trim();
+          const m = out.match(/(\d+)x(\d+)/);
+          if (m) { w = +m[1]; h = +m[2]; meta.w = w; meta.h = h; try { writeFileSync(metaPath, JSON.stringify(meta, null, 2)); } catch {} }
+        } catch {}
+      }
       // lazy thumbnail (first ~1s frame)
       const thumb = base + ".thumb.jpg";
       if (!existsSync(join(OUT, thumb))) {
         try { execFileSync("ffmpeg", ["-y", "-ss", "1", "-i", join(OUT, f), "-frames:v", "1", "-vf", "scale=320:-1", join(OUT, thumb)], { stdio: "ignore" }); } catch {}
       }
-      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(OUT, thumb)) ? thumb : "" };
+      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(OUT, thumb)) ? thumb : "", w: w || 0, h: h || 0 };
     })
     .sort((a, b) => b.mtime - a.mtime);
   res.json(list);

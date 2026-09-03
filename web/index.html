@@ -68,6 +68,8 @@
   .vcard{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel2);transition:transform .12s,border-color .12s}
   .vcard:hover{transform:translateY(-2px);border-color:var(--accent)}
   .vcard .thumb{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000;display:block;cursor:pointer}
+  .galbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .galbar .seg button{min-width:auto;padding:7px 12px}
   .vcard .vinfo{padding:10px 11px 11px}
   .vcard .vt{font-weight:600;font-size:12.5px;line-height:1.25;max-height:2.4em;overflow:hidden}
   .vcard .vm{color:var(--muted);font-size:11px;margin-top:3px}
@@ -440,7 +442,9 @@
 
     <!-- LIBRARY (My Videos) -->
     <div class="gal" id="library">
-      <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2><div id="gallery" class="vgrid"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
+      <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2>
+        <div class="galbar" id="galFilterBar"><span class="muted" style="font-size:12px">Filter:</span><div class="seg" id="galFilter" style="margin-bottom:0;display:inline-flex"><button data-f="all" class="on">All</button><button data-f="vertical">📱 Vertical</button><button data-f="landscape">🖥️ Landscape</button><button data-f="square">⬛ Square</button></div></div>
+        <div id="gallery" class="vgrid"><div class="muted" style="font-size:12px">No videos yet.</div></div></div>
     </div>
     <input type="file" id="assetUp" accept="image/*" hidden />
   </main>
@@ -595,6 +599,7 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   if(v==='editor'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.add('show');showEditor();return;}
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
+    $('#galFilterBar').style.display=(v==='library')?'flex':'none';
     if(v==='drafts'){$('#libTitle').textContent='Drafts';showDrafts();}
     else if(v==='assets'){$('#libTitle').textContent='Assets';showAssets();}
     else {$('#libTitle').textContent=(v==='projects'?'Projects':'My Videos');$('#gallery').className='vgrid';refreshGallery();}
@@ -747,11 +752,22 @@ async function refreshRecent(){
 }
 let VIDEOS=[];
 const esc=(s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+function vidShape(v){const w=v.w||9,h=v.h||16;if(w>h*1.1)return 'landscape';if(h>w*1.1)return 'vertical';return 'square';}
+window.__galF='all';
 async function refreshGallery(){
-  VIDEOS=await(await fetch('/api/videos')).json(); const g=$('#gallery');
-  if(!VIDEOS.length){g.innerHTML='<div class="empty">No videos yet — make your first one!</div>';return;}
-  g.innerHTML=VIDEOS.map((v,i)=>`<div class="vcard"><img class="thumb" loading="lazy" ${v.thumb?`src="/out/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i})">📋 Meta</button></div></div></div>`).join('');
+  VIDEOS=await(await fetch('/api/videos')).json();
+  renderGallery();
 }
+function renderGallery(){
+  const g=$('#gallery');
+  if(!VIDEOS.length){g.innerHTML='<div class="empty">No videos yet — make your first one!</div>';return;}
+  const f=window.__galF||'all';
+  const list=VIDEOS.map((v,i)=>({v,i})).filter(({v})=>f==='all'||vidShape(v)===f);
+  if(!list.length){g.innerHTML='<div class="empty">No '+f+' videos yet.</div>';return;}
+  g.innerHTML=list.map(({v,i})=>`<div class="vcard"><img class="thumb" loading="lazy" style="aspect-ratio:${(v.w||9)}/${(v.h||16)}" ${v.thumb?`src="/out/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB · ${v.w&&v.h?v.w+'×'+v.h:''}</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><button onclick="editVideo('${encodeURIComponent(v.file)}')">✎ Edit</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i})">📋 Meta</button></div></div></div>`).join('');
+}
+document.querySelectorAll('#galFilter button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#galFilter button').forEach(x=>x.classList.toggle('on',x===b));window.__galF=b.dataset.f;renderGallery();});
+window.editVideo=(f)=>{window.__edPre=decodeURIComponent(f);document.querySelector('[data-nav=editor]').click();};
 window.openVid=(i)=>{const v=VIDEOS[i];$('#vidTitle').textContent=v.title||v.file.replace('.mp4','');
   $('#vidPlay').innerHTML=`<video class="preview" controls autoplay src="/out/${encodeURIComponent(v.file)}"></video>`;
   const rows=(v.title||v.description||v.hashtags)?`<div style="margin-top:12px">${v.title?`<div class="metarow"><b>Title</b><button class="cp" data-c="${esc(v.title)}">📋</button><div class="mv">${esc(v.title)}</div></div>`:''}${v.description?`<div class="metarow"><b>Description</b><button class="cp" data-c="${esc(v.description)}">📋</button><div class="mv">${esc(v.description)}</div></div>`:''}${v.hashtags?`<div class="metarow"><b>Hashtags</b><button class="cp" data-c="${esc(v.hashtags)}">📋</button><div class="mv">${esc(v.hashtags)}</div></div>`:''}<a class="getlink" href="/out/${encodeURIComponent(v.file)}" download>⬇ Download video</a></div>`:'';
@@ -896,6 +912,7 @@ async function showEditor(){
   const sel=$('#edVideo'); sel.innerHTML='';
   if(!vids.length){sel.appendChild(opt('','No videos yet — make one first'));$('#edPreviewBox').innerHTML='<div class="previewempty">Make a video first</div>';}
   else vids.forEach(v=>sel.appendChild(opt(v.file,(v.title||v.file.replace('.mp4','')).slice(0,52))));
+  if(window.__edPre&&[...sel.options].some(o=>o.value===window.__edPre)){sel.value=window.__edPre;window.__edPre='';}
   await loadEdMusic(); edLoadPreview();
 }
 async function loadEdMusic(){
