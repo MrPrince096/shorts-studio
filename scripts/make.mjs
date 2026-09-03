@@ -1,6 +1,6 @@
 // One-shot: build (TTS + Pexels + timings) then render to a title-named MP4 in out/
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -29,15 +29,18 @@ execFileSync("npx", ["remotion", "render", "Short", outPath, "--props=public/pro
   stdio: "inherit",
   cwd: ROOT,
 });
+// supporting files live in out/data/ (separate from the final videos in out/)
+const DATA = join(ROOT, "out", "data");
+if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true });
 // keep the voice-only track so the Editor can swap music / remix without re-rendering
-try { if (existsSync(join(ROOT, "public/voiceover.mp3"))) copyFileSync(join(ROOT, "public/voiceover.mp3"), join(ROOT, `out/${name}.voice.mp3`)); } catch {}
+try { if (existsSync(join(ROOT, "public/voiceover.mp3"))) copyFileSync(join(ROOT, "public/voiceover.mp3"), join(DATA, `${name}.voice.mp3`)); } catch {}
 // keep the render config so the Editor can re-voice / change language later
-try { copyFileSync(join(ROOT, "scenes.json"), join(ROOT, `out/${name}.config.json`)); } catch {}
+try { copyFileSync(join(ROOT, "scenes.json"), join(DATA, `${name}.config.json`)); } catch {}
 
 // sidecar metadata for easy copy-paste when uploading to YouTube
 const tags = Array.isArray(config.tags) ? config.tags : [];
 writeFileSync(
-  join(ROOT, `out/${name}.json`),
+  join(DATA, `${name}.json`),
   JSON.stringify(
     {
       title: config.title || "",

@@ -58,6 +58,21 @@ const app = express();
 app.use(express.json({ limit: "80mb" })); // large limit for base64 media uploads
 app.use(express.static(join(ROOT, "web")));
 app.use("/out", express.static(OUT));
+// keep the final videos (out/*.mp4) separate from their supporting files
+// (thumbnails, voice tracks, configs, metadata) which live in out/data/
+const DATA = join(OUT, "data");
+if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true });
+app.use("/data", express.static(DATA));
+// one-time migration: move loose sidecars out of out/ into out/data/
+(function migrateData() {
+  try {
+    for (const f of readdirSync(OUT)) {
+      if (/\.(thumb\.jpg|voice\.mp3|config\.json)$/i.test(f) || (/\.json$/i.test(f) && f !== ".stats.json" && existsSync(join(OUT, f.replace(/\.json$/i, ".mp4"))))) {
+        try { renameSync(join(OUT, f), join(DATA, f)); } catch {}
+      }
+    }
+  } catch {}
+})();
 const DRAFTS_DIR = join(ROOT, "drafts");
 const ASSETS_DIR = join(ROOT, "assets");
 app.use("/assets", express.static(ASSETS_DIR));
@@ -122,7 +137,7 @@ app.post("/api/edit/remix", (req, res) => {
   const videoPath = join(OUT, file);
   if (!file.endsWith(".mp4") || !existsSync(videoPath)) return res.status(404).json({ error: "Video not found." });
   const base = file.replace(/\.mp4$/, "");
-  const voicePath = join(OUT, base + ".voice.mp3");
+  const voicePath = join(DATA, base + ".voice.mp3");
   if (!existsSync(voicePath)) return res.status(400).json({ error: "This video was made before the Editor existed — re-render it once to enable music editing." });
   const voiceVol = Math.max(0, Math.min(2, parseFloat(b.voiceVol) || 1));
   const musicVol = Math.max(0, Math.min(1.5, parseFloat(b.musicVol) != null ? parseFloat(b.musicVol) : 0.25));
@@ -159,7 +174,7 @@ app.post("/api/edit/revoice", (req, res) => {
   const b = req.body || {};
   const file = String(b.file || "").replace(/[^a-z0-9._-]/gi, "");
   const base = file.replace(/\.mp4$/, "");
-  const cfgPath = join(OUT, base + ".config.json");
+  const cfgPath = join(DATA, base + ".config.json");
   if (!file.endsWith(".mp4") || !existsSync(cfgPath)) return res.status(400).json({ error: "This video was made before re-voicing existed — re-render it once to enable it." });
   let config;
   try { config = JSON.parse(readFileSync(cfgPath, "utf8")); } catch { return res.status(500).json({ error: "Could not read this video's saved script." }); }
@@ -648,7 +663,7 @@ app.get("/api/videos", (_req, res) => {
       const s = statSync(join(OUT, f));
       let meta = {};
       const base = f.replace(/\.mp4$/, "");
-      const metaPath = join(OUT, base + ".json");
+      const metaPath = join(DATA, base + ".json");
       if (existsSync(metaPath)) { try { meta = JSON.parse(readFileSync(metaPath, "utf8")); } catch {} }
       // video dimensions (cached in the sidecar so we only ffprobe once)
       let w = meta.w, h = meta.h;
@@ -659,12 +674,12 @@ app.get("/api/videos", (_req, res) => {
           if (m) { w = +m[1]; h = +m[2]; meta.w = w; meta.h = h; try { writeFileSync(metaPath, JSON.stringify(meta, null, 2)); } catch {} }
         } catch {}
       }
-      // lazy thumbnail (first ~1s frame)
+      // lazy thumbnail (first ~1s frame) -> out/data/
       const thumb = base + ".thumb.jpg";
-      if (!existsSync(join(OUT, thumb))) {
-        try { execFileSync("ffmpeg", ["-y", "-ss", "1", "-i", join(OUT, f), "-frames:v", "1", "-vf", "scale=320:-1", join(OUT, thumb)], { stdio: "ignore" }); } catch {}
+      if (!existsSync(join(DATA, thumb))) {
+        try { execFileSync("ffmpeg", ["-y", "-ss", "1", "-i", join(OUT, f), "-frames:v", "1", "-vf", "scale=320:-1", join(DATA, thumb)], { stdio: "ignore" }); } catch {}
       }
-      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(OUT, thumb)) ? thumb : "", w: w || 0, h: h || 0 };
+      return { file: f, size: s.size, mtime: s.mtimeMs, title: meta.title || "", description: meta.description || "", hashtags: meta.hashtags || "", thumb: existsSync(join(DATA, thumb)) ? thumb : "", w: w || 0, h: h || 0 };
     })
     .sort((a, b) => b.mtime - a.mtime);
   res.json(list);

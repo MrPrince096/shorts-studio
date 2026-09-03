@@ -618,7 +618,7 @@ async function showDashboard(){
   loadStats();
   VIDEOS=await(await fetch('/api/videos')).json(); const g=$('#dashRecent');
   if(!VIDEOS.length){g.innerHTML='<div class="empty">No videos yet — pick a Quick action above to create your first one.</div>';return;}
-  g.innerHTML=VIDEOS.slice(0,8).map((v,i)=>`<div class="vcard"><img class="thumb" loading="lazy" ${v.thumb?`src="/out/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
+  g.innerHTML=VIDEOS.slice(0,8).map((v,i)=>`<div class="vcard"><img class="thumb" loading="lazy" ${v.thumb?`src="/data/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
 }
 
 let LANGS=[];
@@ -760,7 +760,7 @@ async function refreshRecent(){
   const l=await(await fetch('/api/videos')).json();
   const el=$('#recentList');
   if(!l.length){el.innerHTML='<div class="muted" style="font-size:12px">No projects yet.</div>';return;}
-  el.innerHTML=l.slice(0,5).map(v=>`<div class="proj" onclick="showPreview('${encodeURIComponent(v.file)}')">${v.thumb?`<img src="/out/${encodeURIComponent(v.thumb)}">`:'<div class="ph"></div>'}<div><div class="pt">${(v.title||v.file.replace('.mp4','')).slice(0,40)}</div><div class="pm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
+  el.innerHTML=l.slice(0,5).map(v=>`<div class="proj" onclick="showPreview('${encodeURIComponent(v.file)}')">${v.thumb?`<img src="/data/${encodeURIComponent(v.thumb)}">`:'<div class="ph"></div>'}<div><div class="pt">${(v.title||v.file.replace('.mp4','')).slice(0,40)}</div><div class="pm">${(v.size/1048576).toFixed(1)} MB</div></div></div>`).join('');
 }
 let VIDEOS=[];
 const esc=(s)=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
@@ -776,7 +776,7 @@ function renderGallery(){
   const f=window.__galF||'all';
   const list=VIDEOS.map((v,i)=>({v,i})).filter(({v})=>f==='all'||vidShape(v)===f);
   if(!list.length){g.innerHTML='<div class="empty">No '+f+' videos yet.</div>';return;}
-  g.innerHTML=list.map(({v,i})=>`<div class="vcard"><img class="thumb" loading="lazy" style="aspect-ratio:${(v.w||9)}/${(v.h||16)}" ${v.thumb?`src="/out/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB · ${v.w&&v.h?v.w+'×'+v.h:''}</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><button onclick="editVideo('${encodeURIComponent(v.file)}')">✎ Edit</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i})">📋 Meta</button></div></div></div>`).join('');
+  g.innerHTML=list.map(({v,i})=>`<div class="vcard"><img class="thumb" loading="lazy" style="aspect-ratio:${(v.w||9)}/${(v.h||16)}" ${v.thumb?`src="/data/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB · ${v.w&&v.h?v.w+'×'+v.h:''}</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><button onclick="editVideo('${encodeURIComponent(v.file)}')">✎ Edit</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i})">📋 Meta</button></div></div></div>`).join('');
 }
 document.querySelectorAll('#galFilter button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#galFilter button').forEach(x=>x.classList.toggle('on',x===b));window.__galF=b.dataset.f;renderGallery();});
 window.editVideo=(f)=>{window.__edPre=decodeURIComponent(f);document.querySelector('[data-nav=editor]').click();};
