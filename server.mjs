@@ -306,6 +306,8 @@ function maskKey(v) {
 }
 
 const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", story: "neutral" };
+// best-fit XTTS-v2 built-in voice per story type (safe: server falls back if missing)
+const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", story: "Damien Black" };
 // emotional delivery per story type: edge-tts rate/pitch + Piper length-scale (pace)
 const PROSODY = {
   scary: { rate: "-12%", pitch: "-6Hz", length: 1.18 },
@@ -646,6 +648,7 @@ app.post("/api/story", (req, res) => {
       config.reuseVisuals = b.reuseVisuals || 0;
       config.pitch = pr.pitch;          // edge-tts pitch for emotion
       config.piperLength = pr.length;   // Piper pace for emotion
+      config.xttsSpeaker = XTTS_VOICE_FOR[b.storyType] || XTTS_VOICE_FOR.story; // best XTTS voice for the genre
       pushLog(job, `🎬 Rendering a ${minutes}-min ${b.storyType || "story"} — ${config.scenes.length} scenes. This is a long render; hang tight…`);
       await runAll([config], job);
     } catch (e) {
