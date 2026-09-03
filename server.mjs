@@ -520,6 +520,7 @@ app.post("/api/generate", async (req, res) => {
         videoModel: b.videoModel || "",
         language: lang.label, font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         ad: !!b.ad, product: b.product || "", benefits: b.benefits || "", cta: b.cta || "", tone: b.tone || "", productImageDesc,
+        instructions: b.instructions || "",
         llmProvider: b.llmProvider || "",
       });
       configs.forEach((c) => {

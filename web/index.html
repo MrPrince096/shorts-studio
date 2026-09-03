@@ -207,8 +207,10 @@
         <div class="card tabpanel" id="tab-shorts">
           <h2><span data-icon="spark"></span> Create Short</h2>
           <div class="cardsub">AI-powered short video in minutes</div>
-          <label>Topic or idea <span class="muted">(optional with a genre/country)</span></label>
-          <div class="withbtn"><input id="topic" class="big" placeholder="e.g. 5 morning habits for success" /><button class="btn ghost" id="surprise" title="Random">🎲</button></div>
+          <label>Your prompt <span class="muted">— what's the video about?</span></label>
+          <div class="withbtn"><input id="topic" class="big" placeholder="e.g. how to grow tomatoes at home" /><button class="btn ghost" id="surprise" title="Surprise me">🎲</button></div>
+          <label>Instructions <span class="muted">— how should it go? (optional)</span></label>
+          <textarea id="instructions" rows="2" placeholder="e.g. beginner step-by-step, 6 clear stages, calm friendly tone, end with a pro tip"></textarea>
           <div class="row"><div><label>How many videos</label><select id="count"></select></div></div>
           <button class="btn grad big" id="goAI" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Generate Short</button>
           <button class="btn ghost" id="saveDraft" style="width:100%;margin-top:8px"><span data-icon="save"></span>Save as draft</button>
@@ -580,7 +582,7 @@ $('#saveSettings').onclick=async()=>{
   ['pexelsKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey'].forEach(id=>$('#'+id).value='');loadSettings();
 };
 
-const IDEAS=['foods that boost your brain','habits of successful people','why you procrastinate','how sleep repairs your body','facts about the human heart','how to build discipline','morning routines that change your life','foods that fight inflammation'];
+const IDEAS=['how to grow tomatoes at home','how to make sourdough bread','how to start composting','foods that boost your brain','how to build discipline','how to make cold brew coffee','how to start a vegetable garden','how sleep repairs your body','how to make homemade pasta','beginner guide to beekeeping'];
 $('#surprise').onclick=(e)=>{e.preventDefault();$('#topic').value=IDEAS[Math.floor(Math.random()*IDEAS.length)];};
 function sceneRow(t='',q=''){const d=document.createElement('div');d.className='scene';d.innerHTML=`<span class="num"></span><textarea placeholder="Narration...">${t}</textarea><input class="q" placeholder="Search term" value="${q.replace(/"/g,'&quot;')}"><button class="del">×</button>`;d.querySelector('.del').onclick=()=>{d.remove();renumber();};$('#scenes').appendChild(d);renumber();}
 function renumber(){[...document.querySelectorAll('.scene .num')].forEach((n,i)=>n.textContent=i+1);}
@@ -633,7 +635,7 @@ async function poll(id){
 }
 function run(url,body){startP();fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{if(!r.ok){const e=await r.json();throw new Error(e.error||'Error');}return r.json();}).then(({jobId})=>{polling=setInterval(()=>poll(jobId),1500);poll(jobId);}).catch(e=>{$('#status').innerHTML=`<span class="err">${e.message}</span>`;endP();});}
 
-$('#goAI').onclick=()=>{const topic=$('#topic').value.trim();const random=!topic&&!$('#genre').value&&!$('#country').value;run('/api/generate',{topic,random,count:$('#count').value,...fmt()});};
+$('#goAI').onclick=()=>{const topic=$('#topic').value.trim();const random=!topic&&!$('#genre').value&&!$('#country').value;run('/api/generate',{topic,random,count:$('#count').value,instructions:$('#instructions').value.trim(),...fmt()});};
 $('#goManual').onclick=()=>{const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(),query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);if(!$('#title').value.trim()||scenes.length<2){alert('Add a title and 2+ scenes.');return;}run('/api/render',{title:$('#title').value.trim(),description:$('#desc').value.trim(),tags:$('#tags').value,scenes,...fmt()});};
 $('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic){alert('Enter a story topic.');return;}run('/api/series/start',{topic,total:$('#seriesTotal').value,batch:$('#seriesBatch').value,...fmt()});};
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
