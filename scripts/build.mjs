@@ -57,9 +57,18 @@ function approxTimings() {
 }
 const toMp3From = (wav) => execFileSync("ffmpeg", ["-y", "-i", wav, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
 
-const usePiper = engine === "piper" && piperModel && existsSync(piperModel) && process.env.PIPER_PYTHON;
-const useXtts = engine === "xtts" && process.env.XTTS_URL;
-const useEleven = engine === "eleven" && process.env.ELEVEN_API_KEY;
+// Language support: fall back to edge-tts (34 langs) when the chosen offline engine
+// can't speak the selected language — otherwise it produces broken/runaway audio.
+const langCode = String(config.langCode || "en").toLowerCase();
+const XTTS_LANGS = new Set(["en", "es", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh", "ja", "hu", "ko", "hi"]);
+const piperLocaleOk = piperModel ? piperModel.split("/").pop().toLowerCase().startsWith(langCode + "_") : false;
+let engineEff = engine;
+if (engine === "piper" && !piperLocaleOk) { console.log(`⚠️  No Piper voice for "${langCode}" — using edge-tts instead.`); engineEff = "edge"; }
+if (engine === "xtts" && !XTTS_LANGS.has(langCode)) { console.log(`⚠️  XTTS-v2 can't speak "${langCode}" — using edge-tts instead.`); engineEff = "edge"; }
+
+const usePiper = engineEff === "piper" && piperModel && existsSync(piperModel) && process.env.PIPER_PYTHON;
+const useXtts = engineEff === "xtts" && process.env.XTTS_URL;
+const useEleven = engineEff === "eleven" && process.env.ELEVEN_API_KEY;
 
 if (usePiper) {
   console.log(`🎙️  Voiceover: Piper (offline) — ${piperModel.split("/").pop()}...`);
@@ -72,7 +81,7 @@ if (usePiper) {
 } else if (useXtts) {
   // Expressive, offline XTTS-v2 via a local voice server (see local-voice-server/)
   console.log(`🎙️  Voiceover: XTTS-v2 (offline, expressive) — ${process.env.XTTS_URL}...`);
-  const body = { text: fullText, language: config.langCode || "en" };
+  const body = { text: fullText, language: langCode === "zh" ? "zh-cn" : langCode };
   if (config.xttsSpeaker) body.speaker = config.xttsSpeaker;
   const r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`XTTS server ${r.status}: ${(await r.text()).slice(0, 160)}`);
@@ -132,6 +141,15 @@ try {
   durationSec = words.length ? words[words.length - 1].end + 0.5 : 10;
 }
 durationSec = Math.max(durationSec, words.length ? words[words.length - 1].end : 1) + 0.4;
+// safety net: a broken TTS (e.g. wrong language) can emit runaway audio. Cap the
+// composition so Remotion never tries to render an absurdly long video and crash.
+const expectedSec = Math.max(30, words.length * 1.0);
+const HARD_CAP = 20 * 60;
+if (durationSec > HARD_CAP || durationSec > expectedSec * 4) {
+  const capped = Math.min(HARD_CAP, Math.max(60, expectedSec * 2));
+  console.log(`⚠️  Voiceover is ${(durationSec / 60).toFixed(1)} min but ~${(expectedSec / 60).toFixed(1)} min was expected — capping to ${(capped / 60).toFixed(1)} min (likely a TTS/language mismatch).`);
+  durationSec = capped;
+}
 console.log(`⏱️  Voiceover duration: ${durationSec.toFixed(2)}s`);
 
 // --- 4. Map scene time ranges by counting words ---

@@ -606,6 +606,7 @@ app.post("/api/generate", async (req, res) => {
         c.piperVoice = b.piperVoice || ""; // chosen local Piper voice file (optional)
         c.musicMood = resolveMood(b.musicMood, { genre });
         c.reuseVisuals = b.reuseVisuals || 0;
+        c.langCode = b.language || "en";
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -661,6 +662,7 @@ app.post("/api/story", (req, res) => {
       config.pitch = pr.pitch;          // edge-tts pitch for emotion
       config.piperLength = pr.length;   // Piper pace for emotion
       config.xttsSpeaker = XTTS_VOICE_FOR[b.storyType] || XTTS_VOICE_FOR.story; // best XTTS voice for the genre
+      config.langCode = b.language || "en";
       pushLog(job, `🎬 Rendering a ${minutes}-min ${b.storyType || "story"} — ${config.scenes.length} scenes. This is a long render; hang tight…`);
       await runAll([config], job);
     } catch (e) {
@@ -697,6 +699,7 @@ app.post("/api/render", (req, res) => {
     piperVoice: b.piperVoice || "",
     musicMood: resolveMood(b.musicMood, {}),
     reuseVisuals: b.reuseVisuals || 0,
+    langCode: b.language || "en",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };
