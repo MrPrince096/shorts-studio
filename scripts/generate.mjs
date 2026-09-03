@@ -195,12 +195,13 @@ This is section ${i + 1} of ${beatList.length}: "${beatList[i]}".
 Write ${scenesPerBeat} consecutive narration scenes for THIS section that flow on from the story so far.
 ${prev ? `The previous narration line was: "${prev}". Continue naturally; do NOT repeat it.` : "This is the opening — hook the viewer immediately."}
 Each scene has: "text" (1-2 spoken narration sentences in a ${storyType} tone, about 20-30 words), "query", and "imagePrompt" (a 15-25 word ENGLISH description of the visual).
+PERFORMANCE (important — this is READ ALOUD by a narrator): write it to be spoken with feeling — short punchy sentences, deliberate pauses using "…" for suspense or comic timing, vivid sensory detail, and speak straight to the listener ("you", "imagine") so it feels like a real person telling the story. Lean HARD into the ${storyType} emotion.
 ${langLine}
 Return ONLY JSON: {"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
     try {
       const d = parseLLMJson(await callLLM(p, llmProvider));
       (d.scenes || []).filter((s) => s && s.text && s.query)
-        .forEach((s) => scenes.push({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || ""), showProduct: false }));
+        .forEach((s) => scenes.push({ text: String(s.text).replace(/[*_`]/g, "").replace(/\s+/g, " ").trim(), query: String(s.query), imagePrompt: String(s.imagePrompt || ""), showProduct: false }));
     } catch { /* skip a bad section rather than fail the whole story */ }
   }
   if (scenes.length < 3) throw new Error("The story came out too short. Try again or a clearer topic.");

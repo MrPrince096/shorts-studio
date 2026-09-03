@@ -45,7 +45,9 @@ const usePiper = config.voiceEngine === "piper" && piperModel && existsSync(pipe
 if (usePiper) {
   console.log(`🎙️  Generating voiceover with Piper (offline) — ${piperModel.split("/").pop()}...`);
   const wav = join(PUBLIC, "voiceover.wav");
-  execFileSync(process.env.PIPER_PYTHON, ["-m", "piper", "-m", piperModel, "-f", wav], { input: fullText });
+  const piperArgs = ["-m", "piper", "-m", piperModel, "-f", wav];
+  if (config.piperLength) piperArgs.push("--length-scale", String(config.piperLength)); // pace for emotion (higher=slower)
+  execFileSync(process.env.PIPER_PYTHON, piperArgs, { input: fullText });
   execFileSync("ffmpeg", ["-y", "-i", wav, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
   // Piper returns no word timings — approximate by spreading words across the
   // measured duration, weighted by word length (good enough for karaoke captions).

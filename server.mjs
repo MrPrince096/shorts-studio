@@ -306,6 +306,16 @@ function maskKey(v) {
 }
 
 const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", tech: "neutral", documentary: "neutral", motivational: "uplifting", story: "neutral" };
+// emotional delivery per story type: edge-tts rate/pitch + Piper length-scale (pace)
+const PROSODY = {
+  scary: { rate: "-12%", pitch: "-6Hz", length: 1.18 },
+  bedtime: { rate: "-14%", pitch: "-2Hz", length: 1.22 },
+  biography: { rate: "-3%", pitch: "0Hz", length: 1.05 },
+  tech: { rate: "+3%", pitch: "0Hz", length: 0.98 },
+  documentary: { rate: "-5%", pitch: "-2Hz", length: 1.08 },
+  motivational: { rate: "+6%", pitch: "+3Hz", length: 0.95 },
+  story: { rate: "-4%", pitch: "0Hz", length: 1.08 },
+};
 function resolveMood(sel, ctx = {}) {
   const s = String(sel || "").trim();
   if (!s || s === "none") return "";
@@ -610,9 +620,10 @@ app.post("/api/story", (req, res) => {
   res.json({ jobId: job.id });
   (async () => {
     try {
+      const pr = PROSODY[b.storyType] || PROSODY.story;
       const config = await generateStory({
         topic, storyType: b.storyType || "story", minutes,
-        language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%",
+        language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: pr.rate,
         width, height, source: b.source || "pexels", videoModel: b.videoModel || "",
         font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
         llmProvider: b.llmProvider || "", instructions: b.instructions || "",
@@ -627,6 +638,8 @@ app.post("/api/story", (req, res) => {
       config.piperVoice = b.piperVoice || "";
       config.musicMood = resolveMood(b.musicMood || "auto", { storyType: b.storyType || "story" });
       config.reuseVisuals = b.reuseVisuals || 0;
+      config.pitch = pr.pitch;          // edge-tts pitch for emotion
+      config.piperLength = pr.length;   // Piper pace for emotion
       pushLog(job, `🎬 Rendering a ${minutes}-min ${b.storyType || "story"} — ${config.scenes.length} scenes. This is a long render; hang tight…`);
       await runAll([config], job);
     } catch (e) {
