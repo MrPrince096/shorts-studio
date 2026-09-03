@@ -446,6 +446,29 @@ app.post("/api/settings", (req, res) => {
   res.json({ ok: true, saved });
 });
 
+// ---- Piper offline voices (list .onnx models in the piper voices folder) ----
+function piperDir() {
+  const d = getEnvValue("PIPER_DIR");
+  if (d) return d;
+  const m = getEnvValue("PIPER_MODEL");
+  return m ? dirname(m) : "";
+}
+const LOCALE_NAMES = { en_US: "English (US)", en_GB: "English (UK)", es_ES: "Spanish", fr_FR: "French", de_DE: "German", it_IT: "Italian", hi_IN: "Hindi", pt_BR: "Portuguese", nl_NL: "Dutch" };
+function piperVoiceLabel(file) {
+  const m = file.replace(/\.onnx$/i, "").match(/^([a-z]{2}_[A-Z]{2})-(.+?)-(\w+)$/);
+  if (!m) return file;
+  const [, loc, name, q] = m;
+  return `${LOCALE_NAMES[loc] || loc} · ${name} (${q})`;
+}
+app.get("/api/piper-voices", (_req, res) => {
+  const dir = piperDir();
+  const voices = dir && existsSync(dir)
+    ? readdirSync(dir).filter((f) => /\.onnx$/i.test(f)).sort().map((f) => ({ file: f, label: piperVoiceLabel(f) }))
+    : [];
+  const current = getEnvValue("PIPER_MODEL");
+  res.json({ dir, voices, current: current ? current.split("/").pop() : "" });
+});
+
 app.get("/api/videos", (_req, res) => {
   const list = readdirSync(OUT)
     .filter((f) => f.endsWith(".mp4"))
@@ -536,6 +559,7 @@ app.post("/api/generate", async (req, res) => {
         c.watermarkImage = b.watermarkImage ? watermarkFile() : "";
         c.talkingAvatar = !!b.talkingAvatar; // bring the creator photo to life (needs an avatar API key)
         c.voiceEngine = b.voiceEngine || "edge"; // "edge" (cloud) or "piper" (offline)
+        c.piperVoice = b.piperVoice || ""; // chosen local Piper voice file (optional)
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -579,6 +603,7 @@ app.post("/api/render", (req, res) => {
     motion: b.motion || "in",
     watermarkImage: b.watermarkImage ? watermarkFile() : "",
     voiceEngine: b.voiceEngine || "edge",
+    piperVoice: b.piperVoice || "",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };

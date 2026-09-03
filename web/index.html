@@ -258,6 +258,7 @@
               <hr />
               <div class="note" id="ugcChosen"></div>
               <div class="row"><div><label>Creator</label><select id="ugcCreator"><option value="">Product showcase (voiceover + captions)</option></select></div><div><label>Tone</label><select id="ugcTone"></select></div></div>
+              <div class="row"><div><label>Variations <span class="muted">— different hooks</span></label><select id="ugcVariations"></select></div></div>
               <label class="chk" style="margin-top:12px"><input type="checkbox" id="ugcTalking" /> <span><b>Bring creator to life</b> — make the photo talk & move <span class="muted" id="ugcTalkNote"></span></span></label>
               <button class="btn grad big" id="goUgc" style="width:100%;margin-top:14px"><span data-icon="mega"></span>Generate UGC ad</button>
             </div>
@@ -272,6 +273,7 @@
             <label>Key benefits</label>
             <input id="adBenefits" placeholder="brightens skin, reduces dark spots" />
             <div class="row"><div><label>Call to action</label><input id="adCta" placeholder="Order now 50% off" /></div><div><label>Tone</label><select id="adTone"></select></div></div>
+            <div class="row"><div><label>Variations <span class="muted">— different hooks/angles</span></label><select id="adVariations"></select></div></div>
             <button class="btn grad big" id="goAds" style="width:100%;margin-top:16px"><span data-icon="mega"></span>Make Ad</button>
           </div>
 
@@ -311,7 +313,7 @@
         <div class="card">
           <h2><span data-icon="zap"></span> Quick settings <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
           <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
-          <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option></select></div></div>
+          <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
           <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
           <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
           <div class="row"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
@@ -553,6 +555,7 @@ async function loadConfig(){
   [6,8,10,12,15,20].forEach(n=>$('#ideaCount').appendChild(opt(n,n+' ideas')));
   ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>{$('#adTone').appendChild(opt(t,t));$('#ugcTone').appendChild(opt(t,t));});
   [['short-form vertical','Short-form vertical'],['social story','Social story'],['product promo','Product promo'],['testimonial','Testimonial'],['offer','Offer / discount']].forEach(([v,l])=>$('#socPreset').appendChild(opt(v,l)));
+  [1,2,3,5].forEach(n=>{const l=n===1?'1 ad':n+' variations';$('#adVariations').appendChild(opt(n,l));$('#ugcVariations').appendChild(opt(n,l));});
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
   [['in','Zoom in (default)'],['out','Zoom out'],['subtle','Subtle zoom'],['none','Static (no motion)'],['random','Random per scene']].forEach(([v,l])=>$('#motion').appendChild(opt(v,l)));
   $('#captionPos').value='bottom'; $('#motion').value='in';
@@ -575,9 +578,17 @@ async function loadSettings(){
   $('#avatarStatus').innerHTML=ap?`✅ Talking avatars ready via <b>${ap}</b>. Turn on “Bring creator to life” in a UGC ad.`:`No talking-avatar key yet — UGC creators stay as still photos until you add one above.`;
   window.__avatar=ap||'';applyAvatarUI();
   $('#piperStatus').className='note '+(s.piperReady?'':'warn');
-  $('#piperStatus').innerHTML=s.piperReady?'✅ Piper ready — choose <b>Voiceover engine → Piper</b> in Quick settings for offline voice.':'Set both paths above to enable offline voice. Until then edge-tts (cloud) is used.';
+  $('#piperStatus').innerHTML=s.piperReady?'✅ Piper ready — offline voice is on by default. Switch back to edge-tts in Quick settings any time.':'Set both paths above to enable offline voice. Until then edge-tts (cloud) is used.';
+  // auto-default to offline Piper when it's ready (unless the user picked an engine)
+  if(s.piperReady && !window.__voiceTouched){$('#voiceEngine').value='piper';}
+  togglePiperVoice();
   toggleLlm();
 }
+async function loadPiperVoices(){
+  try{const r=await(await fetch('/api/piper-voices')).json();const sel=$('#piperVoice');sel.innerHTML='';(r.voices||[]).forEach(v=>sel.appendChild(opt(v.file,v.label)));if(r.current&&[...sel.options].some(o=>o.value===r.current))sel.value=r.current;}catch(e){}
+}
+function togglePiperVoice(){$('#piperVoiceBox').style.display=$('#voiceEngine').value==='piper'?'block':'none';}
+$('#voiceEngine').onchange=()=>{window.__voiceTouched=true;togglePiperVoice();};
 function applyAvatarUI(){
   const ap=window.__avatar||'';const c=$('#ugcTalking');if(!c)return;
   c.disabled=!ap; if(!ap)c.checked=false;
@@ -628,7 +639,7 @@ $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPla
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,voiceEngine:$('#voiceEngine').value});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value});
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
@@ -653,7 +664,7 @@ $('#goManual').onclick=()=>{const scenes=[...document.querySelectorAll('.scene')
 $('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic){alert('Enter a story topic.');return;}run('/api/series/start',{topic,total:$('#seriesTotal').value,batch:$('#seriesBatch').value,...fmt()});};
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
-$('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:1,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};
+$('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:$('#adVariations').value,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};
 
 // ---- Ads Studio: segmented sub-nav ----
 document.querySelectorAll('#adSeg button').forEach(b=>b.onclick=()=>{
@@ -685,7 +696,7 @@ $('#goUgc').onclick=()=>{const i=window.__ugcPick;if(!i){alert('Pick an idea fir
   const product=$('#ugcProduct').value.trim()||i.title||'this product';
   const talk=$('#ugcTalking').checked&&!$('#ugcTalking').disabled;
   if(talk&&!UGCIMG){alert('Talking avatar needs the uploaded photo — add an image first.');return;}
-  const base={ad:true,product,benefits:[i.concept,i.hook,$('#ugcPoint').value.trim()].filter(Boolean).join(' — '),cta:i.cta||$('#ugcOffer').value.trim()||'Try it today',tone:$('#ugcTone').value,talkingAvatar:talk,count:1,...fmt()};
+  const base={ad:true,product,benefits:[i.concept,i.hook,$('#ugcPoint').value.trim()].filter(Boolean).join(' — '),cta:i.cta||$('#ugcOffer').value.trim()||'Try it today',tone:$('#ugcTone').value,talkingAvatar:talk,count:$('#ugcVariations').value,...fmt()};
   if(UGCIMG)run('/api/generate',{...base,imageDataUrl:UGCIMG});else run('/api/generate',base);};
 // ---- Social ad (preset over the product-ad pipeline) ----
 $('#goSocial').onclick=()=>{const product=$('#socProduct').value.trim();if(!product){alert('Enter the product.');return;}
@@ -744,7 +755,7 @@ async function showAssets(){
 window.delAsset=(f)=>{if(confirm('Delete this asset?'))fetch('/api/assets/'+f,{method:'DELETE'}).then(()=>showAssets());};
 $('#assetUp').onchange=()=>{const f=$('#assetUp').files[0];if(!f)return;if(f.size>20*1024*1024){alert('Max 20 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{$('#assetUp').value='';showAssets();});rd.readAsDataURL(f);};
 
-injectIcons();loadConfig();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
+injectIcons();loadConfig();loadPiperVoices();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
 document.querySelector('[data-nav=dashboard]').click();
 </script>
 </body>

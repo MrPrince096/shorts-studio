@@ -37,12 +37,15 @@ const fullText = config.scenes.map((s) => s.text).join(" ");
 const audioPath = join(PUBLIC, "voiceover.mp3");
 const vttPath = join(PUBLIC, "subs.vtt");
 const words = [];
-const usePiper = config.voiceEngine === "piper" && process.env.PIPER_MODEL && process.env.PIPER_PYTHON;
+// resolve the Piper voice: an explicitly chosen voice (from PIPER_DIR) wins, else PIPER_MODEL
+const piperDir = process.env.PIPER_DIR || (process.env.PIPER_MODEL ? dirname(process.env.PIPER_MODEL) : "");
+const piperModel = config.piperVoice && piperDir ? join(piperDir, config.piperVoice) : process.env.PIPER_MODEL;
+const usePiper = config.voiceEngine === "piper" && piperModel && existsSync(piperModel) && process.env.PIPER_PYTHON;
 
 if (usePiper) {
-  console.log("🎙️  Generating voiceover with Piper (offline)...");
+  console.log(`🎙️  Generating voiceover with Piper (offline) — ${piperModel.split("/").pop()}...`);
   const wav = join(PUBLIC, "voiceover.wav");
-  execFileSync(process.env.PIPER_PYTHON, ["-m", "piper", "-m", process.env.PIPER_MODEL, "-f", wav], { input: fullText });
+  execFileSync(process.env.PIPER_PYTHON, ["-m", "piper", "-m", piperModel, "-f", wav], { input: fullText });
   execFileSync("ffmpeg", ["-y", "-i", wav, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
   // Piper returns no word timings — approximate by spreading words across the
   // measured duration, weighted by word length (good enough for karaoke captions).
