@@ -326,7 +326,7 @@
         <div class="card">
           <h2><span data-icon="zap"></span> Quick settings <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
           <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
-          <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
+          <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option><option value="xtts">XTTS-v2 — offline, expressive 🎭</option><option value="eleven">ElevenLabs — cloud, most emotional 🎭</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
           <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
           <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
           <div class="row"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
@@ -491,6 +491,19 @@
         <div id="piperStatus" class="note" style="margin:14px 0 0"></div>
       </div>
 
+      <div class="setsec">
+        <div class="sechead"><span data-icon="mega"></span> Expressive voice <span class="badge opt">optional · emotional 🎭</span></div>
+        <p class="muted" style="font-size:12px;margin:0 0 6px">Genuinely "acted" narration. Pick <b>Voiceover engine → XTTS or ElevenLabs</b> in Quick settings.</p>
+        <label>XTTS-v2 server URL <span class="muted">— offline, expressive (run local-voice-server)</span></label>
+        <input id="xttsUrl" placeholder="http://localhost:7870/generate" />
+        <label style="margin-top:16px">ElevenLabs API key <span class="muted">— cloud, most emotional</span></label>
+        <div class="field"><input id="elevenKey" type="password" placeholder="paste key…" /><span class="fstat" id="elevenState"></span></div>
+        <a class="getlink" href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Get an ElevenLabs key →</a>
+        <label style="margin-top:16px">ElevenLabs voice ID <span class="muted">— optional</span></label>
+        <input id="elevenVoice" placeholder="21m00Tcm4TlvDq8ikWAM (Rachel)" />
+        <div id="exprStatus" class="note" style="margin:14px 0 0"></div>
+      </div>
+
       <button class="btn grad big" id="saveSettings" style="width:100%">Save settings</button>
       <div id="saveMsg" style="text-align:center;font-size:13px;margin-top:10px"></div>
     </div>
@@ -592,9 +605,12 @@ function setStat(el,k){if(!el)return;el.className='fstat '+(k.set?'on':'off');el
 function toggleLlm(){const p=$('#llmProvider').value;$('#geminiBox').style.display=p==='gemini'?'block':'none';$('#openaiBox').style.display=p==='openai'?'block':'none';$('#ollamaBox').style.display=p==='ollama'?'block':'none';}
 async function loadSettings(){
   const s=await(await fetch('/api/settings')).json();
-  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';$('#localAvatarUrl').value=s.localAvatarUrl||'';$('#piperModel').value=s.piperModel||'';$('#piperPython').value=s.piperPython||'';
+  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';$('#localAvatarUrl').value=s.localAvatarUrl||'';$('#piperModel').value=s.piperModel||'';$('#piperPython').value=s.piperPython||'';$('#xttsUrl').value=s.xttsUrl||'';$('#elevenVoice').value=s.elevenVoice||'';
   setStat($('#pexelsState'),s.keys.pexels);setStat($('#geminiState'),s.keys.gemini);setStat($('#openaiState'),s.keys.openai);setStat($('#hfState'),s.keys.hf);setStat($('#falState'),s.keys.fal);
-  setStat($('#didState'),s.keys.did);setStat($('#heygenState'),s.keys.heygen);
+  setStat($('#didState'),s.keys.did);setStat($('#heygenState'),s.keys.heygen);setStat($('#elevenState'),s.keys.eleven);
+  const ve=s.voiceEngines||{};
+  $('#exprStatus').className='note '+((ve.xtts||ve.eleven)?'':'warn');
+  $('#exprStatus').innerHTML=(ve.xtts||ve.eleven)?`✅ Expressive voice ready${ve.xtts?' · XTTS':''}${ve.eleven?' · ElevenLabs':''}. Pick it as the Voiceover engine.`:'Add an XTTS server URL or ElevenLabs key for emotional narration.';
   const ap=s.avatarProvider;
   $('#avatarStatus').className='note '+(ap?'':'warn');
   $('#avatarStatus').innerHTML=ap?`✅ Talking avatars ready via <b>${ap}</b>. Turn on “Bring creator to life” in a UGC ad.`:`No talking-avatar key yet — UGC creators stay as still photos until you add one above.`;
@@ -622,10 +638,10 @@ $('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
 $('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
 $('#saveSettings').onclick=async()=>{
-  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim(),piperModel:$('#piperModel').value.trim(),piperPython:$('#piperPython').value.trim()};
+  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim(),piperModel:$('#piperModel').value.trim(),piperPython:$('#piperPython').value.trim(),xttsUrl:$('#xttsUrl').value.trim(),eleven:$('#elevenKey').value.trim(),elevenVoice:$('#elevenVoice').value.trim()};
   const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML=r.saved&&r.saved.length?'<span class="ok">Saved ✓</span>':'Nothing to save';
-  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey'].forEach(id=>$('#'+id).value='');loadSettings();
+  ['pexelsKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey','elevenKey'].forEach(id=>$('#'+id).value='');loadSettings();
 };
 
 const IDEAS=['how to grow tomatoes at home','how to make sourdough bread','how to start composting','foods that boost your brain','how to build discipline','how to make cold brew coffee','how to start a vegetable garden','how sleep repairs your body','how to make homemade pasta','beginner guide to beekeeping'];

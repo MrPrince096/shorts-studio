@@ -443,8 +443,11 @@ app.get("/api/settings", (_req, res) => {
     piperModel: getEnvValue("PIPER_MODEL") || "",
     piperPython: getEnvValue("PIPER_PYTHON") || "",
     piperReady: !!(getEnvValue("PIPER_MODEL") && getEnvValue("PIPER_PYTHON")),
+    xttsUrl: getEnvValue("XTTS_URL") || "",
+    elevenVoice: getEnvValue("ELEVEN_VOICE") || "",
+    voiceEngines: { piper: !!(getEnvValue("PIPER_MODEL") && getEnvValue("PIPER_PYTHON")), xtts: !!getEnvValue("XTTS_URL"), eleven: !!getEnvValue("ELEVEN_API_KEY") },
     avatarProvider: avatarProvider(),
-    keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY") },
+    keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY"), eleven: km("ELEVEN_API_KEY") },
   });
 });
 app.post("/api/settings", (req, res) => {
@@ -468,6 +471,9 @@ app.post("/api/settings", (req, res) => {
   setIf("localAvatarUrl", "LOCAL_AVATAR_URL", "Local avatar URL");
   setIf("piperModel", "PIPER_MODEL", "Piper voice model");
   setIf("piperPython", "PIPER_PYTHON", "Piper Python");
+  setIf("xttsUrl", "XTTS_URL", "XTTS server URL");
+  setIf("eleven", "ELEVEN_API_KEY", "ElevenLabs key");
+  setIf("elevenVoice", "ELEVEN_VOICE", "ElevenLabs voice");
   res.json({ ok: true, saved });
 });
 

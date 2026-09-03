@@ -37,29 +37,61 @@ const fullText = config.scenes.map((s) => s.text).join(" ");
 const audioPath = join(PUBLIC, "voiceover.mp3");
 const vttPath = join(PUBLIC, "subs.vtt");
 const words = [];
+const engine = config.voiceEngine || "edge";
 // resolve the Piper voice: an explicitly chosen voice (from PIPER_DIR) wins, else PIPER_MODEL
 const piperDir = process.env.PIPER_DIR || (process.env.PIPER_MODEL ? dirname(process.env.PIPER_MODEL) : "");
 const piperModel = config.piperVoice && piperDir ? join(piperDir, config.piperVoice) : process.env.PIPER_MODEL;
-const usePiper = config.voiceEngine === "piper" && piperModel && existsSync(piperModel) && process.env.PIPER_PYTHON;
+
+// audio-only engines (piper/xtts/eleven) have no word timings — approximate them
+// from the measured duration, weighted by word length (fine for karaoke captions).
+function approxTimings() {
+  let dur = 0;
+  try { dur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", audioPath]).toString().trim()); } catch {}
+  const wlist = fullText.split(/\s+/).filter(Boolean);
+  if (!dur) dur = Math.max(2, wlist.length * 0.35);
+  const weights = wlist.map((w) => w.replace(/[^A-Za-z0-9]/g, "").length + 1);
+  const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+  let t = 0;
+  wlist.forEach((w, i) => { const d = (dur * weights[i]) / totalW; words.push({ text: w, start: t, end: t + d }); t += d; });
+  console.log(`📝 ${words.length} words (approx timings) over ${dur.toFixed(2)}s`);
+}
+const toMp3From = (wav) => execFileSync("ffmpeg", ["-y", "-i", wav, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
+
+const usePiper = engine === "piper" && piperModel && existsSync(piperModel) && process.env.PIPER_PYTHON;
+const useXtts = engine === "xtts" && process.env.XTTS_URL;
+const useEleven = engine === "eleven" && process.env.ELEVEN_API_KEY;
 
 if (usePiper) {
-  console.log(`🎙️  Generating voiceover with Piper (offline) — ${piperModel.split("/").pop()}...`);
+  console.log(`🎙️  Voiceover: Piper (offline) — ${piperModel.split("/").pop()}...`);
   const wav = join(PUBLIC, "voiceover.wav");
   const piperArgs = ["-m", "piper", "-m", piperModel, "-f", wav];
   if (config.piperLength) piperArgs.push("--length-scale", String(config.piperLength)); // pace for emotion (higher=slower)
   execFileSync(process.env.PIPER_PYTHON, piperArgs, { input: fullText });
-  execFileSync("ffmpeg", ["-y", "-i", wav, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
-  // Piper returns no word timings — approximate by spreading words across the
-  // measured duration, weighted by word length (good enough for karaoke captions).
-  let piperDur = 0;
-  try { piperDur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", audioPath]).toString().trim()); } catch {}
-  const wlist = fullText.split(/\s+/).filter(Boolean);
-  if (!piperDur) piperDur = Math.max(2, wlist.length * 0.35);
-  const weights = wlist.map((w) => w.replace(/[^A-Za-z0-9]/g, "").length + 1);
-  const totalW = weights.reduce((a, b) => a + b, 0) || 1;
-  let t = 0;
-  wlist.forEach((w, i) => { const d = (piperDur * weights[i]) / totalW; words.push({ text: w, start: t, end: t + d }); t += d; });
-  console.log(`📝 ${words.length} words (approx timings) over ${piperDur.toFixed(2)}s`);
+  toMp3From(wav);
+  approxTimings();
+} else if (useXtts) {
+  // Expressive, offline XTTS-v2 via a local voice server (see local-voice-server/)
+  console.log(`🎙️  Voiceover: XTTS-v2 (offline, expressive) — ${process.env.XTTS_URL}...`);
+  const body = { text: fullText, language: config.langCode || "en" };
+  if (config.xttsSpeaker) body.speaker = config.xttsSpeaker;
+  const r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`XTTS server ${r.status}: ${(await r.text()).slice(0, 160)}`);
+  const wav = join(PUBLIC, "voiceover.wav");
+  writeFileSync(wav, Buffer.from(await r.arrayBuffer()));
+  toMp3From(wav);
+  approxTimings();
+} else if (useEleven) {
+  // Expressive cloud voices with emotion (ElevenLabs)
+  console.log("🎙️  Voiceover: ElevenLabs (cloud, expressive)...");
+  const vid = config.elevenVoice || process.env.ELEVEN_VOICE || "21m00Tcm4TlvDq8ikWAM";
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vid}`, {
+    method: "POST",
+    headers: { "xi-api-key": process.env.ELEVEN_API_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
+    body: JSON.stringify({ text: fullText, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.4, similarity_boost: 0.85, style: 0.6, use_speaker_boost: true } }),
+  });
+  if (!r.ok) throw new Error(`ElevenLabs ${r.status}: ${(await r.text()).slice(0, 160)}`);
+  writeFileSync(audioPath, Buffer.from(await r.arrayBuffer()));
+  approxTimings();
 } else {
   console.log("🎙️  Generating voiceover with edge-tts...");
   const ttsArgs = ["--voice", voice, "--text", fullText, "--write-media", audioPath, "--write-subtitles", vttPath];
