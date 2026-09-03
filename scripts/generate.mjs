@@ -175,23 +175,28 @@ export async function generateStory({ topic, storyType = "story", minutes = 3, l
 
   // 1) Outline — a title + ordered beats forming a full arc
   log(`✍️  Outlining a ${minutes}-min ${storyType} about "${topic}"…`);
-  const outPrompt = `You are a master ${storyType} storyteller AND a YouTube growth strategist. Plan a ${minutes}-minute ${storyType} video about "${topic}".
+  // keep the outline JSON SMALL so small local models return valid JSON reliably
+  const outPrompt = `You are a master ${storyType} storyteller. Plan a ${minutes}-minute ${storyType} video about: ${topic}.
 Style: ${style}
-Give ALL of:
-- "title": a scroll-stopping, YouTube-optimized title (under 70 characters)${nonEnglish ? `, in ${language}` : ""}.
-- "beats": EXACTLY ${beats} sequential story beats (one short sentence each, in order, forming a complete arc with a satisfying ending).
-- "description": an engaging 2-3 sentence YouTube description that hooks the viewer${nonEnglish ? `, in ${language}` : ""}.
-- "tags": 10-12 relevant SEO keywords (lowercase, NO # sign) mixing the topic, the "${storyType}" genre and broad discovery terms.${instructions ? `\nCreator instructions: ${instructions}` : ""}
-Return ONLY JSON: {"title":"","beats":["",""],"description":"","tags":["",""]}`;
-  let outline = null;
-  for (let a = 0; a < 3 && !outline; a++) {
-    try { outline = parseLLMJson(await callLLM(outPrompt, llmProvider)); }
-    catch (e) { if (String(e.message).startsWith("NO_LLM_KEY")) throw e; }
+Give a compelling "title"${nonEnglish ? ` (in ${language})` : ""} and EXACTLY ${beats} sequential story "beats" (one short sentence each, in order, forming a complete arc with a satisfying ending).${instructions ? `\nCreator instructions: ${instructions}` : ""}
+Return ONLY JSON: {"title":"","beats":["",""]}`;
+  const tryOutline = async (prompt, n = 3) => {
+    for (let a = 0; a < n; a++) {
+      try { const o = parseLLMJson(await callLLM(prompt, llmProvider)); if (o) return o; }
+      catch (e) { if (String(e.message).startsWith("NO_LLM_KEY")) throw e; }
+    }
+    return null;
+  };
+  let outline = await tryOutline(outPrompt);
+  let title = (outline && outline.title) || topic;
+  let beatList = ((outline && outline.beats) || []).slice(0, beats).filter(Boolean);
+  if (beatList.length < 2) {
+    // fallback: ask for just the beats with the simplest possible schema
+    log("↩️  Retrying the outline (simpler)…");
+    const o2 = await tryOutline(`List EXACTLY ${beats} short sequential plot points (one sentence each) for a ${minutes}-minute ${storyType} about: ${topic}. Return ONLY JSON: {"beats":["",""]}`, 3);
+    beatList = ((o2 && o2.beats) || []).slice(0, beats).filter(Boolean);
   }
-  if (!outline) throw new Error("Could not outline the story (model returned invalid JSON). Try again.");
-  const title = outline.title || topic;
-  const beatList = (outline.beats || []).slice(0, beats).filter(Boolean);
-  if (beatList.length < 2) throw new Error("Could not outline the story. Try a clearer topic.");
+  if (beatList.length < 2) throw new Error("Could not outline the story — try a shorter, simpler topic, or switch Script AI to Gemini in Settings.");
 
   // 2) Per-beat narration scenes (each call is small -> reliable JSON)
   const langLine = nonEnglish
@@ -219,12 +224,16 @@ Return ONLY JSON: {"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
 
   const slug = (title || "story").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "story";
   log(`✅ Story ready — ${scenes.length} scenes.`);
-  const tags = Array.isArray(outline.tags) && outline.tags.length
-    ? outline.tags.map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 14)
-    : [storyType, "story", "storytime", "narration"];
+  // SEO metadata as a SEPARATE small call (best-effort — never blocks the story)
+  let meta = {};
+  try {
+    meta = parseLLMJson(await callLLM(`For a ${storyType} YouTube video titled "${title}" about ${topic}, write a "description" (2-3 engaging sentences that hook the viewer${nonEnglish ? `, in ${language}` : ""}) and 10-12 "tags" (lowercase keywords, no # sign). Return ONLY JSON: {"description":"","tags":["",""]}`, llmProvider)) || {};
+  } catch { /* keep going with fallbacks */ }
+  const tags = (Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [storyType, "story", "storytime", "narration"])
+    .map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 14);
   return {
     title, slug,
-    description: (outline.description && String(outline.description).trim()) || `${title} — a ${minutes}-minute ${storyType}.`,
+    description: (meta.description && String(meta.description).trim()) || `${title} — a ${minutes}-minute ${storyType}.`,
     tags,
     voice, rate, music: "", width, height,
     source: source || "pexels", videoModel: videoModel || "",
