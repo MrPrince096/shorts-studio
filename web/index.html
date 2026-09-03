@@ -177,6 +177,7 @@
     <div class="brand"><span class="logo" data-icon="film"></span><b>Shorts Studio</b><span class="pro">Pro</span></div>
     <div class="nav active" data-nav="dashboard"><span class="ic" data-icon="home"></span> Dashboard</div>
     <div class="nav" data-nav="shorts"><span class="ic" data-icon="play"></span> Shorts</div>
+    <div class="nav" data-nav="story"><span class="ic" data-icon="film"></span> Story</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
@@ -223,6 +224,18 @@
             <div class="row" style="margin-top:12px"><div><label>Description</label><input id="desc" /></div><div><label>Tags</label><input id="tags" placeholder="motivation, mindset" /></div></div>
             <button class="btn ghost" id="goManual" style="margin-top:12px">Generate this video</button>
           </details>
+        </div>
+        <!-- STORY (long-form narration) -->
+        <div class="card tabpanel" id="tab-story" hidden>
+          <h2><span data-icon="film"></span> Story Studio</h2>
+          <div class="cardsub">Long-form narration videos — 3 to 10 minutes</div>
+          <label>What's the story about?</label>
+          <input id="storyTopic" class="big" placeholder="e.g. the abandoned lighthouse keeper" />
+          <div class="row"><div><label>Story type</label><select id="storyType"></select></div><div><label>Length</label><select id="storyMinutes"></select></div></div>
+          <label>Instructions <span class="muted">— optional, how it should go</span></label>
+          <textarea id="storyInstr" rows="2" placeholder="e.g. first-person, slow suspense build, twist ending"></textarea>
+          <button class="btn grad big" id="goStory" style="width:100%;margin-top:16px"><span data-icon="film"></span>Create Story</button>
+          <div class="note" style="margin-top:12px">Long videos take a while — a 3-min story ≈ 5–8 min to make. Uses your Quick-settings voice, visuals & AI (works offline with Gemma + Piper).</div>
         </div>
         <!-- SERIES -->
         <div class="card tabpanel" id="tab-series" hidden>
@@ -556,6 +569,9 @@ async function loadConfig(){
   ['energetic and persuasive','calm and trustworthy','fun and playful','luxury and premium','urgent hard-sell'].forEach(t=>{$('#adTone').appendChild(opt(t,t));$('#ugcTone').appendChild(opt(t,t));});
   [['short-form vertical','Short-form vertical'],['social story','Social story'],['product promo','Product promo'],['testimonial','Testimonial'],['offer','Offer / discount']].forEach(([v,l])=>$('#socPreset').appendChild(opt(v,l)));
   [1,2,3,5].forEach(n=>{const l=n===1?'1 ad':n+' variations';$('#adVariations').appendChild(opt(n,l));$('#ugcVariations').appendChild(opt(n,l));});
+  [['story','General story'],['bedtime','Bedtime story'],['scary','Scary story'],['biography','Biography'],['tech','Tech explainer'],['documentary','Documentary'],['motivational','Motivational']].forEach(([v,l])=>$('#storyType').appendChild(opt(v,l)));
+  [1,2,3,5,7,10].forEach(n=>$('#storyMinutes').appendChild(opt(n,n+' min')));
+  $('#storyType').value='scary'; $('#storyMinutes').value='3';
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
   [['in','Zoom in (default)'],['out','Zoom out'],['subtle','Subtle zoom'],['none','Static (no motion)'],['random','Random per scene']].forEach(([v,l])=>$('#motion').appendChild(opt(v,l)));
   $('#captionPos').value='bottom'; $('#motion').value='in';
@@ -643,7 +659,7 @@ const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
-const ACT=['#goAI','#goManual','#goSeries','#goAds'];
+const ACT=['#goAI','#goManual','#goSeries','#goAds','#goStory'];
 let polling=null;
 function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';ACT.forEach(s=>$(s).disabled=true);}
 function endP(){ACT.forEach(s=>$(s).disabled=false);}
@@ -662,6 +678,7 @@ function run(url,body){startP();fetch(url,{method:'POST',headers:{'Content-Type'
 $('#goAI').onclick=()=>{const topic=$('#topic').value.trim();const random=!topic&&!$('#genre').value&&!$('#country').value;run('/api/generate',{topic,random,count:$('#count').value,instructions:$('#instructions').value.trim(),...fmt()});};
 $('#goManual').onclick=()=>{const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(),query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);if(!$('#title').value.trim()||scenes.length<2){alert('Add a title and 2+ scenes.');return;}run('/api/render',{title:$('#title').value.trim(),description:$('#desc').value.trim(),tags:$('#tags').value,scenes,...fmt()});};
 $('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic){alert('Enter a story topic.');return;}run('/api/series/start',{topic,total:$('#seriesTotal').value,batch:$('#seriesBatch').value,...fmt()});};
+$('#goStory').onclick=()=>{const topic=$('#storyTopic').value.trim();if(!topic){alert('Enter what the story is about.');return;}run('/api/story',{topic,storyType:$('#storyType').value,minutes:$('#storyMinutes').value,instructions:$('#storyInstr').value.trim(),...fmt()});};
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:$('#adVariations').value,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};

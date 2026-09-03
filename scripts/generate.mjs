@@ -147,6 +147,77 @@ Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
   return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
 }
 
+// ---- Long-form storytelling (3-10 min). Chunked (outline -> per-beat scenes) so
+// small local models never truncate one giant JSON. Great for bedtime / scary /
+// biography / tech-explainer narration videos. ----
+export const STORY_STYLES = {
+  bedtime: "Gentle, soothing, whimsical bedtime-story tone — calm slow pacing, warm and comforting imagery, a peaceful reassuring ending.",
+  scary: "Suspenseful, eerie, atmospheric horror tone — build dread slowly, dark vivid imagery, a chilling twist near the end.",
+  biography: "Inspiring, informative biography tone — tell the life story in order, the key turning points and struggles, end on their legacy.",
+  tech: "Clear, engaging tech-explainer tone — explain the idea simply with concrete real-world examples and why it matters.",
+  documentary: "Authoritative, vivid documentary narration — factual, well-structured, cinematic.",
+  motivational: "Powerful, uplifting motivational tone — build energy toward an inspiring call to action.",
+  story: "Engaging narrative storytelling with a clear beginning, middle and satisfying end.",
+};
+export async function generateStory({ topic, storyType = "story", minutes = 3, language = "English", voice, rate = "0%", width, height, source, videoModel, font, fontCss, rtl, llmProvider, instructions, onProgress }) {
+  const style = STORY_STYLES[storyType] || STORY_STYLES.story;
+  const nonEnglish = language && language.toLowerCase() !== "english";
+  const beats = Math.max(4, Math.min(16, Math.round(minutes * 2)));            // story sections
+  const scenesPerBeat = Math.max(2, Math.round((minutes * 140) / beats / 28)); // ~28 words/scene
+  const log = (m) => { try { onProgress && onProgress(m); } catch {} };
+
+  // 1) Outline — a title + ordered beats forming a full arc
+  log(`✍️  Outlining a ${minutes}-min ${storyType} about "${topic}"…`);
+  const outPrompt = `You are a master ${storyType} storyteller. Plan a ${minutes}-minute ${storyType} video about "${topic}".
+Style: ${style}
+Give a compelling "title" and EXACTLY ${beats} sequential story "beats" (one short sentence each, in order, forming a complete arc with a satisfying ending).${instructions ? `\nCreator instructions: ${instructions}` : ""}
+Return ONLY JSON: {"title":"","beats":["",""]}`;
+  let outline = null;
+  for (let a = 0; a < 3 && !outline; a++) {
+    try { outline = parseLLMJson(await callLLM(outPrompt, llmProvider)); }
+    catch (e) { if (String(e.message).startsWith("NO_LLM_KEY")) throw e; }
+  }
+  if (!outline) throw new Error("Could not outline the story (model returned invalid JSON). Try again.");
+  const title = outline.title || topic;
+  const beatList = (outline.beats || []).slice(0, beats).filter(Boolean);
+  if (beatList.length < 2) throw new Error("Could not outline the story. Try a clearer topic.");
+
+  // 2) Per-beat narration scenes (each call is small -> reliable JSON)
+  const langLine = nonEnglish
+    ? `Write "text" in ${language} using its native script. Keep "query" in simple ENGLISH (2-4 words).`
+    : `Keep "query" a 2-4 word ENGLISH stock-footage search term.`;
+  const scenes = [];
+  for (let i = 0; i < beatList.length; i++) {
+    log(`📝 Writing part ${i + 1}/${beatList.length}…`);
+    const prev = scenes.length ? scenes[scenes.length - 1].text : "";
+    const p = `You are writing a ${minutes}-minute ${storyType} titled "${title}". Style: ${style}
+This is section ${i + 1} of ${beatList.length}: "${beatList[i]}".
+Write ${scenesPerBeat} consecutive narration scenes for THIS section that flow on from the story so far.
+${prev ? `The previous narration line was: "${prev}". Continue naturally; do NOT repeat it.` : "This is the opening — hook the viewer immediately."}
+Each scene has: "text" (1-2 spoken narration sentences in a ${storyType} tone, about 20-30 words), "query", and "imagePrompt" (a 15-25 word ENGLISH description of the visual).
+${langLine}
+Return ONLY JSON: {"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
+    try {
+      const d = parseLLMJson(await callLLM(p, llmProvider));
+      (d.scenes || []).filter((s) => s && s.text && s.query)
+        .forEach((s) => scenes.push({ text: String(s.text), query: String(s.query), imagePrompt: String(s.imagePrompt || ""), showProduct: false }));
+    } catch { /* skip a bad section rather than fail the whole story */ }
+  }
+  if (scenes.length < 3) throw new Error("The story came out too short. Try again or a clearer topic.");
+
+  const slug = (title || "story").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "story";
+  log(`✅ Story ready — ${scenes.length} scenes.`);
+  return {
+    title, slug,
+    description: `${title} — a ${minutes}-minute ${storyType}.`,
+    tags: [storyType, "story", "storytime", "narration"],
+    voice, rate, music: "", width, height,
+    source: source || "pexels", videoModel: videoModel || "",
+    font: font || "Arial Black", fontCss: fontCss || "", rtl: !!rtl,
+    scenes,
+  };
+}
+
 // UGC ad ideas from a product/person image + optional context.
 export async function generateAdIdeas({ productDesc = "", product = "", audience = "", sellingPoint = "", offer = "", count = 5, language = "English", llmProvider }) {
   const ctx = [

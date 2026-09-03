@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
@@ -575,6 +575,44 @@ app.post("/api/generate", async (req, res) => {
       }
       job.status = "error";
       busy = false;
+    }
+  })();
+});
+
+// ---- Long-form Story mode (3-10 min narration: bedtime / scary / biography / tech) ----
+app.post("/api/story", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const topic = String(b.topic || "").trim();
+  if (!topic) return res.status(400).json({ error: "Enter what the story is about." });
+  const minutes = Math.min(Math.max(parseInt(b.minutes) || 3, 1), 10);
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
+  busy = true;
+  const job = newJob(1);
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      const config = await generateStory({
+        topic, storyType: b.storyType || "story", minutes,
+        language: lang.label, voice: b.voice || "en-US-AriaNeural", rate: b.rate || "0%",
+        width, height, source: b.source || "pexels", videoModel: b.videoModel || "",
+        font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
+        llmProvider: b.llmProvider || "", instructions: b.instructions || "",
+        onProgress: (m) => pushLog(job, m),
+      });
+      config.imageStyle = b.imageStyle || "";
+      config.watermark = b.watermark || "";
+      config.captionPos = b.captionPos || "bottom";
+      config.motion = b.motion || "in";
+      config.watermarkImage = b.watermarkImage ? watermarkFile() : "";
+      config.voiceEngine = b.voiceEngine || "edge";
+      config.piperVoice = b.piperVoice || "";
+      pushLog(job, `🎬 Rendering a ${minutes}-min ${b.storyType || "story"} — ${config.scenes.length} scenes. This is a long render; hang tight…`);
+      await runAll([config], job);
+    } catch (e) {
+      pushLog(job, "❌ " + (String(e.message).startsWith("NO_LLM_KEY") ? "No AI key/model set — add a Gemini key or set an Ollama model in Settings." : e.message));
+      job.status = "error"; busy = false;
     }
   })();
 });
