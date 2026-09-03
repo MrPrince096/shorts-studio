@@ -357,6 +357,7 @@
           <h2><span data-icon="play"></span> Output preview</h2>
           <div id="previewBox"><div class="previewempty">Your rendered video will appear here</div></div>
           <div id="status" class="status" style="margin-top:10px"></div>
+          <div class="note" id="renderHint" style="display:none;margin-top:8px"></div>
           <div id="log" hidden></div>
           <div id="result"></div>
         </div>
@@ -736,8 +737,13 @@ $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
 const ACT=['#goAI','#goManual','#goSeries','#goAds','#goStory'];
 let polling=null;
-function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';ACT.forEach(s=>$(s).disabled=true);}
-function endP(){ACT.forEach(s=>$(s).disabled=false);}
+function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';
+  const ve=$('#voiceEngine').value,h=$('#renderHint');
+  if(ve==='xtts'){h.innerHTML='🎙️ Expressive XTTS voice is synthesizing — long stories take several minutes. It’s working, not stuck; watch the live progress below.';h.style.display='block';}
+  else if(ve==='eleven'){h.innerHTML='🎙️ Generating voice via ElevenLabs (cloud)…';h.style.display='block';}
+  else h.style.display='none';
+  ACT.forEach(s=>$(s).disabled=true);}
+function endP(){$('#renderHint').style.display='none';ACT.forEach(s=>$(s).disabled=false);}
 async function poll(id){
   const s=await(await fetch('/api/status/'+id)).json();
   $('#log').textContent=(s.log||[]).join('\n');$('#log').scrollTop=$('#log').scrollHeight;
