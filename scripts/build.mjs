@@ -33,47 +33,55 @@ const config = JSON.parse(readFileSync(join(ROOT, "scenes.json"), "utf8"));
 const voice = config.voice || "en-US-GuyNeural";
 const fullText = config.scenes.map((s) => s.text).join(" ");
 
-// --- 1. Voiceover + word-level subtitles via edge-tts ---
+// --- 1. Voiceover + word-level timings (edge-tts cloud, or Piper offline) ---
 const audioPath = join(PUBLIC, "voiceover.mp3");
 const vttPath = join(PUBLIC, "subs.vtt");
-console.log("🎙️  Generating voiceover with edge-tts...");
-const ttsArgs = ["--voice", voice, "--text", fullText, "--write-media", audioPath, "--write-subtitles", vttPath];
-// edge-tts requires a leading +/- sign; auto-add it so "0%" / "10%" also work.
-const signed = (v) => (/^[+-]/.test(String(v).trim()) ? String(v).trim() : "+" + String(v).trim());
-if (config.rate) ttsArgs.push("--rate", signed(config.rate)); // e.g. "-10%" slower, "+10%" faster
-if (config.pitch) ttsArgs.push("--pitch", signed(config.pitch)); // e.g. "-5Hz"
-execFileSync("edge-tts", ttsArgs, { stdio: "inherit" });
-
-// --- 2. Parse VTT into word-level timings ---
-function vttTimeToSec(t) {
-  // handle SRT (HH:MM:SS,mmm) and VTT (HH:MM:SS.mmm or MM:SS.mmm)
-  const parts = t.trim().replace(",", ".").split(":").map(Number);
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return parts[0] * 60 + parts[1];
-}
-const vtt = readFileSync(vttPath, "utf8");
-const cues = [];
-const blocks = vtt.replace(/\r/g, "").split("\n\n");
-for (const b of blocks) {
-  const line = b.split("\n").find((l) => l.includes("-->"));
-  if (!line) continue;
-  const [s, e] = line.split("-->").map((x) => vttTimeToSec(x));
-  const textLines = b
-    .split("\n")
-    .filter((l) => l && !l.includes("-->") && l !== "WEBVTT" && !/^\d+$/.test(l.trim()));
-  const text = textLines.join(" ").trim();
-  if (text) cues.push({ start: s, end: e, text });
-}
-// Expand each cue into words with evenly distributed timing
 const words = [];
-for (const c of cues) {
-  const ws = c.text.split(/\s+/).filter(Boolean);
-  const dur = (c.end - c.start) / ws.length;
-  ws.forEach((w, i) => {
-    words.push({ text: w, start: c.start + i * dur, end: c.start + (i + 1) * dur });
-  });
+const usePiper = config.voiceEngine === "piper" && process.env.PIPER_MODEL && process.env.PIPER_PYTHON;
+
+if (usePiper) {
+  console.log("🎙️  Generating voiceover with Piper (offline)...");
+  const wav = join(PUBLIC, "voiceover.wav");
+  execFileSync(process.env.PIPER_PYTHON, ["-m", "piper", "-m", process.env.PIPER_MODEL, "-f", wav], { input: fullText });
+  execFileSync("ffmpeg", ["-y", "-i", wav, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
+  // Piper returns no word timings — approximate by spreading words across the
+  // measured duration, weighted by word length (good enough for karaoke captions).
+  let piperDur = 0;
+  try { piperDur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", audioPath]).toString().trim()); } catch {}
+  const wlist = fullText.split(/\s+/).filter(Boolean);
+  if (!piperDur) piperDur = Math.max(2, wlist.length * 0.35);
+  const weights = wlist.map((w) => w.replace(/[^A-Za-z0-9]/g, "").length + 1);
+  const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+  let t = 0;
+  wlist.forEach((w, i) => { const d = (piperDur * weights[i]) / totalW; words.push({ text: w, start: t, end: t + d }); t += d; });
+  console.log(`📝 ${words.length} words (approx timings) over ${piperDur.toFixed(2)}s`);
+} else {
+  console.log("🎙️  Generating voiceover with edge-tts...");
+  const ttsArgs = ["--voice", voice, "--text", fullText, "--write-media", audioPath, "--write-subtitles", vttPath];
+  // edge-tts requires a leading +/- sign; auto-add it so "0%" / "10%" also work.
+  const signed = (v) => (/^[+-]/.test(String(v).trim()) ? String(v).trim() : "+" + String(v).trim());
+  if (config.rate) ttsArgs.push("--rate", signed(config.rate)); // e.g. "-10%" slower, "+10%" faster
+  if (config.pitch) ttsArgs.push("--pitch", signed(config.pitch)); // e.g. "-5Hz"
+  execFileSync("edge-tts", ttsArgs, { stdio: "inherit" });
+  // parse VTT into word-level timings
+  const vttTimeToSec = (t) => { const p = t.trim().replace(",", ".").split(":").map(Number); return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1]; };
+  const vtt = readFileSync(vttPath, "utf8");
+  const cues = [];
+  for (const b of vtt.replace(/\r/g, "").split("\n\n")) {
+    const line = b.split("\n").find((l) => l.includes("-->"));
+    if (!line) continue;
+    const [s, e] = line.split("-->").map((x) => vttTimeToSec(x));
+    const textLines = b.split("\n").filter((l) => l && !l.includes("-->") && l !== "WEBVTT" && !/^\d+$/.test(l.trim()));
+    const text = textLines.join(" ").trim();
+    if (text) cues.push({ start: s, end: e, text });
+  }
+  for (const c of cues) {
+    const ws = c.text.split(/\s+/).filter(Boolean);
+    const dur = (c.end - c.start) / ws.length;
+    ws.forEach((w, i) => words.push({ text: w, start: c.start + i * dur, end: c.start + (i + 1) * dur }));
+  }
+  console.log(`📝 Parsed ${words.length} words across ${cues.length} cues`);
 }
-console.log(`📝 Parsed ${words.length} words across ${cues.length} cues`);
 
 // --- 3. Total duration from ffprobe ---
 let durationSec;

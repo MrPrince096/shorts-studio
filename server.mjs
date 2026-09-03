@@ -415,6 +415,9 @@ app.get("/api/settings", (_req, res) => {
     ollamaModel: getEnvValue("OLLAMA_MODEL") || "llama3.1",
     localImageUrl: getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate",
     localAvatarUrl: getEnvValue("LOCAL_AVATAR_URL") || "",
+    piperModel: getEnvValue("PIPER_MODEL") || "",
+    piperPython: getEnvValue("PIPER_PYTHON") || "",
+    piperReady: !!(getEnvValue("PIPER_MODEL") && getEnvValue("PIPER_PYTHON")),
     avatarProvider: avatarProvider(),
     keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY") },
   });
@@ -438,6 +441,8 @@ app.post("/api/settings", (req, res) => {
   setIf("heygen", "HEYGEN_API_KEY", "HeyGen key");
   setIf("localImageUrl", "LOCAL_IMAGE_URL", "Local image URL");
   setIf("localAvatarUrl", "LOCAL_AVATAR_URL", "Local avatar URL");
+  setIf("piperModel", "PIPER_MODEL", "Piper voice model");
+  setIf("piperPython", "PIPER_PYTHON", "Piper Python");
   res.json({ ok: true, saved });
 });
 
@@ -530,6 +535,7 @@ app.post("/api/generate", async (req, res) => {
         c.motion = b.motion || "in";
         c.watermarkImage = b.watermarkImage ? watermarkFile() : "";
         c.talkingAvatar = !!b.talkingAvatar; // bring the creator photo to life (needs an avatar API key)
+        c.voiceEngine = b.voiceEngine || "edge"; // "edge" (cloud) or "piper" (offline)
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -572,6 +578,7 @@ app.post("/api/render", (req, res) => {
     captionPos: b.captionPos || "bottom",
     motion: b.motion || "in",
     watermarkImage: b.watermarkImage ? watermarkFile() : "",
+    voiceEngine: b.voiceEngine || "edge",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };

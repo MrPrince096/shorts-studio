@@ -311,6 +311,7 @@
         <div class="card">
           <h2><span data-icon="zap"></span> Quick settings <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
           <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
+          <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option></select></div></div>
           <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
           <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
           <div class="row"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
@@ -461,6 +462,16 @@
         <div id="avatarStatus" class="note" style="margin:14px 0 0"></div>
       </div>
 
+      <div class="setsec">
+        <div class="sechead"><span data-icon="mega"></span> Offline voice — Piper <span class="badge opt">optional · free</span></div>
+        <p class="muted" style="font-size:12px;margin:0 0 6px">Local neural voiceover — no cloud. Then pick <b>Voiceover engine → Piper</b> in Quick settings.</p>
+        <label>Piper voice model (.onnx path)</label>
+        <input id="piperModel" placeholder="/Users/you/piper-voices/en_US-amy-medium.onnx" />
+        <label>Piper Python (venv with piper-tts)</label>
+        <input id="piperPython" placeholder="/Users/you/Wav2Lip/.venv311/bin/python" />
+        <div id="piperStatus" class="note" style="margin:14px 0 0"></div>
+      </div>
+
       <button class="btn grad big" id="saveSettings" style="width:100%">Save settings</button>
       <div id="saveMsg" style="text-align:center;font-size:13px;margin-top:10px"></div>
     </div>
@@ -556,13 +567,15 @@ function setStat(el,k){if(!el)return;el.className='fstat '+(k.set?'on':'off');el
 function toggleLlm(){const p=$('#llmProvider').value;$('#geminiBox').style.display=p==='gemini'?'block':'none';$('#openaiBox').style.display=p==='openai'?'block':'none';$('#ollamaBox').style.display=p==='ollama'?'block':'none';}
 async function loadSettings(){
   const s=await(await fetch('/api/settings')).json();
-  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';$('#localAvatarUrl').value=s.localAvatarUrl||'';
+  $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';$('#localAvatarUrl').value=s.localAvatarUrl||'';$('#piperModel').value=s.piperModel||'';$('#piperPython').value=s.piperPython||'';
   setStat($('#pexelsState'),s.keys.pexels);setStat($('#geminiState'),s.keys.gemini);setStat($('#openaiState'),s.keys.openai);setStat($('#hfState'),s.keys.hf);setStat($('#falState'),s.keys.fal);
   setStat($('#didState'),s.keys.did);setStat($('#heygenState'),s.keys.heygen);
   const ap=s.avatarProvider;
   $('#avatarStatus').className='note '+(ap?'':'warn');
   $('#avatarStatus').innerHTML=ap?`✅ Talking avatars ready via <b>${ap}</b>. Turn on “Bring creator to life” in a UGC ad.`:`No talking-avatar key yet — UGC creators stay as still photos until you add one above.`;
   window.__avatar=ap||'';applyAvatarUI();
+  $('#piperStatus').className='note '+(s.piperReady?'':'warn');
+  $('#piperStatus').innerHTML=s.piperReady?'✅ Piper ready — choose <b>Voiceover engine → Piper</b> in Quick settings for offline voice.':'Set both paths above to enable offline voice. Until then edge-tts (cloud) is used.';
   toggleLlm();
 }
 function applyAvatarUI(){
@@ -576,7 +589,7 @@ $('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
 $('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
 $('#saveSettings').onclick=async()=>{
-  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim()};
+  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim(),piperModel:$('#piperModel').value.trim(),piperPython:$('#piperPython').value.trim()};
   const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML=r.saved&&r.saved.length?'<span class="ok">Saved ✓</span>':'Nothing to save';
   ['pexelsKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey'].forEach(id=>$('#'+id).value='');loadSettings();
@@ -615,7 +628,7 @@ $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPla
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,voiceEngine:$('#voiceEngine').value});
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
