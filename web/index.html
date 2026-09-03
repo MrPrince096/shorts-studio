@@ -229,8 +229,8 @@
         <div class="card tabpanel" id="tab-story" hidden>
           <h2><span data-icon="film"></span> Story Studio</h2>
           <div class="cardsub">Long-form narration videos — 3 to 10 minutes</div>
-          <label>What's the story about?</label>
-          <input id="storyTopic" class="big" placeholder="e.g. the abandoned lighthouse keeper" />
+          <label>What's the story about? <span class="muted">— or roll the dice 🎲</span></label>
+          <div class="withbtn"><input id="storyTopic" class="big" placeholder="e.g. the abandoned lighthouse keeper" /><button class="btn ghost" id="storySurprise" title="Surprise me">🎲</button></div>
           <div class="row"><div><label>Story type</label><select id="storyType"></select></div><div><label>Length</label><select id="storyMinutes"></select></div></div>
           <div class="note" id="storyTheme" style="margin-top:10px"></div>
           <label>Instructions <span class="muted">— optional, how it should go</span></label>
@@ -325,29 +325,29 @@
 
         <!-- QUICK SETTINGS -->
         <div class="card">
-          <h2><span data-icon="zap"></span> Quick settings <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
-          <div class="row"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
-          <div class="row"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option><option value="xtts">XTTS-v2 — offline, expressive 🎭</option><option value="eleven">ElevenLabs — cloud, most emotional 🎭</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
+          <h2><span data-icon="zap"></span> <span id="qsTitle">Quick settings</span> <span class="muted" id="qsScope" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
+          <div class="row" id="qsVoice"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
+          <div class="row" id="qsEngine"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option><option value="xtts">XTTS-v2 — offline, expressive 🎭</option><option value="eleven">ElevenLabs — cloud, most emotional 🎭</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
           <div class="note warn" id="voiceWarn" style="display:none;margin-top:8px"></div>
-          <div class="row"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
-          <div class="row"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div><label>Length</label><select id="lenPick"></select></div></div>
-          <div class="row"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
-          <div class="row"><div><label>Visual source 🎥</label><select id="source"></select></div><div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div><div id="falModelBox" style="display:none"><label>Video model</label><select id="videoModel"></select></div></div>
-          <label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
-          <input type="range" id="rate" min="-20" max="20" step="2" value="0" />
-          <div class="row">
+          <div class="row" id="qsGenre"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
+          <div class="row" id="qsAILen"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div id="qsLenCol"><label>Length</label><select id="lenPick"></select></div></div>
+          <div class="row" id="qsAspect"><div><label>Aspect ratio</label><select id="aspect"></select></div><div><label>Resolution</label><select id="quality"></select></div></div>
+          <div class="row" id="qsSource"><div><label>Visual source 🎥</label><select id="source"></select></div><div id="styleBox" style="display:none"><label>Image style 🎨</label><select id="imageStyle"></select></div><div id="falModelBox" style="display:none"><label>Video model</label><select id="videoModel"></select></div></div>
+          <div id="qsRate"><label>Voice speed: <span class="rateval" id="rateval">0%</span></label>
+          <input type="range" id="rate" min="-20" max="20" step="2" value="0" /></div>
+          <div class="row" id="qsCapMotion">
             <div><label>Caption position</label><select id="captionPos"></select></div>
             <div><label>Motion / zoom</label><select id="motion"></select></div>
           </div>
-          <div class="row">
+          <div class="row" id="qsMusicReuse">
             <div><label>Background music 🎵</label><select id="musicMood"><option value="none">None</option><option value="auto">Auto (match mood)</option><option value="calm">Calm</option><option value="scary">Suspense</option><option value="uplifting">Uplifting</option><option value="neutral">Neutral</option></select></div>
             <div><label>Reuse visuals <span class="muted">— faster long videos</span></label><select id="reuseVisuals"></select></div>
           </div>
-          <label>Watermark text <span class="muted">— optional</span></label>
+          <div id="qsWatermark"><label>Watermark text <span class="muted">— optional</span></label>
           <input id="watermark" placeholder="@yourchannel" />
           <label>Watermark logo <span class="muted">— optional image</span></label>
           <div class="withbtn"><input id="wmName" placeholder="no logo selected" readonly style="cursor:default" /><button class="btn ghost" id="wmPick">Upload</button><button class="btn ghost" id="wmClear" title="remove">✕</button></div>
-          <input type="file" id="wmFile" accept="image/*" hidden />
+          <input type="file" id="wmFile" accept="image/*" hidden /></div>
         </div>
       </div>
 
@@ -540,10 +540,20 @@ const ICONS={
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
 // nav + tabs
+const QS_LABEL={shorts:'Shorts',story:'Story',series:'Series',ads:'Ads',ideas:'Idea'};
+const QS_HIDE={shorts:[],series:[],story:['qsGenre','qsLenCol'],ads:['qsGenre','qsLenCol'],ideas:['qsEngine','qsAspect','qsSource','qsRate','qsCapMotion','qsMusicReuse','qsWatermark','qsLenCol']};
+function applyTabSettings(tab){
+  const lbl=QS_LABEL[tab]||'Quick';
+  $('#qsTitle').textContent=lbl+' settings';
+  $('#qsScope').textContent='· just for '+lbl;
+  const hide=new Set(QS_HIDE[tab]||[]);
+  ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
+}
 function switchTab(name){
   $('#dashboard').classList.remove('show'); $('#library').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#workspace').style.display='grid';
+  applyTabSettings(name);
 }
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
@@ -602,6 +612,16 @@ async function loadConfig(){
   };
   const updTheme=()=>{$('#storyTheme').innerHTML=(STORY_THEME_DESC[$('#storyType').value]||'')+'<br><span class="muted" style="font-size:11px">Theme is applied automatically. XTTS/ElevenLabs voices need the expressive engine; music & pacing work on any voice.</span>';};
   $('#storyType').onchange=updTheme; updTheme();
+  const STORY_IDEAS={
+    scary:['the doll that blinks at midnight','the last house on Hollow Lane','the whisper behind the walls','the elevator that stops at floor 13','the babysitter and the upstairs phone','the abandoned lighthouse keeper','the thing living in the attic','the town that forgot how to sleep'],
+    bedtime:['the little star who lost her shine','a sleepy dragon who couldn’t yawn','the moon’s quiet best friend','the rabbit who counted clouds','the firefly and the night garden','the teddy bear’s midnight adventure','the boat that sailed to Dreamland'],
+    biography:['the life of Nikola Tesla','the rise of Cleopatra','the untold story of Ada Lovelace','how Walt Disney built a dream','the courage of Malala Yousafzai','the genius of Leonardo da Vinci','the journey of A. P. J. Abdul Kalam'],
+    tech:['how AI actually thinks','the history of the internet','how your phone knows where you are','what quantum computers really do','how the first computer was born','how the internet travels under the ocean'],
+    documentary:['the mystery of the Bermuda Triangle','how the pyramids were really built','the deepest place on Earth','the fall of the Roman Empire','the secrets of the ocean floor','the day the dinosaurs vanished'],
+    motivational:['why you should never give up','the power of tiny daily habits','how discipline beats motivation','turning failure into your fuel','the mindset that changes everything','5am and the life it built'],
+    story:['the traveler who found a hidden door','a letter that arrived 50 years late','the village that vanished overnight','two strangers on a rainy night','the shop that only opens at midnight'],
+  };
+  $('#storySurprise').onclick=(e)=>{e.preventDefault();const arr=STORY_IDEAS[$('#storyType').value]||STORY_IDEAS.story;$('#storyTopic').value=arr[Math.floor(Math.random()*arr.length)];};
   [['0','Off — one per scene'],['3','3 images'],['5','5 images'],['8','8 images']].forEach(([v,l])=>$('#reuseVisuals').appendChild(opt(v,l)));
   $('#musicMood').value='auto'; $('#reuseVisuals').value='0';
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
