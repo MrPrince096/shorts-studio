@@ -79,15 +79,38 @@ if (usePiper) {
   toMp3From(wav);
   approxTimings();
 } else if (useXtts) {
-  // Expressive, offline XTTS-v2 via a local voice server (see local-voice-server/)
+  // Expressive, offline XTTS-v2 via a local voice server (see local-voice-server/).
+  // Synthesize in CHUNKS so each request returns quickly — one big request for a
+  // long story exceeds the fetch header timeout (UND_ERR_HEADERS_TIMEOUT).
   console.log(`🎙️  Voiceover: XTTS-v2 (offline, expressive) — ${process.env.XTTS_URL}...`);
-  const body = { text: fullText, language: langCode === "zh" ? "zh-cn" : langCode };
-  if (config.xttsSpeaker) body.speaker = config.xttsSpeaker;
-  const r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`XTTS server ${r.status}: ${(await r.text()).slice(0, 160)}`);
-  const wav = join(PUBLIC, "voiceover.wav");
-  writeFileSync(wav, Buffer.from(await r.arrayBuffer()));
-  toMp3From(wav);
+  const lang2 = langCode === "zh" ? "zh-cn" : langCode;
+  const chunks = [];
+  let buf = "";
+  for (const s of config.scenes) {
+    buf += (buf ? " " : "") + String(s.text || "").trim();
+    if (buf.length > 240) { chunks.push(buf); buf = ""; }
+  }
+  if (buf) chunks.push(buf);
+  if (!chunks.length) chunks.push(fullText);
+  const parts = [];
+  for (let i = 0; i < chunks.length; i++) {
+    process.stdout.write(`  🎙️ XTTS chunk ${i + 1}/${chunks.length} … `);
+    const body = { text: chunks[i], language: lang2 };
+    if (config.xttsSpeaker) body.speaker = config.xttsSpeaker;
+    const r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(`XTTS server ${r.status}: ${(await r.text()).slice(0, 160)}`);
+    const p = join(PUBLIC, `vpart${i}.wav`);
+    writeFileSync(p, Buffer.from(await r.arrayBuffer()));
+    parts.push(p);
+    console.log("ok");
+  }
+  if (parts.length === 1) {
+    toMp3From(parts[0]);
+  } else {
+    const listPath = join(PUBLIC, "vlist.txt");
+    writeFileSync(listPath, parts.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"));
+    execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
+  }
   approxTimings();
 } else if (useEleven) {
   // Expressive cloud voices with emotion (ElevenLabs)

@@ -26,3 +26,5 @@ public/watermark.*
 creators/
 public/bg_*.mp3
 public/voiceover.wav
+public/vpart*.wav
+public/vlist.txt
