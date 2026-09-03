@@ -339,6 +339,7 @@
             <div><label>Caption position</label><select id="captionPos"></select></div>
             <div><label>Motion / zoom</label><select id="motion"></select></div>
           </div>
+          <div class="row" id="qsEffect"><div><label>Visual effect 🎬 <span class="muted">— camera look</span></label><select id="effect"></select></div></div>
           <div class="row" id="qsMusicReuse">
             <div><label>Background music 🎵</label><select id="musicMood"><option value="none">None</option><option value="auto">Auto (match mood)</option><option value="calm">Calm</option><option value="scary">Suspense</option><option value="uplifting">Uplifting</option><option value="neutral">Neutral</option></select></div>
             <div><label>Reuse visuals <span class="muted">— faster long videos</span></label><select id="reuseVisuals"></select></div>
@@ -541,13 +542,13 @@ function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{cons
 
 // nav + tabs
 const QS_LABEL={shorts:'Shorts',story:'Story',series:'Series',ads:'Ads',ideas:'Idea'};
-const QS_HIDE={shorts:[],series:[],story:['qsGenre','qsLenCol'],ads:['qsGenre','qsLenCol'],ideas:['qsEngine','qsAspect','qsSource','qsRate','qsCapMotion','qsMusicReuse','qsWatermark','qsLenCol']};
+const QS_HIDE={shorts:[],series:[],story:['qsGenre','qsLenCol'],ads:['qsGenre','qsLenCol'],ideas:['qsEngine','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol']};
 function applyTabSettings(tab){
   const lbl=QS_LABEL[tab]||'Quick';
   $('#qsTitle').textContent=lbl+' settings';
   $('#qsScope').textContent='· just for '+lbl;
   const hide=new Set(QS_HIDE[tab]||[]);
-  ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
+  ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
 }
 function switchTab(name){
   $('#dashboard').classList.remove('show'); $('#library').classList.remove('show');
@@ -626,6 +627,8 @@ async function loadConfig(){
   $('#musicMood').value='auto'; $('#reuseVisuals').value='0';
   [['bottom','Bottom'],['middle','Middle'],['top','Top']].forEach(([v,l])=>$('#captionPos').appendChild(opt(v,l)));
   [['in','Zoom in (default)'],['out','Zoom out'],['subtle','Subtle zoom'],['none','Static (no motion)'],['random','Random per scene']].forEach(([v,l])=>$('#motion').appendChild(opt(v,l)));
+  [['auto','Auto (match story)'],['none','None'],['tiltshift','Tilt-shift (miniature) 🔭'],['vintage','Vintage film 🎞️'],['noir','Noir (B&W) 🖤'],['dreamy','Dreamy glow ✨'],['vibrant','Vibrant 🌈'],['cold','Cold cinematic ❄️'],['warm','Warm 🌇']].forEach(([v,l])=>$('#effect').appendChild(opt(v,l)));
+  $('#effect').value='auto';
   $('#captionPos').value='bottom'; $('#motion').value='in';
   $('#seriesTotal').value='10';$('#seriesBatch').value='3';$('#ideaCount').value='8';
   $('#source').onchange=()=>{const s=$('#source').value;$('#falModelBox').style.display=s==='fal'?'block':'none';$('#styleBox').style.display=['image','hf','local','fal-image','fal'].includes(s)?'block':'none';};
@@ -718,7 +721,7 @@ $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPla
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value,musicMood:$('#musicMood').value,reuseVisuals:$('#reuseVisuals').value});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,effect:$('#effect').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value,musicMood:$('#musicMood').value,reuseVisuals:$('#reuseVisuals').value});
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};

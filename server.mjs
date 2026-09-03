@@ -309,13 +309,13 @@ const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "neutral", 
 // a full VISUAL THEME per story type — imageStyle (AI images), motion, captions —
 // so a scary story and a bedtime story actually look different, not just sound it.
 const STORY_THEMES = {
-  scary: { imageStyle: "dark cinematic horror still, eerie, desaturated, deep shadows, moody low-key lighting, film grain, unsettling", motion: "in", captionPos: "bottom" },
-  bedtime: { imageStyle: "soft dreamy storybook illustration, warm pastel colors, gentle glow, cozy, whimsical, calming", motion: "subtle", captionPos: "bottom" },
-  biography: { imageStyle: "cinematic documentary photograph, warm natural light, timeless, dignified, detailed", motion: "in", captionPos: "bottom" },
-  tech: { imageStyle: "sleek modern technology, clean minimal, cool blue tones, futuristic, crisp, high-tech", motion: "in", captionPos: "bottom" },
-  documentary: { imageStyle: "epic cinematic documentary, natural lighting, sweeping wide shots, rich detail, film look", motion: "in", captionPos: "bottom" },
-  motivational: { imageStyle: "epic inspiring cinematic, golden-hour light, dramatic, uplifting, high contrast", motion: "in", captionPos: "middle" },
-  story: { imageStyle: "cinematic film still, dramatic lighting, highly detailed, atmospheric", motion: "in", captionPos: "bottom" },
+  scary: { imageStyle: "dark cinematic horror still, eerie, desaturated, deep shadows, moody low-key lighting, film grain, unsettling", motion: "in", captionPos: "bottom", effect: "vintage" },
+  bedtime: { imageStyle: "soft dreamy storybook illustration, warm pastel colors, gentle glow, cozy, whimsical, calming", motion: "subtle", captionPos: "bottom", effect: "dreamy" },
+  biography: { imageStyle: "cinematic documentary photograph, warm natural light, timeless, dignified, detailed", motion: "in", captionPos: "bottom", effect: "warm" },
+  tech: { imageStyle: "sleek modern technology, clean minimal, cool blue tones, futuristic, crisp, high-tech", motion: "in", captionPos: "bottom", effect: "cold" },
+  documentary: { imageStyle: "epic cinematic documentary, natural lighting, sweeping wide shots, rich detail, film look", motion: "in", captionPos: "bottom", effect: "none" },
+  motivational: { imageStyle: "epic inspiring cinematic, golden-hour light, dramatic, uplifting, high contrast", motion: "in", captionPos: "middle", effect: "vibrant" },
+  story: { imageStyle: "cinematic film still, dramatic lighting, highly detailed, atmospheric", motion: "in", captionPos: "bottom", effect: "none" },
 };
 // best-fit XTTS-v2 built-in voice per story type (safe: server falls back if missing)
 const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", story: "Damien Black" };
@@ -607,6 +607,7 @@ app.post("/api/generate", async (req, res) => {
         c.musicMood = resolveMood(b.musicMood, { genre });
         c.reuseVisuals = b.reuseVisuals || 0;
         c.langCode = b.language || "en";
+        c.effect = (b.effect && b.effect !== "auto") ? b.effect : "none";
         // keep the chosen source for hook/problem scenes; the product image is used only on product scenes
         if (upload) { c.uploadFile = upload.uploadPath; c.uploadIsImage = upload.uploadIsImage; }
       });
@@ -663,6 +664,7 @@ app.post("/api/story", (req, res) => {
       config.piperLength = pr.length;   // Piper pace for emotion
       config.xttsSpeaker = XTTS_VOICE_FOR[b.storyType] || XTTS_VOICE_FOR.story; // best XTTS voice for the genre
       config.langCode = b.language || "en";
+      config.effect = (!b.effect || b.effect === "auto") ? theme.effect : b.effect; // themed camera look, or the user's pick
       pushLog(job, `🎬 Rendering a ${minutes}-min ${b.storyType || "story"} — ${config.scenes.length} scenes. This is a long render; hang tight…`);
       await runAll([config], job);
     } catch (e) {
@@ -700,6 +702,7 @@ app.post("/api/render", (req, res) => {
     musicMood: resolveMood(b.musicMood, {}),
     reuseVisuals: b.reuseVisuals || 0,
     langCode: b.language || "en",
+    effect: (b.effect && b.effect !== "auto") ? b.effect : "none",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     scenes: scenes.map((s) => ({ text: String(s.text), query: String(s.query) })),
   };

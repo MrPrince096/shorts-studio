@@ -465,6 +465,7 @@ const props = {
   watermarkImage: config.watermarkImage || "",
   captionPos: config.captionPos || "bottom",
   motion: config.motion || "in",
+  effect: config.effect || "none",
   talkingVideo,
   durationInSeconds: talkingSeconds || durationSec,
   audio: "voiceover.mp3",

@@ -17,6 +17,7 @@ const fallback = {
   captionPos: "bottom",
   motion: "in",
   talkingVideo: "",
+  effect: "none",
   scenes: [],
   words: [],
 };

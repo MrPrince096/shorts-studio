@@ -28,22 +28,44 @@ type Props = {
   captionPos?: "top" | "middle" | "bottom";
   motion?: "in" | "out" | "subtle" | "none" | "random";
   talkingVideo?: string;
+  effect?: string;
 };
 
 const MOTION_RANGE: Record<string, [number, number]> = {
   in: [1.06, 1.2], out: [1.2, 1.06], subtle: [1.03, 1.1], none: [1, 1],
 };
-const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: string }> = ({ src, durationInFrames, motion }) => {
+// cinematic colour/camera looks applied to every scene's footage
+const EFFECT_FILTER: Record<string, string> = {
+  none: "",
+  tiltshift: "saturate(1.5) contrast(1.12)",       // miniature look (+ blur band below)
+  vintage: "sepia(0.42) contrast(1.15) brightness(1.04) saturate(1.15)",
+  noir: "grayscale(1) contrast(1.32) brightness(1.03)",
+  dreamy: "brightness(1.08) contrast(0.96) saturate(1.12)",
+  vibrant: "saturate(1.55) contrast(1.12)",
+  cold: "saturate(1.12) brightness(1.02) hue-rotate(-8deg)",
+  warm: "sepia(0.22) saturate(1.22) brightness(1.03)",
+};
+const VIGNETTE_EFFECTS = new Set(["tiltshift", "vintage", "noir", "dreamy"]);
+// top/bottom visible, middle transparent → reveals a blurred copy only at the edges
+const TILT_MASK = "linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.55) 16%, transparent 34%, transparent 66%, rgba(0,0,0,0.55) 84%, #000 100%)";
+
+const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: string; effect: string }> = ({ src, durationInFrames, motion, effect }) => {
   const frame = useCurrentFrame();
   const [from, to] = MOTION_RANGE[motion] || MOTION_RANGE.in;
   const scale = interpolate(frame, [0, durationInFrames], [from, to], {
     extrapolateRight: "clamp",
   });
   const isImage = /\.(jpe?g|png|webp)$/i.test(src);
-  const media = { width: "100%", height: "100%", objectFit: "cover" as const, transform: `scale(${scale})` };
+  const filter = EFFECT_FILTER[effect] || "";
+  const media = { width: "100%", height: "100%", objectFit: "cover" as const, transform: `scale(${scale})`, filter };
+  const Media: React.FC<{ extra?: React.CSSProperties }> = ({ extra }) =>
+    isImage ? <Img src={src} style={{ ...media, ...extra }} /> : <OffthreadVideo src={src} muted style={{ ...media, ...extra }} />;
   return (
     <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "black" }}>
-      {isImage ? <Img src={src} style={media} /> : <OffthreadVideo src={src} muted style={media} />}
+      <Media />
+      {effect === "tiltshift" ? (
+        <Media extra={{ position: "absolute", inset: 0, filter: `${filter} blur(7px)`, WebkitMaskImage: TILT_MASK, maskImage: TILT_MASK }} />
+      ) : null}
     </AbsoluteFill>
   );
 };
@@ -124,7 +146,7 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean; captionPos
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "" }) => {
+export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "", effect = "none" }) => {
   const { fps, width, height } = useVideoConfig();
   const mOpts = ["in", "out", "subtle"];
   const sceneMotion = (i: number) => (motion === "random" ? mOpts[i % mOpts.length] : motion);
@@ -158,11 +180,27 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
           const durationInFrames = Math.max(1, Math.ceil((s.end - s.start) * fps));
           return (
             <Sequence key={i} from={from} durationInFrames={durationInFrames}>
-              <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} />
+              <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} effect={effect} />
             </Sequence>
           );
         })
       )}
+
+      {/* cinematic effect overlays (vignette + film grain) */}
+      {VIGNETTE_EFFECTS.has(effect) ? (
+        <AbsoluteFill style={{ background: "radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.55) 100%)" }} />
+      ) : null}
+      {effect === "vintage" ? (
+        <AbsoluteFill
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+            backgroundRepeat: "repeat",
+            opacity: 0.09,
+            mixBlendMode: "overlay",
+          }}
+        />
+      ) : null}
 
       {/* dark gradient for caption legibility */}
       <AbsoluteFill
