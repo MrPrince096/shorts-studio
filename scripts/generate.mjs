@@ -168,10 +168,14 @@ export async function generateStory({ topic, storyType = "story", minutes = 3, l
 
   // 1) Outline — a title + ordered beats forming a full arc
   log(`✍️  Outlining a ${minutes}-min ${storyType} about "${topic}"…`);
-  const outPrompt = `You are a master ${storyType} storyteller. Plan a ${minutes}-minute ${storyType} video about "${topic}".
+  const outPrompt = `You are a master ${storyType} storyteller AND a YouTube growth strategist. Plan a ${minutes}-minute ${storyType} video about "${topic}".
 Style: ${style}
-Give a compelling "title" and EXACTLY ${beats} sequential story "beats" (one short sentence each, in order, forming a complete arc with a satisfying ending).${instructions ? `\nCreator instructions: ${instructions}` : ""}
-Return ONLY JSON: {"title":"","beats":["",""]}`;
+Give ALL of:
+- "title": a scroll-stopping, YouTube-optimized title (under 70 characters)${nonEnglish ? `, in ${language}` : ""}.
+- "beats": EXACTLY ${beats} sequential story beats (one short sentence each, in order, forming a complete arc with a satisfying ending).
+- "description": an engaging 2-3 sentence YouTube description that hooks the viewer${nonEnglish ? `, in ${language}` : ""}.
+- "tags": 10-12 relevant SEO keywords (lowercase, NO # sign) mixing the topic, the "${storyType}" genre and broad discovery terms.${instructions ? `\nCreator instructions: ${instructions}` : ""}
+Return ONLY JSON: {"title":"","beats":["",""],"description":"","tags":["",""]}`;
   let outline = null;
   for (let a = 0; a < 3 && !outline; a++) {
     try { outline = parseLLMJson(await callLLM(outPrompt, llmProvider)); }
@@ -208,10 +212,13 @@ Return ONLY JSON: {"scenes":[{"text":"","query":"","imagePrompt":""}]}`;
 
   const slug = (title || "story").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "story";
   log(`✅ Story ready — ${scenes.length} scenes.`);
+  const tags = Array.isArray(outline.tags) && outline.tags.length
+    ? outline.tags.map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 14)
+    : [storyType, "story", "storytime", "narration"];
   return {
     title, slug,
-    description: `${title} — a ${minutes}-minute ${storyType}.`,
-    tags: [storyType, "story", "storytime", "narration"],
+    description: (outline.description && String(outline.description).trim()) || `${title} — a ${minutes}-minute ${storyType}.`,
+    tags,
     voice, rate, music: "", width, height,
     source: source || "pexels", videoModel: videoModel || "",
     font: font || "Arial Black", fontCss: fontCss || "", rtl: !!rtl,
