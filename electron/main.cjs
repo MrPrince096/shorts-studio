@@ -80,7 +80,9 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: "#0e0e12",
     title: "Shorts Studio",
-    titleBarStyle: "hiddenInset",
+    // A normal macOS title bar: the window controls sit in their own bar and no
+    // longer overlap the "Shorts Studio" logo in the app's sidebar.
+    titleBarStyle: "default",
     icon: path.join(ROOT, "build", "icon.png"),
     webPreferences: { contextIsolation: true, nodeIntegration: false },
     show: false,
