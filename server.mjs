@@ -603,7 +603,7 @@ app.get("/api/settings", (_req, res) => {
     elevenVoice: getEnvValue("ELEVEN_VOICE") || "",
     voiceEngines: { piper: !!(getEnvValue("PIPER_MODEL") && getEnvValue("PIPER_PYTHON")), xtts: !!getEnvValue("XTTS_URL"), eleven: !!getEnvValue("ELEVEN_API_KEY") },
     avatarProvider: avatarProvider(),
-    keys: { pexels: km("PEXELS_API_KEY"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY"), eleven: km("ELEVEN_API_KEY") },
+    keys: { pexels: km("PEXELS_API_KEY"), jamendo: km("JAMENDO_CLIENT_ID"), gemini: km("GEMINI_API_KEY"), openai: km("OPENAI_API_KEY"), fal: km("FAL_KEY"), hf: km("HF_TOKEN"), did: km("DID_API_KEY"), heygen: km("HEYGEN_API_KEY"), eleven: km("ELEVEN_API_KEY") },
   });
 });
 app.post("/api/settings", (req, res) => {
@@ -614,6 +614,7 @@ app.post("/api/settings", (req, res) => {
   };
   if (b.llmProvider) { setEnvValue("LLM_PROVIDER", String(b.llmProvider)); saved.push("LLM provider"); }
   setIf("pexels", "PEXELS_API_KEY", "Pexels key");
+  setIf("jamendo", "JAMENDO_CLIENT_ID", "Jamendo key");
   setIf("gemini", "GEMINI_API_KEY", "Gemini key");
   setIf("openai", "OPENAI_API_KEY", "OpenAI key");
   setIf("openaiModel", "OPENAI_MODEL", "OpenAI model");
@@ -911,7 +912,49 @@ app.get("/api/find/images", async (req, res) => {
     res.json((d.photos || []).map((p) => ({ id: p.id, thumb: p.src.medium, url: p.src.large2x || p.src.large, w: p.width, h: p.height, alt: p.alt || "" })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post("/api/find/create", (req, res) => {
+async function searchJamendo(q, page) {
+  const cid = getEnvValue("JAMENDO_CLIENT_ID");
+  if (!cid) return null;
+  const offset = (Math.max(1, page) - 1) * 24;
+  const url = `https://api.jamendo.com/v3.0/tracks/?client_id=${encodeURIComponent(cid)}&format=json&limit=24&offset=${offset}&search=${encodeURIComponent(q)}&audioformat=mp32&include=musicinfo+licenses&order=popularity_total`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) throw new Error(`Jamendo ${r.status}`);
+  const d = await r.json();
+  return (d.results || []).filter((x) => x.audio).map((x) => ({
+    id: "jam-" + x.id, title: x.name || "Untitled", creator: x.artist_name || "", license: "CC (Jamendo)",
+    duration: Math.round(x.duration || 0), url: x.audiodownload || x.audio,
+    attribution: `"${x.name}" by ${x.artist_name} — Jamendo (${x.license_ccurl ? x.license_ccurl.replace(/^https?:\/\//, "") : "Creative Commons"})`,
+  }));
+}
+async function searchOpenverse(q, page) {
+  const r = await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(q)}&page_size=24&page=${Math.max(1, page)}&license_type=commercial,modification`, { headers: { "User-Agent": "ShortsStudio/1.0 (faceless-video-studio)" }, signal: AbortSignal.timeout(12000) });
+  if (!r.ok) throw new Error(`Openverse ${r.status}`);
+  const d = await r.json();
+  return (d.results || []).filter((x) => x.url).map((x) => ({
+    id: "ov-" + x.id, title: x.title || "Untitled", creator: x.creator || "", license: ((x.license || "") + " " + (x.license_version || "")).trim().toUpperCase(),
+    duration: Math.round((x.duration || 0) / 1000), url: x.url,
+    attribution: `"${x.title || "track"}" by ${x.creator || "unknown"} — ${(x.license || "").toUpperCase()} ${x.license_version || ""}`.trim(),
+  }));
+}
+app.get("/api/find/music", async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  if (!q) return res.json([]);
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const hasJamendo = !!getEnvValue("JAMENDO_CLIENT_ID");
+  try {
+    // Prefer Jamendo when a key is set (reliable, high limits); else keyless Openverse.
+    if (hasJamendo) {
+      try { const j = await searchJamendo(q, page); if (j && j.length) return res.json(j); } catch (e) { /* fall through */ }
+    }
+    const ov = await searchOpenverse(q, page);
+    return res.json(ov);
+  } catch (e) {
+    // Last resort: if Openverse failed but we haven't tried Jamendo, try it.
+    if (!hasJamendo) return res.status(502).json({ error: "Free music search is busy right now (Openverse). Add a free Jamendo key in Settings for reliable search.", source: "openverse" });
+    try { const j = await searchJamendo(q, page); return res.json(j || []); } catch (e2) { return res.status(502).json({ error: "Music search failed: " + e2.message }); }
+  }
+});
+app.post("/api/find/create", async (req, res) => {
   if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
   const b = req.body || {};
   const images = Array.isArray(b.images) ? b.images.filter(Boolean).slice(0, 40) : [];
@@ -927,6 +970,14 @@ app.post("/api/find/create", (req, res) => {
     const f = String(mu.file).replace(/[^a-z0-9._-]/gi, ""); const mp = join(MUSIC_DIR, f);
     if (!existsSync(mp)) return res.status(400).json({ error: "Music track not found." });
     try { execFileSync("ffmpeg", ["-y", "-i", mp, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); } catch { return res.status(400).json({ error: "Music error." }); }
+  } else if (mu.url && /^https?:\/\//.test(String(mu.url))) {
+    const raw = join(PUBLIC, "song_raw");
+    try {
+      const rr = await fetch(String(mu.url), { headers: { "User-Agent": "ShortsStudio/1.0" }, redirect: "follow" });
+      if (!rr.ok) throw new Error(`download ${rr.status}`);
+      writeFileSync(raw, Buffer.from(await rr.arrayBuffer()));
+      execFileSync("ffmpeg", ["-y", "-i", raw, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" });
+    } catch { return res.status(400).json({ error: "Couldn't fetch that track. Pick another." }); }
   } else return res.status(400).json({ error: "Pick a music track." });
   let dur = 20; try { dur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", songPath]).toString().trim()) || 20; } catch {}
   const lines = String(b.lines || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);

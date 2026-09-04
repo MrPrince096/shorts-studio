@@ -3,14 +3,51 @@
   "version": "1.0.0",
   "description": "Free faceless Shorts/Reels engine: edge-tts voiceover + Pexels stock + Remotion render",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "start": "node server.mjs",
     "app": "node server.mjs",
+    "desktop": "electron .",
+    "icon": "python3 scripts/make-icon.py",
+    "dist": "npm run icon && electron-builder --mac",
     "build": "node scripts/build.mjs",
     "studio": "remotion studio",
     "render": "remotion render Short out/video.mp4 --props=public/props.json",
     "make": "node scripts/make.mjs",
     "batch": "node scripts/batch.mjs"
+  },
+  "build": {
+    "appId": "com.shortsstudio.app",
+    "productName": "Shorts Studio",
+    "directories": {
+      "output": "dist-app",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "server.mjs",
+      "scripts/**/*",
+      "src/**/*",
+      "web/**/*",
+      "public/**/*",
+      "remotion.config.*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    }
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
@@ -23,6 +60,8 @@
     "remotion": "4.0.392"
   },
   "devDependencies": {
-    "@types/react": "19.0.0"
+    "@types/react": "19.0.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
   }
 }

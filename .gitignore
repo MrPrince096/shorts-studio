@@ -20,6 +20,12 @@ public/voiceover.mp3
 public/subs.vtt
 public/props.json
 
+# desktop app build artifacts
+Shorts Studio.app/
+dist-app/
+build/icon.iconset/
+song_raw
+
 # os
 .DS_Store
 public/watermark.*

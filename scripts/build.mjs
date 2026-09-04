@@ -364,6 +364,15 @@ async function pollImage(scene, outFile) {
   }
 }
 
+async function localOrPollImage(scene, outFile) {
+  try {
+    return await localImage(scene, outFile);
+  } catch (e) {
+    console.log(`⚠️  ${e.message} Falling back to Pollinations.`);
+    return await pollImage(scene, outFile);
+  }
+}
+
 // use the user's uploaded image/video as the visual for every scene
 async function uploadMedia(_scene, outFile) {
   if (!config.uploadFile || !existsSync(config.uploadFile)) throw new Error("uploaded media file missing");
@@ -376,7 +385,7 @@ const GEN = {
   pexels: (s, f) => pexelsVideo(s.query, f),
   image: pollImage,
   hf: hfImage,
-  local: localImage,
+  local: localOrPollImage,
   "fal-image": falImage,
   fal: falVideo,
 };
