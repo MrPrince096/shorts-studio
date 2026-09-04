@@ -10,6 +10,13 @@ const ROOT = path.join(__dirname, "..");
 const PORT = process.env.PORT || 4321;
 const URL = `http://localhost:${PORT}`;
 
+// Some Macs crash Electron's GPU/network service process (exit_code=15) which
+// leaves the window blank or unopened. This is a plain web UI — it doesn't need
+// GPU acceleration — so turn it off for a rock-solid window.
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch("disable-gpu");
+app.commandLine.appendSwitch("disable-gpu-compositing");
+
 let serverProc = null;
 let win = null;
 
@@ -78,6 +85,15 @@ function createWindow() {
 
   win.loadURL(URL);
   win.once("ready-to-show", () => win.show());
+  // Fallbacks: show even if ready-to-show is delayed, and retry on a failed load.
+  setTimeout(() => { if (win && !win.isVisible()) win.show(); }, 3000);
+  win.webContents.on("did-fail-load", (_e, code, desc) => {
+    if (code === -3) return; // aborted (normal during redirects)
+    setTimeout(() => win && win.loadURL(URL), 800);
+  });
+  win.webContents.on("render-process-gone", () => {
+    setTimeout(() => win && win.reload(), 500);
+  });
 
   // Open external links (e.g. "Get a free key →") in the real browser, not inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
