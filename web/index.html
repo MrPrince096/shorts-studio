@@ -437,7 +437,7 @@
         <div class="card">
           <h2><span data-icon="zap"></span> <span id="qsTitle">Quick settings</span> <span class="muted" id="qsScope" style="text-transform:none;letter-spacing:0;font-weight:400">· applied to every tab</span></h2>
           <div class="row" id="qsVoice"><div><label>Language 🌐</label><select id="language"></select></div><div><label>Voice</label><select id="voice"></select></div></div>
-          <div class="row" id="qsEngine"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="piper">Piper — offline (local)</option><option value="xtts">XTTS-v2 — offline, expressive 🎭</option><option value="eleven">ElevenLabs — cloud, most emotional 🎭</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div></div>
+          <div class="row" id="qsEngine"><div><label>Voiceover engine</label><select id="voiceEngine"><option value="edge">edge-tts — cloud, all languages</option><option value="kokoro">Kokoro — offline, natural 🎧</option><option value="piper">Piper — offline (local)</option><option value="xtts">XTTS-v2 — offline, expressive 🎭</option><option value="eleven">ElevenLabs — cloud, most emotional 🎭</option></select></div><div id="piperVoiceBox" style="display:none"><label>Piper voice</label><select id="piperVoice"></select></div><div id="kokoroVoiceBox" style="display:none"><label>Kokoro voice 🎧</label><select id="kokoroVoice"></select></div></div>
           <div class="note warn" id="voiceWarn" style="display:none;margin-top:8px"></div>
           <div class="row" id="qsGenre"><div><label>Genre</label><select id="genre"></select></div><div><label>Country</label><select id="country"></select></div></div>
           <div class="row" id="qsAILen"><div><label>Script AI 🧠</label><select id="llmPick"></select></div><div id="qsLenCol"><label>Length</label><select id="lenPick"></select></div></div>
@@ -808,8 +808,9 @@ document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySe
   let busy=false;
   async function refresh(){
     try{const h=await(await fetch('/api/health')).json();
-      setDot('xtts',h.xtts?'up':'down'); setDot('comfy',h.comfy?'up':'down'); setDot('ollama',h.ollama?'up':'down');
-      if(!busy){ sw.checked=(h.xtts&&h.comfy); lbl.textContent=(h.xtts&&h.comfy)?'Local engines · on':(!h.xtts&&!h.comfy)?'Local engines · off':'Local engines'; }
+      const voice=h.xtts||h.kokoro;
+      setDot('xtts',voice?'up':'down'); setDot('comfy',h.comfy?'up':'down'); setDot('ollama',h.ollama?'up':'down');
+      if(!busy){ sw.checked=(voice&&h.comfy); lbl.textContent=(voice&&h.comfy)?'Local engines · on':(!voice&&!h.comfy)?'Local engines · off':'Local engines'; }
       return h;
     }catch{return null;}
   }
@@ -819,8 +820,9 @@ document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySe
     bar.querySelectorAll('.estat').forEach(e=>{if((on&&e.classList.contains('down'))||(!on&&e.classList.contains('up')&&e.dataset.eng!=='ollama')){e.classList.remove('up','down');e.classList.add('pending');}});
     try{await fetch(on?'/api/servers/start':'/api/servers/stop',{method:'POST'});}catch{}
     let n=0; const iv=setInterval(async()=>{n++;const h=await refresh();
-      const settled = on ? (h&&h.xtts&&h.comfy) : (h&&!h.xtts&&!h.comfy);
-      if(on && !settled && h){ lbl.textContent='Starting · '+(h.comfy?'Images ✓':'Images…')+' · '+(h.xtts?'Voice ✓':'Voice…')+' (~30s)'; }
+      const voice=h&&(h.xtts||h.kokoro);
+      const settled = on ? (voice&&h.comfy) : (h&&!h.xtts&&!h.kokoro&&!h.comfy);
+      if(on && !settled && h){ lbl.textContent='Starting · '+(h.comfy?'Images ✓':'Images…')+' · '+(voice?'Voice ✓':'Voice…')+' (~30s)'; }
       else if(!on && !settled){ lbl.textContent='Stopping…'; }
       if(settled||n>=40){clearInterval(iv);busy=false;wrap.classList.remove('pending');refresh();}
     }, on?2500:800);
@@ -986,7 +988,9 @@ async function loadPiperVoices(){
   try{const r=await(await fetch('/api/piper-voices')).json();const fill=(id)=>{const sel=$(id);if(!sel)return;sel.innerHTML='';(r.voices||[]).forEach(v=>sel.appendChild(opt(v.file,v.label)));if(r.current&&[...sel.options].some(o=>o.value===r.current))sel.value=r.current;};fill('#piperVoice');fill('#edPiperVoice');}catch(e){}
   voiceWarn();
 }
-function togglePiperVoice(){$('#piperVoiceBox').style.display=$('#voiceEngine').value==='piper'?'block':'none';}
+function kokoroLabel(v){const m={af:'US Female',am:'US Male',bf:'UK Female',bm:'UK Male'};return (m[v.slice(0,2)]||'Voice')+' · '+v.slice(3).replace(/^./,c=>c.toUpperCase());}
+async function loadKokoroVoices(){try{const d=await(await fetch('/api/voices')).json();const sel=$('#kokoroVoice');if(!sel)return;const cur=sel.value;sel.innerHTML='';sel.appendChild(opt('','Default (natural US female)'));(d.kokoro||[]).forEach(v=>sel.appendChild(opt(v,kokoroLabel(v))));if(cur&&[...sel.options].some(o=>o.value===cur))sel.value=cur;}catch{}}
+function togglePiperVoice(){const e=$('#voiceEngine').value;$('#piperVoiceBox').style.display=e==='piper'?'block':'none';$('#kokoroVoiceBox').style.display=e==='kokoro'?'block':'none';if(e==='kokoro'&&$('#kokoroVoice').options.length<=1)loadKokoroVoices();}
 const XTTS_LANGS_UI=new Set(['en','es','fr','de','it','pt','pl','tr','ru','nl','cs','ar','zh','ja','hu','ko','hi']);
 function voiceWarn(){
   const eng=$('#voiceEngine').value, lc=$('#language').value; let w='';
@@ -1059,7 +1063,7 @@ $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPla
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,effect:$('#effect').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value,musicMood:$('#musicMood').value,reuseVisuals:$('#reuseVisuals').value});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,effect:$('#effect').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value,kokoroVoice:$('#kokoroVoice').value,musicMood:$('#musicMood').value,reuseVisuals:$('#reuseVisuals').value});
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};

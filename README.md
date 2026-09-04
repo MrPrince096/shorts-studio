@@ -65,6 +65,16 @@ Copy `Shorts Studio.app` into **/Applications** to get it in Spotlight/Launchpad
 From the app's **Local Servers** menu you can start/stop the offline voice + image
 servers without touching the terminal.
 
+### Voices
+
+- **edge-tts** (cloud, 34 languages) — default, zero setup.
+- **Kokoro** (offline, fast, natural) — 54 US/UK voices. One-time install:
+  `bash local-voice-server/setup-kokoro.sh` (~340 MB), then pick **Voiceover
+  engine → Kokoro** and a voice. ~2s/clip on CPU. English + a few majors.
+- **XTTS-v2** (offline, expressive + **voice cloning**) — clone any voice from a
+  6–20s sample in **Settings → Expressive voice → Voice cloning**.
+- **Piper** (offline, light) and **ElevenLabs** (cloud) also supported.
+
 ### Local servers in one click
 
 For fully-offline generation you need the voice (XTTS) and image (ComfyUI) servers

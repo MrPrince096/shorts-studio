@@ -20,6 +20,19 @@ fi
 
 echo ""
 
+# --- Voice: Kokoro (fast, natural) ---
+if up 7880; then
+  echo "✅ Voice (Kokoro) already running on :7880"
+elif [ ! -d "$HOME/kokoro-tts/venv" ]; then
+  echo "ℹ️  Kokoro not installed — skipping (run local-voice-server/setup-kokoro.sh to add it)."
+else
+  echo "→ Starting Kokoro voice server…"
+  nohup bash "$ROOT/local-voice-server/start-kokoro.command" > /tmp/kokoro.log 2>&1 &
+  echo "   loads fast (~10s), log: /tmp/kokoro.log"
+fi
+
+echo ""
+
 # --- Images: ComfyUI + adapter ---
 if up 7801; then
   echo "✅ Images (ComfyUI adapter) already running on :7801"

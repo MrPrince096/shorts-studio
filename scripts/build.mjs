@@ -65,9 +65,13 @@ const piperLocaleOk = piperModel ? piperModel.split("/").pop().toLowerCase().sta
 let engineEff = engine;
 if (engine === "piper" && !piperLocaleOk) { console.log(`⚠️  No Piper voice for "${langCode}" — using edge-tts instead.`); engineEff = "edge"; }
 if (engine === "xtts" && !XTTS_LANGS.has(langCode)) { console.log(`⚠️  XTTS-v2 can't speak "${langCode}" — using edge-tts instead.`); engineEff = "edge"; }
+const KOKORO_LANGS = new Set(["en", "en-gb", "fr", "ja", "ko", "zh", "es", "hi", "it", "pt"]);
+if (engine === "kokoro" && !KOKORO_LANGS.has(langCode)) { console.log(`⚠️  Kokoro can't speak "${langCode}" — using edge-tts instead.`); engineEff = "edge"; }
 
 const usePiper = engineEff === "piper" && piperModel && existsSync(piperModel) && process.env.PIPER_PYTHON;
 const useXtts = engineEff === "xtts" && process.env.XTTS_URL;
+const KOKORO_URL = process.env.KOKORO_URL || "http://localhost:7880/generate";
+const useKokoro = engineEff === "kokoro";
 const useEleven = engineEff === "eleven" && process.env.ELEVEN_API_KEY;
 
 if (config.songMode) {
@@ -126,6 +130,39 @@ if (config.songMode) {
   } else {
     const listPath = join(PUBLIC, "vlist.txt");
     writeFileSync(listPath, parts.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"));
+    execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
+  }
+  approxTimings();
+} else if (useKokoro) {
+  // Kokoro (fast, natural, offline) — chunk by scenes so requests stay quick.
+  console.log(`🎧  Voiceover: Kokoro (offline, natural) — ${KOKORO_URL}...`);
+  const kVoice = config.kokoroVoice || process.env.KOKORO_VOICE || "";
+  const kchunks = [];
+  let kbuf = "";
+  for (const s of config.scenes) { kbuf += (kbuf ? " " : "") + String(s.text || "").trim(); if (kbuf.length > 320) { kchunks.push(kbuf); kbuf = ""; } }
+  if (kbuf) kchunks.push(kbuf);
+  if (!kchunks.length) kchunks.push(fullText);
+  const kparts = [];
+  for (let i = 0; i < kchunks.length; i++) {
+    process.stdout.write(`  🎧 Kokoro chunk ${i + 1}/${kchunks.length} … `);
+    const body = { text: kchunks[i], language: langCode };
+    if (kVoice) body.speaker = kVoice;
+    let r;
+    try {
+      r = await fetch(KOKORO_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } catch (e) {
+      throw new Error(`Kokoro voice server isn't running at ${KOKORO_URL}. Start it (local-voice-server/start-kokoro.command), or pick a different voice engine in Settings.`);
+    }
+    if (!r.ok) throw new Error(`Kokoro server ${r.status}: ${(await r.text()).slice(0, 160)}`);
+    const p = join(PUBLIC, `vpart${i}.wav`);
+    writeFileSync(p, Buffer.from(await r.arrayBuffer()));
+    kparts.push(p);
+    console.log("ok");
+  }
+  if (kparts.length === 1) { toMp3From(kparts[0]); }
+  else {
+    const listPath = join(PUBLIC, "vlist.txt");
+    writeFileSync(listPath, kparts.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"));
     execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-codec:a", "libmp3lame", "-q:a", "2", audioPath], { stdio: "ignore" });
   }
   approxTimings();

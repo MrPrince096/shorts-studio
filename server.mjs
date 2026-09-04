@@ -183,6 +183,7 @@ app.post("/api/edit/revoice", (req, res) => {
   if (b.voice) config.voice = b.voice;
   config.voiceEngine = b.voiceEngine || config.voiceEngine || "edge";
   if (typeof b.piperVoice === "string") config.piperVoice = b.piperVoice;
+  if (typeof b.kokoroVoice === "string") config.kokoroVoice = b.kokoroVoice;
   config.font = lang.font; config.fontCss = lang.fontCss; config.rtl = lang.rtl;
   config.slug = base; // keep the same filename so it overwrites this video
   busy = true;
@@ -759,7 +760,8 @@ app.post("/api/generate", async (req, res) => {
         c.watermarkImage = b.watermarkImage ? watermarkFile() : "";
         c.talkingAvatar = !!b.talkingAvatar; // bring the creator photo to life (needs an avatar API key)
         c.voiceEngine = b.voiceEngine || "edge"; // "edge" (cloud) or "piper" (offline)
-        c.piperVoice = b.piperVoice || ""; // chosen local Piper voice file (optional)
+        c.piperVoice = b.piperVoice || "";
+    c.kokoroVoice = b.kokoroVoice || ""; // chosen local Piper voice file (optional)
         c.musicMood = resolveMood(b.musicMood, { genre });
         c.reuseVisuals = b.reuseVisuals || 0;
         c.langCode = b.language || "en";
@@ -815,6 +817,7 @@ app.post("/api/story", (req, res) => {
       config.watermarkImage = b.watermarkImage ? watermarkFile() : "";
       config.voiceEngine = b.voiceEngine || "edge";
       config.piperVoice = b.piperVoice || "";
+    config.kokoroVoice = b.kokoroVoice || "";
       config.musicMood = resolveMood(b.musicMood || "auto", { storyType: b.storyType || "story" });
       config.reuseVisuals = b.reuseVisuals || 0;
       config.pitch = pr.pitch;          // edge-tts pitch for emotion
@@ -1030,6 +1033,7 @@ app.post("/api/render", (req, res) => {
     watermarkImage: b.watermarkImage ? watermarkFile() : "",
     voiceEngine: b.voiceEngine || "edge",
     piperVoice: b.piperVoice || "",
+    kokoroVoice: b.kokoroVoice || "",
     musicMood: resolveMood(b.musicMood, {}),
     reuseVisuals: b.reuseVisuals || 0,
     langCode: b.language || "en",
@@ -1230,13 +1234,18 @@ app.get("/api/voices", async (_req, res) => {
         return { id, name: id.replace(/-/g, " "), url: "/data/voices/" + f };
       })
     : [];
-  let speakers = [];
+  let speakers = [], kokoro = [];
   try {
     const u = (getEnvValue("XTTS_URL") || "http://localhost:7870/generate").replace(/\/generate$/, "/health");
     const r = await fetch(u, { signal: AbortSignal.timeout(2000) });
     if (r.ok) speakers = (await r.json()).speakers || [];
   } catch {}
-  res.json({ clones, speakers, selected: getEnvValue("XTTS_VOICE") || "" });
+  try {
+    const u = (getEnvValue("KOKORO_URL") || "http://localhost:7880/generate").replace(/\/generate$/, "/health");
+    const r = await fetch(u, { signal: AbortSignal.timeout(2000) });
+    if (r.ok) kokoro = (await r.json()).voices || [];
+  } catch {}
+  res.json({ clones, speakers, kokoro, selected: getEnvValue("XTTS_VOICE") || "" });
 });
 app.post("/api/voices", (req, res) => {
   const b = req.body || {};
@@ -1274,10 +1283,11 @@ async function portUp(url) {
 }
 app.get("/api/health", async (_req, res) => {
   const xttsUrl = (getEnvValue("XTTS_URL") || "http://localhost:7870/generate").replace(/\/generate$/, "/");
+  const kokUrl = (getEnvValue("KOKORO_URL") || "http://localhost:7880/generate").replace(/\/generate$/, "/health");
   const localImg = (getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate").replace(/\/generate$/, "/health");
   const ollama = (getEnvValue("OLLAMA_URL") || "http://localhost:11434") + "/api/tags";
-  const [xtts, comfy, llm] = await Promise.all([portUp(xttsUrl), portUp(localImg), portUp(ollama)]);
-  res.json({ xtts, comfy, ollama: llm });
+  const [xtts, kokoro, comfy, llm] = await Promise.all([portUp(xttsUrl), portUp(kokUrl), portUp(localImg), portUp(ollama)]);
+  res.json({ xtts, kokoro, comfy, ollama: llm });
 });
 let startingServers = false;
 app.post("/api/servers/start", (_req, res) => {
@@ -1298,13 +1308,13 @@ app.post("/api/servers/start", (_req, res) => {
 });
 app.post("/api/servers/stop", (_req, res) => {
   // force-kill immediately (SIGKILL) so OFF is instant — no graceful torch teardown
-  for (const port of [7870, 7801, 8188]) {
+  for (const port of [7870, 7880, 7801, 8188]) {
     try {
       const pids = execFileSync("lsof", ["-ti:" + port]).toString().trim().split(/\s+/).filter(Boolean);
       if (pids.length) execFileSync("kill", ["-9", ...pids]);
     } catch {}
   }
-  for (const pat of ["xtts_server.py", "main.py --port 8188", "comfy-adapter.mjs", "start-xtts.command", "start-comfy.command"]) {
+  for (const pat of ["xtts_server.py", "kokoro_server.py", "main.py --port 8188", "comfy-adapter.mjs", "start-xtts.command", "start-kokoro.command", "start-comfy.command"]) {
     try { execFileSync("pkill", ["-9", "-f", pat]); } catch {}
   }
   res.json({ ok: true });
