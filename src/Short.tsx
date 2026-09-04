@@ -29,6 +29,7 @@ type Props = {
   motion?: "in" | "out" | "subtle" | "none" | "random";
   talkingVideo?: string;
   effect?: string;
+  lyricLines?: { text: string; start: number; end: number }[];
 };
 
 const MOTION_RANGE: Record<string, [number, number]> = {
@@ -74,6 +75,27 @@ const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: strin
 };
 
 const GROUP = 3;
+
+// full-line lyric captions (for Song mode) — shows the current line with a soft fade
+const LineCaptions: React.FC<{ lines: { text: string; start: number; end: number }[]; font: string; rtl: boolean; captionPos: string }> = ({ lines, font, rtl, captionPos }) => {
+  const { fps, width, height } = useVideoConfig();
+  const t = useCurrentFrame() / fps;
+  const line = lines.find((l) => t >= l.start && t < l.end);
+  if (!line || !line.text) return null;
+  const base = Math.min(width, height);
+  const fontSize = Math.round(base * 0.052);
+  const stroke = Math.max(2, Math.round(base * 0.004));
+  const padX = Math.round(width * 0.08);
+  const shiftY = captionPos === "top" ? Math.round(-height * 0.30) : captionPos === "middle" ? 0 : Math.round(height * 0.16);
+  const fade = interpolate(t, [line.start, line.start + 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", padding: `0 ${padX}px` }}>
+      <div style={{ transform: `translateY(${shiftY}px)`, opacity: fade, textAlign: "center", direction: rtl ? "rtl" : "ltr", fontFamily: `'${font}', 'Georgia', serif`, fontWeight: 600, fontSize, lineHeight: 1.35, color: "#f3ead3", WebkitTextStroke: `${stroke}px rgba(0,0,0,0.5)`, paintOrder: "stroke fill", textShadow: "0 2px 14px rgba(0,0,0,0.85)" }}>
+        {line.text}
+      </div>
+    </AbsoluteFill>
+  );
+};
 
 const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean; captionPos: string }> = ({ words, font, rtl, captionPos }) => {
   const { fps, width, height } = useVideoConfig();
@@ -149,7 +171,7 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean; captionPos
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "", effect = "none" }) => {
+export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "", effect = "none", lyricLines = [] }) => {
   const { fps, width, height } = useVideoConfig();
   const mOpts = ["in", "out", "subtle"];
   const sceneMotion = (i: number) => (motion === "random" ? mOpts[i % mOpts.length] : motion);
@@ -228,7 +250,9 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
         }}
       />
 
-      <Captions words={words} font={font} rtl={rtl} captionPos={captionPos} />
+      {lyricLines && lyricLines.length
+        ? <LineCaptions lines={lyricLines} font={font} rtl={rtl} captionPos={captionPos} />
+        : <Captions words={words} font={font} rtl={rtl} captionPos={captionPos} />}
 
       {watermarkImage ? (
         <Img

@@ -70,7 +70,11 @@ const usePiper = engineEff === "piper" && piperModel && existsSync(piperModel) &
 const useXtts = engineEff === "xtts" && process.env.XTTS_URL;
 const useEleven = engineEff === "eleven" && process.env.ELEVEN_API_KEY;
 
-if (usePiper) {
+if (config.songMode) {
+  // Song mode: the uploaded song is already at public/voiceover.mp3 (the audio slot).
+  // No TTS; captions come from config.lyricLines (full-line lyrics).
+  console.log("🎵 Song mode — using your uploaded song + synced lyrics (no TTS).");
+} else if (usePiper) {
   console.log(`🎙️  Voiceover: Piper (offline) — ${piperModel.split("/").pop()}...`);
   const wav = join(PUBLIC, "voiceover.wav");
   const piperArgs = ["-m", "piper", "-m", piperModel, "-f", wav];
@@ -168,7 +172,7 @@ durationSec = Math.max(durationSec, words.length ? words[words.length - 1].end :
 // composition so Remotion never tries to render an absurdly long video and crash.
 const expectedSec = Math.max(30, words.length * 1.0);
 const HARD_CAP = 20 * 60;
-if (durationSec > HARD_CAP || durationSec > expectedSec * 4) {
+if (!config.songMode && (durationSec > HARD_CAP || durationSec > expectedSec * 4)) {
   const capped = Math.min(HARD_CAP, Math.max(60, expectedSec * 2));
   console.log(`⚠️  Voiceover is ${(durationSec / 60).toFixed(1)} min but ~${(expectedSec / 60).toFixed(1)} min was expected — capping to ${(capped / 60).toFixed(1)} min (likely a TTS/language mismatch).`);
   durationSec = capped;
@@ -180,13 +184,22 @@ function wordCount(t) {
   return t.split(/\s+/).filter(Boolean).length;
 }
 const sceneRanges = [];
-let idx = 0;
-for (const s of config.scenes) {
-  const n = wordCount(s.text);
-  const first = words[Math.min(idx, words.length - 1)];
-  const last = words[Math.min(idx + n - 1, words.length - 1)];
-  sceneRanges.push({ start: first ? first.start : 0, end: last ? last.end : durationSec });
-  idx += n;
+if (config.songMode && Array.isArray(config.lyricLines) && config.lyricLines.length === config.scenes.length) {
+  // one image per lyric line — scene timing follows the lyric timing
+  for (const l of config.lyricLines) sceneRanges.push({ start: l.start, end: l.end });
+} else if (config.songMode) {
+  // no per-line mapping — spread the scenes evenly across the song
+  const per = durationSec / Math.max(1, config.scenes.length);
+  config.scenes.forEach((_, i) => sceneRanges.push({ start: i * per, end: (i + 1) * per }));
+} else {
+  let idx = 0;
+  for (const s of config.scenes) {
+    const n = wordCount(s.text);
+    const first = words[Math.min(idx, words.length - 1)];
+    const last = words[Math.min(idx + n - 1, words.length - 1)];
+    sceneRanges.push({ start: first ? first.start : 0, end: last ? last.end : durationSec });
+    idx += n;
+  }
 }
 // stretch last scene end to full duration
 if (sceneRanges.length) sceneRanges[sceneRanges.length - 1].end = durationSec;
@@ -494,6 +507,7 @@ const props = {
   captionPos: config.captionPos || "bottom",
   motion: config.motion || "in",
   effect: config.effect || "none",
+  lyricLines: config.songMode ? (config.lyricLines || []) : [],
   talkingVideo,
   durationInSeconds: talkingSeconds || durationSec,
   audio: "voiceover.mp3",

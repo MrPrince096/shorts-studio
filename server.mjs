@@ -828,6 +828,74 @@ app.post("/api/story", (req, res) => {
   })();
 });
 
+// ---- Song mode: your song + lyrics -> aesthetic lyric video ----
+function parseLyrics(raw, dur) {
+  const rawLines = String(raw || "").split(/\r?\n/).map((l) => l.trim());
+  const timed = [];
+  const plain = [];
+  const lrc = /^\[(\d{1,2}):(\d{2})(?:[.:](\d{1,2}))?\]\s*(.*)$/;
+  for (const l of rawLines) {
+    if (!l) continue;
+    const m = l.match(lrc);
+    if (m) { const t = (+m[1]) * 60 + (+m[2]) + (m[3] ? (+m[3]) / (m[3].length === 1 ? 10 : 100) : 0); timed.push({ t, text: m[4].trim() }); }
+    else plain.push(l);
+  }
+  let lines;
+  if (timed.length >= 2) {
+    timed.sort((a, b) => a.t - b.t);
+    lines = timed.map((x, i) => ({ text: x.text, start: x.t, end: i + 1 < timed.length ? timed[i + 1].t : dur })).filter((x) => x.text);
+  } else {
+    const all = (plain.length ? plain : rawLines).filter(Boolean);
+    const per = dur / Math.max(1, all.length);
+    lines = all.map((text, i) => ({ text, start: i * per, end: (i + 1) * per }));
+  }
+  return lines;
+}
+app.post("/api/song", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const m = String(b.songDataUrl || "").match(/^data:audio\/[^;]+;base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: "Upload a song (mp3/wav/m4a)." });
+  const lyricsRaw = String(b.lyrics || "").trim();
+  if (!lyricsRaw) return res.status(400).json({ error: "Paste the lyrics — one line per subtitle." });
+  const theme = String(b.theme || b.topic || "aesthetic cinematic art, beautiful, atmospheric").trim();
+  // save the song as the audio track, convert to mp3
+  const rawPath = join(PUBLIC, "song_raw");
+  writeFileSync(rawPath, Buffer.from(m[1], "base64"));
+  const songPath = join(PUBLIC, "voiceover.mp3");
+  try { execFileSync("ffmpeg", ["-y", "-i", rawPath, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); }
+  catch (e) { return res.status(400).json({ error: "Could not read that audio file." }); }
+  let dur = 30;
+  try { dur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", songPath]).toString().trim()) || 30; } catch {}
+  const lyricLines = parseLyrics(lyricsRaw, dur);
+  if (lyricLines.length < 1) return res.status(400).json({ error: "Couldn't read any lyric lines." });
+  const { width, height } = dims(b.aspect || "1:1", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
+  const uniq = Math.max(1, Math.min(lyricLines.length, parseInt(b.reuseVisuals) || 6));
+  const config = {
+    title: String(b.title || "Lyric Video").slice(0, 100),
+    slug: slugify(b.title || "lyric-video") || ("song-" + Date.now().toString(36)),
+    description: "", tags: [],
+    songMode: true,
+    voice: "", rate: "0%", music: "", width, height,
+    source: b.source || "image", videoModel: b.videoModel || "",
+    imageStyle: b.imageStyle || "",
+    watermark: b.watermark || "", watermarkImage: b.watermarkImage ? watermarkFile() : "",
+    captionPos: b.captionPos || "bottom", motion: b.motion || "subtle", effect: (b.effect && b.effect !== "auto") ? b.effect : "none",
+    reuseVisuals: uniq, langCode: b.language || "en",
+    font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
+    lyricLines,
+    scenes: lyricLines.map((l) => ({ text: l.text, query: theme, imagePrompt: theme })),
+  };
+  busy = true;
+  const job = newJob(1);
+  res.json({ jobId: job.id });
+  (async () => {
+    try { pushLog(job, `🎵 Building a ${Math.round(dur)}s lyric video — ${lyricLines.length} lines, ${uniq} images…`); await runAll([config], job); }
+    catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
 // ---- manual: explicit scenes -> render one ----
 app.post("/api/render", (req, res) => {
   if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });

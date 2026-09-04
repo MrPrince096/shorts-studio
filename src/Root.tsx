@@ -18,6 +18,7 @@ const fallback = {
   motion: "in",
   talkingVideo: "",
   effect: "none",
+  lyricLines: [],
   scenes: [],
   words: [],
 };

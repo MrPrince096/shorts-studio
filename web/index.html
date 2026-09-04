@@ -179,6 +179,7 @@
     <div class="nav active" data-nav="dashboard"><span class="ic" data-icon="home"></span> Dashboard</div>
     <div class="nav" data-nav="shorts"><span class="ic" data-icon="play"></span> Shorts</div>
     <div class="nav" data-nav="story"><span class="ic" data-icon="film"></span> Story</div>
+    <div class="nav" data-nav="song"><span class="ic" data-icon="spark"></span> Song</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
@@ -240,6 +241,20 @@
           <textarea id="storyInstr" rows="2" placeholder="e.g. first-person, slow suspense build, twist ending"></textarea>
           <button class="btn grad big" id="goStory" style="width:100%;margin-top:16px"><span data-icon="film"></span>Create Story</button>
           <div class="note" style="margin-top:12px">Long videos take a while — a 3-min story ≈ 5–8 min to make. Uses your Quick-settings voice, visuals & AI (works offline with Gemma + Piper).</div>
+        </div>
+        <!-- SONG (lyric / musical shorts) -->
+        <div class="card tabpanel" id="tab-song" hidden>
+          <h2><span data-icon="spark"></span> Song Studio</h2>
+          <div class="cardsub">Musical lyric videos — your song + synced lyrics over aesthetic art</div>
+          <label>Your song <span class="muted">— mp3 / wav / m4a (you provide it)</span></label>
+          <div class="withbtn"><input id="songName" placeholder="no song selected" readonly style="cursor:default" /><button class="btn ghost" id="songPick">Upload</button></div>
+          <input type="file" id="songFile" accept="audio/*" hidden />
+          <label>Lyrics <span class="muted">— one line per subtitle (or paste an .lrc for exact timing)</span></label>
+          <textarea id="songLyrics" rows="6" placeholder="Bhaamake longetodu bhaadhem theerusthaaduu&#10;Premake pongaadante praanam bhadhulisthaadu&#10;..."></textarea>
+          <label>Visual theme <span class="muted">— the art to show</span></label>
+          <input id="songTheme" class="big" placeholder="e.g. Radha Krishna divine painting, ornate, ethereal" />
+          <button class="btn grad big" id="goSong" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Create Lyric Video</button>
+          <div class="note" style="margin-top:12px">Tip: set <b>Image style → Indian mythological art</b> and <b>Aspect → 1:1</b> in Song settings for that devotional look. Lines spread evenly across the song (or exactly, with an .lrc).</div>
         </div>
         <!-- SERIES -->
         <div class="card tabpanel" id="tab-series" hidden>
@@ -584,8 +599,8 @@ const ICONS={
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
 // nav + tabs
-const QS_LABEL={shorts:'Shorts',story:'Story',series:'Series',ads:'Ads',ideas:'Idea'};
-const QS_HIDE={shorts:[],series:[],story:['qsGenre','qsLenCol'],ads:['qsGenre','qsLenCol'],ideas:['qsEngine','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol']};
+const QS_LABEL={shorts:'Shorts',story:'Story',song:'Song',series:'Series',ads:'Ads',ideas:'Idea'};
+const QS_HIDE={shorts:[],series:[],story:['qsGenre','qsLenCol'],song:['qsVoice','qsEngine','qsGenre','qsLenCol','qsRate','qsMusicReuse'],ads:['qsGenre','qsLenCol'],ideas:['qsEngine','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol']};
 function applyTabSettings(tab){
   const lbl=QS_LABEL[tab]||'Quick';
   $('#qsTitle').textContent=lbl+' settings';
@@ -798,7 +813,7 @@ const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
-const ACT=['#goAI','#goManual','#goSeries','#goAds','#goStory'];
+const ACT=['#goAI','#goManual','#goSeries','#goAds','#goStory','#goSong'];
 let polling=null;
 function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').textContent='';$('#status').innerHTML='<span class="spin"></span> Starting…';
   const ve=$('#voiceEngine').value,h=$('#renderHint');
@@ -823,6 +838,10 @@ $('#goAI').onclick=()=>{const topic=$('#topic').value.trim();const random=!topic
 $('#goManual').onclick=()=>{const scenes=[...document.querySelectorAll('.scene')].map(d=>({text:d.querySelector('textarea').value.trim(),query:d.querySelector('.q').value.trim()})).filter(s=>s.text&&s.query);if(!$('#title').value.trim()||scenes.length<2){alert('Add a title and 2+ scenes.');return;}run('/api/render',{title:$('#title').value.trim(),description:$('#desc').value.trim(),tags:$('#tags').value,scenes,...fmt()});};
 $('#goSeries').onclick=()=>{const topic=$('#seriesTopic').value.trim();if(!topic){alert('Enter a story topic.');return;}run('/api/series/start',{topic,total:$('#seriesTotal').value,batch:$('#seriesBatch').value,...fmt()});};
 $('#goStory').onclick=()=>{const topic=$('#storyTopic').value.trim();const country=$('#storyCountry').value;if(!topic&&!country){alert('Enter a topic or pick a country.');return;}run('/api/story',{topic,country,storyType:$('#storyType').value,minutes:$('#storyMinutes').value,instructions:$('#storyInstr').value.trim(),...fmt()});};
+// ---- Song (lyric video) ----
+$('#songPick').onclick=()=>$('#songFile').click();
+$('#songFile').onchange=()=>{const f=$('#songFile').files[0];if(!f)return;if(f.size>30*1024*1024){alert('Song max 30 MB.');return;}const rd=new FileReader();rd.onload=()=>{window.__songData=rd.result;$('#songName').value=f.name;};rd.readAsDataURL(f);};
+$('#goSong').onclick=()=>{if(!window.__songData){alert('Upload your song first.');return;}const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Paste the lyrics — one line each.');return;}run('/api/song',{songDataUrl:window.__songData,lyrics,theme:$('#songTheme').value.trim(),...fmt()});};
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:$('#adVariations').value,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};
