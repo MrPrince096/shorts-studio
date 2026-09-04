@@ -34,9 +34,20 @@ PLIST
 
 cat > "$CON/MacOS/ShortsStudio" <<LAUNCH
 #!/bin/bash
-# Launch the Electron desktop window from the project directory.
+# Launch Shorts Studio's Electron window from the project directory.
+# Use Electron's NATIVE binary (not node_modules/.bin/electron, which is a
+# node script) so it works when Finder launches us with a bare PATH.
 cd "$ROOT" || exit 1
-exec "$ROOT/node_modules/.bin/electron" "$ROOT" >> "/tmp/shorts-studio.log" 2>&1
+# Make node/ffmpeg/python discoverable for the render pipeline.
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:\$HOME/.local/bin:\$PATH"
+LOGIN_PATH="\$(/bin/zsh -ilc 'echo -n \$PATH' 2>/dev/null)"
+[ -n "\$LOGIN_PATH" ] && export PATH="\$LOGIN_PATH:\$PATH"
+ELECTRON="$ROOT/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
+if [ ! -x "\$ELECTRON" ]; then
+  osascript -e 'display alert "Shorts Studio" message "Electron is not installed. In the project folder run: npm install"'
+  exit 1
+fi
+exec "\$ELECTRON" "$ROOT" >> "/tmp/shorts-studio.log" 2>&1
 LAUNCH
 chmod +x "$CON/MacOS/ShortsStudio"
 
