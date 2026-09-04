@@ -1248,13 +1248,17 @@ app.post("/api/servers/start", (_req, res) => {
   } catch (e) { startingServers = false; res.status(500).json({ error: e.message }); }
 });
 app.post("/api/servers/stop", (_req, res) => {
-  const script = join(ROOT, "stop-local-servers.command");
-  if (!existsSync(script)) return res.status(404).json({ error: "stop script missing" });
-  try {
-    const p = spawn("bash", [script], { cwd: ROOT, detached: true, stdio: "ignore", env: { ...process.env } });
-    p.unref();
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  // force-kill immediately (SIGKILL) so OFF is instant — no graceful torch teardown
+  for (const port of [7870, 7801, 8188]) {
+    try {
+      const pids = execFileSync("lsof", ["-ti:" + port]).toString().trim().split(/\s+/).filter(Boolean);
+      if (pids.length) execFileSync("kill", ["-9", ...pids]);
+    } catch {}
+  }
+  for (const pat of ["xtts_server.py", "main.py --port 8188", "comfy-adapter.mjs", "start-xtts.command", "start-comfy.command"]) {
+    try { execFileSync("pkill", ["-9", "-f", pat]); } catch {}
+  }
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => {

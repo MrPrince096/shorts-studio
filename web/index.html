@@ -807,8 +807,10 @@ document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySe
     try{await fetch(on?'/api/servers/start':'/api/servers/stop',{method:'POST'});}catch{}
     let n=0; const iv=setInterval(async()=>{n++;const h=await refresh();
       const settled = on ? (h&&h.xtts&&h.comfy) : (h&&!h.xtts&&!h.comfy);
-      if(settled||n>=30){clearInterval(iv);busy=false;wrap.classList.remove('pending');refresh();}
-    }, on?3000:2000);
+      if(on && !settled && h){ lbl.textContent='Starting · '+(h.comfy?'Images ✓':'Images…')+' · '+(h.xtts?'Voice ✓':'Voice…')+' (~30s)'; }
+      else if(!on && !settled){ lbl.textContent='Stopping…'; }
+      if(settled||n>=40){clearInterval(iv);busy=false;wrap.classList.remove('pending');refresh();}
+    }, on?2500:800);
   });
   refresh(); setInterval(()=>{if(!busy)refresh();}, 12000);
 })();
