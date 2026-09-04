@@ -37,6 +37,8 @@ function resolveUserPath() {
   return [...parts].join(":");
 }
 
+let restarts = 0;
+let serverUpSince = 0;
 function startServer() {
   // Use the same Node that launched Electron so the server runs identically.
   serverProc = spawn(process.execPath, [path.join(ROOT, "server.mjs")], {
@@ -44,13 +46,26 @@ function startServer() {
     env: { ...process.env, PATH: resolveUserPath(), PORT: String(PORT), ELECTRON_RUN_AS_NODE: "1", SHORTS_DESKTOP: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  serverUpSince = Date.now();
   serverProc.stdout.on("data", (d) => process.stdout.write(`[server] ${d}`));
   serverProc.stderr.on("data", (d) => process.stderr.write(`[server] ${d}`));
   serverProc.on("exit", (code) => {
     serverProc = null;
-    if (code && code !== 0 && !app.isQuiting) {
-      dialog.showErrorBox("Shorts Studio", `The engine stopped unexpectedly (code ${code}). Restart the app.`);
-    }
+    if (app.isQuiting || !code) return;
+    // If something else already answers on the port (e.g. another window or a
+    // dev server), just use it — no need for our own engine or an error.
+    http.get(URL + "/api/config", (res) => { res.destroy(); if (win) win.reload(); })
+      .on("error", () => {
+        // Port is genuinely dead — auto-restart the engine (with a rapid-fail cap).
+        if (serverUpSince && Date.now() - serverUpSince > 12000) restarts = 0; // was stable, reset
+        if (restarts < 6) {
+          restarts++;
+          setTimeout(() => { startServer(); waitForServer(15000).then(() => win && win.reload()).catch(() => {}); }, 700);
+        } else if (!app.isQuiting) {
+          dialog.showErrorBox("Shorts Studio", `The engine keeps stopping (code ${code}). Another program may be using port ${PORT} — quit any other Shorts Studio window and reopen.`);
+        }
+      })
+      .setTimeout(2500, function () { this.destroy(); });
   });
 }
 
