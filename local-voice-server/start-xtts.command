@@ -23,4 +23,4 @@ echo "➡️  In Shorts Studio → Settings → Expressive voice, set:"
 echo "       XTTS-v2 server URL = http://localhost:$PORT/generate"
 echo "   Then pick Voiceover engine → XTTS in Quick settings."
 echo
-exec "$VENV" "$(dirname "$0")/xtts_server.py"
+exec "$VENV" xtts_server.py
