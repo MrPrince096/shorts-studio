@@ -6,16 +6,16 @@
 <title>Shorts Studio</title>
 <style>
   :root{
-    --bg:#07080c; --bg2:#0a0b11; --panel:#10131d; --panel2:#161a27; --line:#232a3c; --line-soft:#1a2030;
+    --bg:#000000; --bg2:#060609; --panel:#0c0c11; --panel2:#131319; --line:#23252f; --line-soft:#181920;
     --text:#f0f2f8; --muted:#8b93a7; --faint:#616b81; --accent:#8b6bff; --accent2:#5b93ff;
     --grad:linear-gradient(135deg,#8b6bff,#5b93ff); --ok:#39d98a; --err:#ff5c6c; --gold:#ffd23f;
-    --radius:16px; --shadow:0 18px 46px -18px rgba(0,0,0,.66); --ring:0 0 0 3px rgba(139,107,255,.20);
+    --radius:16px; --shadow:0 18px 46px -18px rgba(0,0,0,.75); --ring:0 0 0 3px rgba(139,107,255,.20);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;
     background:
-      radial-gradient(1000px 560px at 100% -8%,rgba(124,92,255,.13),transparent 56%),
-      radial-gradient(760px 520px at -8% 112%,rgba(79,140,255,.09),transparent 55%),
+      radial-gradient(900px 520px at 100% -10%,rgba(124,92,255,.08),transparent 55%),
+      radial-gradient(700px 480px at -8% 112%,rgba(79,140,255,.05),transparent 55%),
       var(--bg);
     background-attachment:fixed;color:var(--text);font-size:14.5px;-webkit-font-smoothing:antialiased;letter-spacing:.1px}
   input,select,textarea{transition:border-color .12s}
@@ -41,6 +41,21 @@
   .nav .ic svg{width:19px;height:19px}
   .nav:hover .ic{background:rgba(255,255,255,.05);color:var(--text)}
   .nav.active .ic{background:linear-gradient(135deg,rgba(139,107,255,.4),rgba(91,147,255,.2));color:#e2dbff;box-shadow:inset 0 0 0 1px rgba(139,107,255,.4),0 6px 14px -4px rgba(124,92,255,.6)}
+  .railtoggle{align-self:center;width:38px;height:34px;border-radius:10px;background:transparent;border:1px solid var(--line);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-bottom:8px;transition:background .14s,color .14s,border-color .14s}
+  .railtoggle:hover{background:rgba(255,255,255,.05);color:var(--text);border-color:var(--accent)}
+  .railtoggle svg{width:18px;height:18px}
+  /* expanded sidebar (open menu) */
+  .app.sbopen{grid-template-columns:232px 1fr}
+  .app.sbopen .sidebar{padding:16px 12px 14px;gap:3px}
+  .app.sbopen .railtoggle{align-self:flex-start;margin-left:2px}
+  .app.sbopen .brand{justify-content:flex-start;gap:11px;padding:4px 8px 16px}
+  .app.sbopen .brand b{display:inline;font-size:16px;letter-spacing:.2px;white-space:nowrap}
+  .app.sbopen .brand .pro{display:inline;font-size:9.5px;font-weight:700;letter-spacing:.4px;background:linear-gradient(135deg,rgba(139,107,255,.28),rgba(91,147,255,.18));color:#c9bcff;border:1px solid rgba(139,107,255,.4);padding:2px 8px;border-radius:20px}
+  .app.sbopen .brand .logo{width:36px;height:36px;font-size:18px}
+  .app.sbopen .navlabel{height:auto;font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);background:none;padding:14px 12px 6px;margin:0}
+  .app.sbopen .nav{flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;padding:10px 12px;border-radius:11px;font-size:14px;text-align:left;font-weight:600}
+  .app.sbopen .nav.active{box-shadow:none}
+  .app.sbopen .nav.active::before{content:"";position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--grad);box-shadow:0 0 12px rgba(139,107,255,.7)}
   .ic svg{width:18px;height:18px;display:block}
   .iconbtn svg{width:18px;height:18px}
   .tab svg{width:15px;height:15px;vertical-align:-2px;margin-right:3px}
@@ -216,6 +231,7 @@
 <body>
 <div class="app">
   <aside class="sidebar">
+    <button class="railtoggle" id="railToggle" title="Expand / collapse menu"><span data-icon="menu"></span></button>
     <div class="brand"><span class="logo" data-icon="film"></span><b>Shorts Studio</b><span class="pro">Pro</span></div>
     <div class="nav active" data-nav="dashboard"><span class="ic" data-icon="home"></span> Dashboard</div>
     <div class="nav" data-nav="shorts"><span class="ic" data-icon="play"></span> Shorts</div>
@@ -678,6 +694,7 @@ const ICONS={
   search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
   save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
   sliders:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -713,6 +730,12 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   } else switchTab(v);
 });
 document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySelector('[data-nav='+c.dataset.go+']').click());
+// collapsible sidebar (open/close)
+(function(){const app=document.querySelector('.app'),tg=document.getElementById('railToggle');if(!app||!tg)return;
+  const set=o=>{app.classList.toggle('sbopen',o);try{localStorage.setItem('sbopen',o?'1':'0')}catch{}};
+  tg.onclick=()=>set(!app.classList.contains('sbopen'));
+  try{if(localStorage.getItem('sbopen')==='1')set(true)}catch{}
+})();
 async function showDashboard(){
   loadStats();
   VIDEOS=await(await fetch('/api/videos')).json(); const g=$('#dashRecent');
