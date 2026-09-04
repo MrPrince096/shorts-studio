@@ -1247,6 +1247,15 @@ app.post("/api/servers/start", (_req, res) => {
     res.json({ ok: true });
   } catch (e) { startingServers = false; res.status(500).json({ error: e.message }); }
 });
+app.post("/api/servers/stop", (_req, res) => {
+  const script = join(ROOT, "stop-local-servers.command");
+  if (!existsSync(script)) return res.status(404).json({ error: "stop script missing" });
+  try {
+    const p = spawn("bash", [script], { cwd: ROOT, detached: true, stdio: "ignore", env: { ...process.env } });
+    p.unref();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;

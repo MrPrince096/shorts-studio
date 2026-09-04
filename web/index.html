@@ -80,8 +80,16 @@
   .estat.down i{background:var(--err);box-shadow:0 0 8px rgba(255,92,108,.55)}
   .estat.pending i{background:var(--gold);animation:epulse 1s ease-in-out infinite}
   @keyframes epulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .estart{padding:6px 12px;font-size:12px;font-weight:600}
-  @media(max-width:900px){.enginebar .estat{display:none}.enginebar{padding:0;background:none;border:none}}
+  .engtoggle{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none;padding-left:4px;border-left:1px solid var(--line)}
+  .engtoggle .etl{font-size:12px;font-weight:600;color:var(--muted)}
+  .etsw{position:relative;width:38px;height:22px;flex:0 0 auto}
+  .etsw input{position:absolute;opacity:0;width:0;height:0}
+  .ettk{position:absolute;inset:0;border-radius:20px;background:var(--panel2);border:1px solid var(--line);transition:background .2s,border-color .2s}
+  .ettk::before{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--faint);transition:transform .2s,background .2s}
+  .etsw input:checked+.ettk{background:linear-gradient(135deg,rgba(var(--accent-rgb),.9),rgba(var(--accent2-rgb),.85));border-color:transparent}
+  .etsw input:checked+.ettk::before{transform:translateX(16px);background:#fff}
+  .engtoggle.pending .ettk::before{background:var(--gold);animation:epulse 1s ease-in-out infinite}
+  @media(max-width:960px){.enginebar .estat{display:none}.enginebar{padding:5px 10px}.engtoggle{border-left:none}}
   .iconbtn{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px;transition:border-color .14s,background .14s}
   .iconbtn:hover{border-color:var(--accent);background:var(--panel2)}
   .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
@@ -279,7 +287,10 @@
         <span class="estat" data-eng="xtts"><i></i>Voice</span>
         <span class="estat" data-eng="comfy"><i></i>Images</span>
         <span class="estat" data-eng="ollama"><i></i>AI</span>
-        <button class="btn ghost estart" id="startServers" hidden>Start local servers</button>
+        <label class="engtoggle" id="engToggleWrap" title="Turn the local voice + image servers on/off to free up memory">
+          <span class="etl" id="engToggleLabel">Local engines</span>
+          <span class="etsw"><input type="checkbox" id="engSwitch"><span class="ettk"></span></span>
+        </label>
       </div>
       <button class="iconbtn" id="navSettings2" title="Settings"><span data-icon="gear"></span></button>
       <button class="btn grad" onclick="document.querySelector('[data-nav=shorts]').click()"><span data-icon="plus"></span>New Project</button>
@@ -775,31 +786,31 @@ document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySe
   tg.onclick=()=>set(!app.classList.contains('sbopen'));
   try{if(localStorage.getItem('sbopen')==='1')set(true)}catch{}
 })();
-// ---- engine status strip + one-click start ----
+// ---- engine status strip + local-engines ON/OFF switch ----
 (function(){
   const bar=document.getElementById('engineBar'); if(!bar)return;
-  const btn=document.getElementById('startServers');
+  const sw=document.getElementById('engSwitch'), wrap=document.getElementById('engToggleWrap'), lbl=document.getElementById('engToggleLabel');
   const setDot=(eng,state)=>{const el=bar.querySelector('.estat[data-eng="'+eng+'"]');if(!el)return;el.classList.remove('up','down','pending');el.classList.add(state);
-    el.title=({xtts:'XTTS voice server (:7870)',comfy:'ComfyUI image server (:7801)',ollama:'Ollama LLM (:11434)'}[eng]||'')+' — '+(state==='up'?'running':state==='pending'?'starting…':'not running');};
-  let polling=false;
+    el.title=({xtts:'XTTS voice server (:7870)',comfy:'ComfyUI image server (:7801)',ollama:'Ollama LLM (:11434)'}[eng]||'')+' — '+(state==='up'?'running':state==='pending'?'working…':'off');};
+  let busy=false;
   async function refresh(){
     try{const h=await(await fetch('/api/health')).json();
       setDot('xtts',h.xtts?'up':'down'); setDot('comfy',h.comfy?'up':'down'); setDot('ollama',h.ollama?'up':'down');
-      // offer Start only when a server we manage (XTTS/ComfyUI) is down
-      if(!polling) btn.hidden = (h.xtts && h.comfy);
+      if(!busy){ sw.checked=(h.xtts&&h.comfy); lbl.textContent=(h.xtts&&h.comfy)?'Local engines · on':(!h.xtts&&!h.comfy)?'Local engines · off':'Local engines'; }
       return h;
     }catch{return null;}
   }
-  btn.onclick=async()=>{
-    btn.disabled=true; btn.textContent='Starting…'; polling=true;
-    bar.querySelectorAll('.estat.down').forEach(e=>{e.classList.remove('down');e.classList.add('pending');});
-    try{await fetch('/api/servers/start',{method:'POST'});}catch{}
+  sw.addEventListener('change',async()=>{
+    const on=sw.checked; busy=true; wrap.classList.add('pending');
+    lbl.textContent = on?'Starting…':'Stopping…';
+    bar.querySelectorAll('.estat').forEach(e=>{if((on&&e.classList.contains('down'))||(!on&&e.classList.contains('up')&&e.dataset.eng!=='ollama')){e.classList.remove('up','down');e.classList.add('pending');}});
+    try{await fetch(on?'/api/servers/start':'/api/servers/stop',{method:'POST'});}catch{}
     let n=0; const iv=setInterval(async()=>{n++;const h=await refresh();
-      const done = h && h.xtts && h.comfy;
-      if(done||n>=30){clearInterval(iv);polling=false;btn.disabled=false;btn.textContent='Start local servers';btn.hidden=!!(h&&h.xtts&&h.comfy);}
-    },3000);
-  };
-  refresh(); setInterval(()=>{if(!polling)refresh();}, 12000);
+      const settled = on ? (h&&h.xtts&&h.comfy) : (h&&!h.xtts&&!h.comfy);
+      if(settled||n>=30){clearInterval(iv);busy=false;wrap.classList.remove('pending');refresh();}
+    }, on?3000:2000);
+  });
+  refresh(); setInterval(()=>{if(!busy)refresh();}, 12000);
 })();
 // ---- accent colour theming (pick any colour, recolours whole app) ----
 (function(){
