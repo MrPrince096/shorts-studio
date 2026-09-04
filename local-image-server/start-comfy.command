@@ -9,10 +9,14 @@ if [ ! -d "$COMFY/venv" ]; then
   exit 1
 fi
 
-# --- optional SDXL Lightning speed mode (≈4× faster) -------------------------
-# If you downloaded a Lightning checkpoint, set these before launch, e.g.:
-#   export COMFY_CKPT="dreamshaperXL_lightningDPMSDE.safetensors"
-#   export COMFY_STEPS=6 COMFY_CFG=2 COMFY_SAMPLER=dpmpp_sde COMFY_SCHEDULER=sgm_uniform
+# --- SDXL Lightning speed mode (auto) ----------------------------------------
+# If the Lightning LoRA is installed, use it by default (~6x faster: 4 steps).
+# Override anything by exporting COMFY_* before running this script.
+LORA_FILE="$COMFY/models/loras/sdxl_lightning_4step_lora.safetensors"
+if [ -z "$COMFY_LORA" ] && [ -f "$LORA_FILE" ]; then
+  export COMFY_LORA="sdxl_lightning_4step_lora.safetensors"
+  echo "    ⚡ Lightning mode ON (4 steps). Unset COMFY_LORA for full-quality 25-step SDXL."
+fi
 # -----------------------------------------------------------------------------
 
 cleanup() { echo "stopping…"; kill $COMFY_PID $ADAPTER_PID 2>/dev/null; exit 0; }

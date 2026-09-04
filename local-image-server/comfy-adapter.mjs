@@ -18,10 +18,15 @@ import { randomUUID } from "crypto";
 const PORT = parseInt(process.env.PORT || "7801", 10);
 const COMFY = (process.env.COMFY_URL || "http://127.0.0.1:8188").replace(/\/$/, "");
 const CKPT = process.env.COMFY_CKPT || "sd_xl_base_1.0.safetensors";
-const STEPS = parseInt(process.env.COMFY_STEPS || "25", 10);
-const CFG = parseFloat(process.env.COMFY_CFG || "7.0");
-const SAMPLER = process.env.COMFY_SAMPLER || "dpmpp_2m";
-const SCHEDULER = process.env.COMFY_SCHEDULER || "karras";
+// Optional SDXL-Lightning LoRA — makes each image ~6x faster (4 steps vs 25).
+// When set, defaults switch to Lightning-friendly sampling unless overridden.
+const LORA = process.env.COMFY_LORA || "";           // e.g. sdxl_lightning_4step_lora.safetensors
+const LORA_STRENGTH = parseFloat(process.env.COMFY_LORA_STRENGTH || "1.0");
+const LIGHT = !!LORA;
+const STEPS = parseInt(process.env.COMFY_STEPS || (LIGHT ? "4" : "25"), 10);
+const CFG = parseFloat(process.env.COMFY_CFG || (LIGHT ? "1.0" : "7.0"));
+const SAMPLER = process.env.COMFY_SAMPLER || (LIGHT ? "euler" : "dpmpp_2m");
+const SCHEDULER = process.env.COMFY_SCHEDULER || (LIGHT ? "sgm_uniform" : "karras");
 const NEG = process.env.COMFY_NEG || "blurry, low quality, jpeg artifacts, watermark, text, signature, deformed, extra limbs, bad anatomy";
 
 // SDXL is trained ~1MP; generating huge frames (1080x1920) is off-distribution and
@@ -41,18 +46,27 @@ function pickBucket(w, h) {
 }
 
 function workflow(prompt, w, h, seed) {
-  return {
+  // model/clip sources: straight from the checkpoint, or through the LoRA loader.
+  const modelSrc = LORA ? ["10", 0] : ["4", 0];
+  const clipSrc = LORA ? ["10", 1] : ["4", 1];
+  const g = {
     "4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: CKPT } },
     "5": { class_type: "EmptyLatentImage", inputs: { width: w, height: h, batch_size: 1 } },
-    "6": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: ["4", 1] } },
-    "7": { class_type: "CLIPTextEncode", inputs: { text: NEG, clip: ["4", 1] } },
+    "6": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: clipSrc } },
+    "7": { class_type: "CLIPTextEncode", inputs: { text: NEG, clip: clipSrc } },
     "3": { class_type: "KSampler", inputs: {
       seed, steps: STEPS, cfg: CFG, sampler_name: SAMPLER, scheduler: SCHEDULER, denoise: 1,
-      model: ["4", 0], positive: ["6", 0], negative: ["7", 0], latent_image: ["5", 0],
+      model: modelSrc, positive: ["6", 0], negative: ["7", 0], latent_image: ["5", 0],
     } },
     "8": { class_type: "VAEDecode", inputs: { samples: ["3", 0], vae: ["4", 2] } },
     "9": { class_type: "SaveImage", inputs: { images: ["8", 0], filename_prefix: "shorts" } },
   };
+  if (LORA) {
+    g["10"] = { class_type: "LoraLoader", inputs: {
+      lora_name: LORA, strength_model: LORA_STRENGTH, strength_clip: 1.0, model: ["4", 0], clip: ["4", 1],
+    } };
+  }
+  return g;
 }
 
 async function jf(url, opts) {
@@ -70,7 +84,7 @@ async function generate({ prompt, width, height }) {
     body: JSON.stringify({ prompt: workflow(prompt, w, h, seed), client_id }),
   });
   // poll history until this prompt has outputs
-  const deadline = Date.now() + 180000;
+  const deadline = Date.now() + 600000;
   let img = null;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 800));

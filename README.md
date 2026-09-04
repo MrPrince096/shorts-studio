@@ -76,7 +76,8 @@ By default AI images come from **Pollinations** (free, cloud, no key). For
 (SDXL) on Apple Silicon:
 
 ```bash
-# one-time setup (installs ComfyUI + SDXL into ~/ComfyUI, ~7 GB download)
+# one-time setup: installs ComfyUI + SDXL base (~7 GB) + SDXL-Lightning LoRA
+# (~400 MB) into ~/ComfyUI
 bash local-image-server/setup-comfy.sh
 
 # each session: start ComfyUI + the adapter (keep the window open)
@@ -89,14 +90,17 @@ requests into a ComfyUI SDXL workflow, picks an SDXL-optimal resolution (so it
 won't OOM a 16 GB Mac), and returns the image. If ComfyUI isn't running, the
 `local` source automatically falls back to Pollinations.
 
-**Speed:** SDXL base is ~30–60 s/image on an M1. For ~4× faster, drop a
-**SDXL-Lightning** checkpoint into `~/ComfyUI/models/checkpoints/` and set before
-launch:
+**Speed (Apple M1, 16 GB):** the launcher auto-enables **SDXL-Lightning** (4
+steps) when the LoRA is present → **~45 s/image** (first image of a session is
+slower while the model loads). Verified end-to-end at 768×1344. For maximum
+quality instead of speed, run full 25-step SDXL:
 
 ```bash
-export COMFY_CKPT="your_lightning_checkpoint.safetensors"
-export COMFY_STEPS=6 COMFY_CFG=2 COMFY_SAMPLER=dpmpp_sde COMFY_SCHEDULER=sgm_uniform
+COMFY_LORA= bash local-image-server/start-comfy.command   # ~3–4 min/image
 ```
+
+Tune anything with env vars: `COMFY_STEPS`, `COMFY_CFG`, `COMFY_SAMPLER`,
+`COMFY_SCHEDULER`, `COMFY_CKPT`, `COMFY_LORA`.
 
 ## 🧰 Command-line usage
 

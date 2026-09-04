@@ -33,8 +33,20 @@ else
   echo "    model already present"
 fi
 
-echo "==> 4/4 Done"
+echo "==> 4/5 Download SDXL-Lightning 4-step LoRA (~394 MB — makes images ~6x faster)"
+LORA_DIR="$COMFY/models/loras"
+LORA_FILE="$LORA_DIR/sdxl_lightning_4step_lora.safetensors"
+LORA_URL="https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_lora.safetensors"
+mkdir -p "$LORA_DIR"
+if [ ! -f "$LORA_FILE" ] || [ "$(stat -f%z "$LORA_FILE" 2>/dev/null || echo 0)" -lt 300000000 ]; then
+  curl -L --fail --retry 5 -C - -o "$LORA_FILE" "$LORA_URL" || echo "    (Lightning LoRA download failed — base SDXL still works, just slower)"
+else
+  echo "    Lightning LoRA already present"
+fi
+
+echo "==> 5/5 Done"
 echo "    ComfyUI:   $COMFY"
 echo "    venv:      $COMFY/venv"
 echo "    model:     $MODEL_FILE"
+echo "    lightning: $LORA_FILE"
 echo "Start it with:  bash local-image-server/start-comfy.command"
