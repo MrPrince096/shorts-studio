@@ -9,6 +9,13 @@ CON="$APP/Contents"
 # Ensure the icon exists.
 [ -f "$ROOT/build/icon.icns" ] || python3 "$ROOT/scripts/make-icon.py"
 
+# Ad-hoc code-sign the Electron runtime so macOS doesn't kill its sandboxed
+# helper processes (GPU/network) — otherwise the window can fail to paint.
+ELECTRON_APP="$ROOT/node_modules/electron/dist/Electron.app"
+if [ -d "$ELECTRON_APP" ]; then
+  codesign --force --deep --sign - "$ELECTRON_APP" 2>/dev/null && echo "code-signed Electron runtime (ad-hoc)" || true
+fi
+
 rm -rf "$APP"
 mkdir -p "$CON/MacOS" "$CON/Resources"
 cp "$ROOT/build/icon.icns" "$CON/Resources/icon.icns"

@@ -16,6 +16,9 @@ const URL = `http://localhost:${PORT}`;
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-gpu-compositing");
+// Unsigned/relocated Electron on macOS can have its sandboxed helper processes
+// (GPU, network) killed (exit_code=15); disabling the sandbox keeps them alive.
+app.commandLine.appendSwitch("no-sandbox");
 
 let serverProc = null;
 let win = null;
