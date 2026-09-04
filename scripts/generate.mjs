@@ -109,16 +109,51 @@ export async function callLLM(prompt, providerOverride) {
 // text, and trailing commas (small local models like gemma/llama do all three).
 export function parseLLMJson(raw) {
   let text = String(raw).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  // normalize "smart"/curly quotes that small models emit as delimiters
+  text = text.replace(/[“”„‟″‶]/g, '"').replace(/[‘’‚‛′‵]/g, "'");
   try { return JSON.parse(text); } catch {}
   // grab the outermost {...} or [...] block and drop trailing commas
   const starts = ["{", "["].map((c) => text.indexOf(c)).filter((i) => i >= 0);
   const first = starts.length ? Math.min(...starts) : -1;
   const last = Math.max(text.lastIndexOf("}"), text.lastIndexOf("]"));
-  if (first >= 0 && last > first) {
-    const cand = text.slice(first, last + 1).replace(/,(\s*[}\]])/g, "$1");
-    return JSON.parse(cand);
+  const cand = first >= 0 && last > first ? text.slice(first, last + 1) : text;
+  const noTrailing = cand.replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(noTrailing); } catch {}
+  // last resort: repair unescaped quotes / newlines inside string values
+  // (gemma/llama often write  "why": "Combines "epic" with drama"  → invalid)
+  return JSON.parse(repairJsonStrings(noTrailing));
+}
+
+// Walk the text char-by-char; a `"` that is NOT a structural delimiter (i.e. not
+// preceded by { [ , : or followed by : , } ]) is treated as an inner quote and
+// escaped. Raw newlines/tabs inside strings are turned into spaces.
+export function repairJsonStrings(s) {
+  let out = "";
+  let inStr = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (!inStr) {
+      out += c;
+      if (c === '"') inStr = true;
+      continue;
+    }
+    if (c === "\\") { out += c + (s[i + 1] ?? ""); i++; continue; } // keep valid escapes
+    if (c === "\n" || c === "\r" || c === "\t") { out += " "; continue; }
+    if (c === '"') {
+      // is this the string's real closing quote? look at the next non-space char
+      let j = i + 1;
+      while (j < s.length && (s[j] === " " || s[j] === "\t" || s[j] === "\n" || s[j] === "\r")) j++;
+      const next = s[j];
+      if (next === undefined || next === ":" || next === "," || next === "}" || next === "]") {
+        out += c; inStr = false;                 // structural closing quote
+      } else {
+        out += '\\"';                            // inner quote → escape it
+      }
+      continue;
+    }
+    out += c;
   }
-  return JSON.parse(text); // let it throw with the original error
+  return out;
 }
 
 // ---------- prompt building ----------
