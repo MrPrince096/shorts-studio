@@ -24,7 +24,11 @@ trap cleanup INT TERM
 
 echo "==> starting ComfyUI (this loads the model; first run is slow)…"
 source "$COMFY/venv/bin/activate"
-( cd "$COMFY" && exec python main.py --port 8188 ) &
+# Force native arm64 (torch/venv are arm64-only). Detect hardware via sysctl so
+# it works even under a Rosetta/x86_64 parent (where uname -m says x86_64).
+PYRUN="python"
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] && command -v arch >/dev/null 2>&1; then PYRUN="arch -arm64 python"; fi
+( cd "$COMFY" && exec $PYRUN main.py --port 8188 ) &
 COMFY_PID=$!
 
 # wait for ComfyUI to answer

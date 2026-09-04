@@ -23,4 +23,11 @@ echo "➡️  In Shorts Studio → Settings → Expressive voice, set:"
 echo "       XTTS-v2 server URL = http://localhost:$PORT/generate"
 echo "   Then pick Voiceover engine → XTTS in Quick settings."
 echo
-exec "$VENV" xtts_server.py
+# Force native arm64 on Apple Silicon HARDWARE (detect via sysctl, which is true
+# even under a Rosetta/x86_64 parent where `uname -m` lies and says x86_64).
+# The venv packages are arm64-only, so a universal python must run arm64.
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] && command -v arch >/dev/null 2>&1; then
+  exec arch -arm64 "$VENV" xtts_server.py
+else
+  exec "$VENV" xtts_server.py
+fi
