@@ -96,11 +96,19 @@ if (config.songMode) {
   }
   if (buf) chunks.push(buf);
   if (!chunks.length) chunks.push(fullText);
+  // Resolve the chosen XTTS voice: "clone:<id>" -> clone that sample, "builtin:<name>" -> built-in speaker.
+  const xv = config.xttsVoice || process.env.XTTS_VOICE || "";
+  let xClone = "", xSpeaker = config.xttsSpeaker || "";
+  if (xv.startsWith("clone:")) {
+    const p = join(ROOT, "out", "data", "voices", xv.slice(6) + ".wav");
+    if (existsSync(p)) { xClone = p; console.log(`🎙️  Cloning voice: ${xv.slice(6)}`); }
+  } else if (xv.startsWith("builtin:")) { xSpeaker = xv.slice(8); }
   const parts = [];
   for (let i = 0; i < chunks.length; i++) {
     process.stdout.write(`  🎙️ XTTS chunk ${i + 1}/${chunks.length} … `);
     const body = { text: chunks[i], language: lang2 };
-    if (config.xttsSpeaker) body.speaker = config.xttsSpeaker;
+    if (xClone) body.speaker_wav = xClone;
+    else if (xSpeaker) body.speaker = xSpeaker;
     let r;
     try {
       r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

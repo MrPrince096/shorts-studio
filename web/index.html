@@ -701,6 +701,19 @@
         <p class="muted" style="font-size:12px;margin:0 0 6px">Genuinely "acted" narration. Pick <b>Voiceover engine → XTTS or ElevenLabs</b> in Quick settings.</p>
         <label>XTTS-v2 server URL <span class="muted">— offline, expressive (run local-voice-server)</span></label>
         <input id="xttsUrl" placeholder="http://localhost:7870/generate" />
+        <div style="margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)">
+          <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px"><span class="iconbadge" data-icon="wand"></span> Voice cloning <span class="badge opt" style="margin-left:auto">XTTS</span></div>
+          <p class="muted" style="font-size:11.5px;margin:6px 0 10px">Upload a clean <b>6–20s</b> sample of any voice — XTTS will narrate in that voice. Your videos use the voice you pick below.</p>
+          <div class="row" style="align-items:flex-end">
+            <div><label style="margin:0 0 6px">Name</label><input id="cloneName" placeholder="e.g. My voice, Morgan, Grandpa" /></div>
+            <div style="flex:0 0 auto"><label style="margin:0 0 6px">&nbsp;</label><button class="btn ghost" id="cloneUp">＋ Upload sample</button></div>
+          </div>
+          <input type="file" id="cloneFile" accept="audio/*" hidden />
+          <div id="cloneStatus" style="font-size:12px;margin-top:8px"></div>
+          <label style="margin-top:14px">XTTS narration voice</label>
+          <select id="xttsVoiceSel"></select>
+          <div id="cloneList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
         <label style="margin-top:16px">ElevenLabs API key <span class="muted">— cloud, most emotional</span></label>
         <div class="field"><input id="elevenKey" type="password" placeholder="paste key…" /><span class="fstat" id="elevenState"></span></div>
         <a class="getlink" href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Get an ElevenLabs key →</a>
@@ -920,6 +933,32 @@ async function loadConfig(){
   $('#statLangs').textContent=LANGS.length;
 }
 
+// ---- voice cloning ----
+async function loadVoices(selected){
+  let d; try{ d=await(await fetch('/api/voices')).json(); }catch{ return; }
+  const sel=$('#xttsVoiceSel'); if(!sel)return;
+  sel.innerHTML=''; sel.appendChild(opt('','Default (built-in narrator)'));
+  (d.speakers||[]).forEach(s=>sel.appendChild(opt('builtin:'+s,s)));
+  (d.clones||[]).forEach(c=>sel.appendChild(opt('clone:'+c.id,'🎙️ '+c.name+' (cloned)')));
+  sel.value = (selected!==undefined?selected:d.selected)||'';
+  const l=$('#cloneList');
+  l.innerHTML=(d.clones||[]).length ? (d.clones.map(c=>`<div class="mrow"><button class="mplay" data-u="${c.url}" title="preview">▶</button><div class="minfo"><b>🎙️ ${esc(c.name)}</b><span>cloned voice</span></div><button class="btn ghost" data-del="${c.id}" style="padding:5px 11px;font-size:12px;color:var(--err)">Delete</button></div>`).join('')) : '<span class="muted" style="font-size:12px">No cloned voices yet — upload a sample above.</span>';
+  l.querySelectorAll('.mplay').forEach(b=>b.onclick=()=>{try{new Audio(b.dataset.u).play();}catch{}});
+  l.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this cloned voice?'))return;await fetch('/api/voices/'+encodeURIComponent(b.dataset.del),{method:'DELETE'});loadVoices();});
+}
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='xttsVoiceSel'){ fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({xttsVoice:e.target.value})}); }});
+document.addEventListener('click',e=>{ if(e.target&&e.target.id==='cloneUp'){ if(!$('#cloneName').value.trim()){alert('Name the voice first.');return;} $('#cloneFile').click(); }});
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='cloneFile'){
+  const f=e.target.files[0]; if(!f)return; if(f.size>15*1024*1024){alert('Please keep the sample under 15 MB (6–20s is plenty).');return;}
+  const rd=new FileReader(); rd.onload=async()=>{ $('#cloneStatus').innerHTML='<span class="spin"></span> Adding voice…';
+    try{ const r=await(await fetch('/api/voices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('#cloneName').value.trim(),dataUrl:rd.result})})).json();
+      if(r.error){$('#cloneStatus').innerHTML='<span class="err">'+esc(r.error)+'</span>';}
+      else{$('#cloneStatus').innerHTML='<span class="ok">✅ Added “'+esc(r.name)+'”. Select it below to use it.</span>';$('#cloneName').value='';loadVoices('clone:'+r.id);fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({xttsVoice:'clone:'+r.id})});}
+    }catch(err){$('#cloneStatus').innerHTML='<span class="err">'+esc(err.message)+'</span>';}
+    e.target.value='';
+  }; rd.readAsDataURL(f);
+}});
+
 // settings
 function setStat(el,k){if(!el)return;el.className='fstat '+(k.set?'on':'off');el.textContent=k.set?'✓':'✕';el.title=k.set?('set '+(k.masked||'')):'not set';}
 function toggleLlm(){const p=$('#llmProvider').value;$('#geminiBox').style.display=p==='gemini'?'block':'none';$('#openaiBox').style.display=p==='openai'?'block':'none';$('#ollamaBox').style.display=p==='ollama'?'block':'none';}
@@ -931,6 +970,7 @@ async function loadSettings(){
   const ve=s.voiceEngines||{};
   $('#exprStatus').className='note '+((ve.xtts||ve.eleven)?'':'warn');
   $('#exprStatus').innerHTML=(ve.xtts||ve.eleven)?`✅ Expressive voice ready${ve.xtts?' · XTTS':''}${ve.eleven?' · ElevenLabs':''}. Pick it as the Voiceover engine.`:'Add an XTTS server URL or ElevenLabs key for emotional narration.';
+  loadVoices(s.xttsVoice||'');
   const ap=s.avatarProvider;
   $('#avatarStatus').className='note '+(ap?'':'warn');
   $('#avatarStatus').innerHTML=ap?`✅ Talking avatars ready via <b>${ap}</b>. Turn on “Bring creator to life” in a UGC ad.`:`No talking-avatar key yet — UGC creators stay as still photos until you add one above.`;

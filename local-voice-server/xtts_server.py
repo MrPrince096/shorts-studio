@@ -26,6 +26,19 @@ REF_WAV = os.environ.get("XTTS_REF_WAV", "")             # optional: clone THIS 
 PORT = int(os.environ.get("PORT", "7870"))
 
 print("Loading XTTS-v2 (first run downloads ~1.8GB)…", flush=True)
+# Voice cloning loads the reference wav via torchaudio, whose ffmpeg/torchcodec
+# backend fails to load on many Macs ("Could not load libtorchcodec"). Replace
+# torchaudio.load outright with a soundfile (libsndfile) reader so cloning works
+# from a plain WAV reference — no ffmpeg/torchcodec involved.
+try:
+    import torch as _torch, soundfile as _sf, torchaudio
+    def _sf_load(path, *a, **k):
+        data, sr = _sf.read(str(path), dtype="float32", always_2d=True)  # (frames, channels)
+        return _torch.from_numpy(data.T.copy()), sr                       # (channels, frames), sr
+    torchaudio.load = _sf_load
+    print("(audio loading via soundfile — cloning enabled)", flush=True)
+except Exception as _e:
+    print(f"(soundfile audio patch skipped: {_e})", flush=True)
 from TTS.api import TTS
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(DEVICE)
 SPEAKERS = list(getattr(tts, "speakers", []) or [])
@@ -45,19 +58,22 @@ class Req(BaseModel):
     text: str
     language: str = "en"
     speaker: str | None = None
+    speaker_wav: str | None = None            # per-request voice clone (path to a short wav)
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "device": DEVICE, "clone": bool(REF_WAV), "speakers": SPEAKERS[:12]}
+    return {"ok": True, "device": DEVICE, "clone": bool(REF_WAV), "speakers": SPEAKERS}
 
 
 @app.post("/generate")
 def generate(r: Req):
     out = tempfile.mktemp(suffix=".wav")
     kw = dict(text=r.text, file_path=out, language=(r.language or "en"), split_sentences=True)
-    if REF_WAV and os.path.isfile(REF_WAV):
-        kw["speaker_wav"] = REF_WAV            # clone a narrator you provide
+    if r.speaker_wav and os.path.isfile(r.speaker_wav):
+        kw["speaker_wav"] = r.speaker_wav      # clone the voice for THIS request
+    elif REF_WAV and os.path.isfile(REF_WAV):
+        kw["speaker_wav"] = REF_WAV            # clone a narrator you provide (global)
     else:
         kw["speaker"] = pick_speaker(r.speaker or SPEAKER)
     try:

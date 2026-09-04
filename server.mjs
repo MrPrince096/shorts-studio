@@ -51,7 +51,7 @@ function watermarkFile() {
   if (!existsSync(PUBLIC)) return "";
   return readdirSync(PUBLIC).find((f) => /^watermark\./i.test(f)) || "";
 }
-const PORT = 4321;
+const PORT = parseInt(process.env.PORT, 10) || 4321;
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
 const app = express();
@@ -600,6 +600,7 @@ app.get("/api/settings", (_req, res) => {
     piperPython: getEnvValue("PIPER_PYTHON") || "",
     piperReady: !!(getEnvValue("PIPER_MODEL") && getEnvValue("PIPER_PYTHON")),
     xttsUrl: getEnvValue("XTTS_URL") || "",
+    xttsVoice: getEnvValue("XTTS_VOICE") || "",
     elevenVoice: getEnvValue("ELEVEN_VOICE") || "",
     voiceEngines: { piper: !!(getEnvValue("PIPER_MODEL") && getEnvValue("PIPER_PYTHON")), xtts: !!getEnvValue("XTTS_URL"), eleven: !!getEnvValue("ELEVEN_API_KEY") },
     avatarProvider: avatarProvider(),
@@ -629,6 +630,7 @@ app.post("/api/settings", (req, res) => {
   setIf("piperModel", "PIPER_MODEL", "Piper voice model");
   setIf("piperPython", "PIPER_PYTHON", "Piper Python");
   setIf("xttsUrl", "XTTS_URL", "XTTS server URL");
+  if (typeof b.xttsVoice === "string") { setEnvValue("XTTS_VOICE", b.xttsVoice.trim()); saved.push("XTTS voice"); }
   setIf("eleven", "ELEVEN_API_KEY", "ElevenLabs key");
   setIf("elevenVoice", "ELEVEN_VOICE", "ElevenLabs voice");
   res.json({ ok: true, saved });
@@ -1215,6 +1217,49 @@ app.get("/api/status/:id", (req, res) => {
     status: job.status, title: job.title, total: job.total, current: job.current,
     files: job.files, log: job.log.slice(-26),
   });
+});
+
+// ---- voice cloning: manage reference samples for XTTS ----
+const VOICE_DIR = join(DATA, "voices");
+if (!existsSync(VOICE_DIR)) mkdirSync(VOICE_DIR, { recursive: true });
+app.use("/data/voices", express.static(VOICE_DIR));
+app.get("/api/voices", async (_req, res) => {
+  const clones = existsSync(VOICE_DIR)
+    ? readdirSync(VOICE_DIR).filter((f) => f.endsWith(".wav")).map((f) => {
+        const id = f.replace(/\.wav$/, "");
+        return { id, name: id.replace(/-/g, " "), url: "/data/voices/" + f };
+      })
+    : [];
+  let speakers = [];
+  try {
+    const u = (getEnvValue("XTTS_URL") || "http://localhost:7870/generate").replace(/\/generate$/, "/health");
+    const r = await fetch(u, { signal: AbortSignal.timeout(2000) });
+    if (r.ok) speakers = (await r.json()).speakers || [];
+  } catch {}
+  res.json({ clones, speakers, selected: getEnvValue("XTTS_VOICE") || "" });
+});
+app.post("/api/voices", (req, res) => {
+  const b = req.body || {};
+  const name = String(b.name || "").trim().slice(0, 40);
+  if (!name) return res.status(400).json({ error: "Give the voice a name." });
+  const m = String(b.dataUrl || "").match(/^data:audio\/[^;]+;base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: "Upload a short audio sample (6–20s)." });
+  const id = (slugify(name) || "voice-" + Date.now().toString(36));
+  const raw = join(VOICE_DIR, id + "_raw");
+  const wav = join(VOICE_DIR, id + ".wav");
+  writeFileSync(raw, Buffer.from(m[1], "base64"));
+  // XTTS clones best from a clean ~mono 22.05kHz wav; cap length to keep it snappy
+  try { execFileSync("ffmpeg", ["-y", "-i", raw, "-t", "25", "-ac", "1", "-ar", "22050", wav], { stdio: "ignore" }); }
+  catch { try { unlinkSync(raw); } catch {}; return res.status(400).json({ error: "Couldn't read that audio file." }); }
+  try { unlinkSync(raw); } catch {}
+  res.json({ id, name, url: "/data/voices/" + id + ".wav" });
+});
+app.delete("/api/voices/:id", (req, res) => {
+  const id = String(req.params.id).replace(/[^a-z0-9._-]/gi, "");
+  const wav = join(VOICE_DIR, id + ".wav");
+  if (existsSync(wav)) { try { unlinkSync(wav); } catch {} }
+  if (getEnvValue("XTTS_VOICE") === "clone:" + id) setEnvValue("XTTS_VOICE", "");
+  res.json({ ok: true });
 });
 
 // ---- engine health + one-click local-server start ----
