@@ -1242,7 +1242,11 @@ app.post("/api/servers/start", (_req, res) => {
   startingServers = true;
   setTimeout(() => { startingServers = false; }, 90000);
   try {
-    const p = spawn("bash", [script], { cwd: ROOT, detached: true, stdio: "ignore", env: { ...process.env } });
+    // Strip PORT (the web server's 4321) and Electron flags so the launched
+    // XTTS/ComfyUI servers use THEIR own default ports (7870/7801/8188), not 4321.
+    const env = { ...process.env };
+    delete env.PORT; delete env.ELECTRON_RUN_AS_NODE; delete env.SHORTS_DESKTOP;
+    const p = spawn("bash", [script], { cwd: ROOT, detached: true, stdio: "ignore", env });
     p.unref();
     res.json({ ok: true });
   } catch (e) { startingServers = false; res.status(500).json({ error: e.message }); }

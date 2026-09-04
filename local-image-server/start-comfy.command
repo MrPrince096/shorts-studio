@@ -39,7 +39,7 @@ for i in $(seq 1 120); do
 done
 
 echo "==> starting adapter on :7801"
-node "$ADAPTER" &
+PORT=7801 node "$ADAPTER" &   # adapter is always :7801 (ignore any inherited PORT)
 ADAPTER_PID=$!
 
 echo ""

@@ -4,7 +4,7 @@
 cd "$(dirname "$0")"
 
 export XTTS_DEVICE="${XTTS_DEVICE:-cpu}"     # cpu | cuda | mps
-export PORT="${PORT:-7870}"
+export PORT="7870"   # XTTS is always :7870 (ignore any inherited PORT like the app's 4321)
 export COQUI_TOS_AGREED=1                     # accept the Coqui model license non-interactively
 VENV="${XTTS_PYTHON:-$HOME/Wav2Lip/.venv311/bin/python}"
 
