@@ -101,7 +101,12 @@ if (config.songMode) {
     process.stdout.write(`  🎙️ XTTS chunk ${i + 1}/${chunks.length} … `);
     const body = { text: chunks[i], language: lang2 };
     if (config.xttsSpeaker) body.speaker = config.xttsSpeaker;
-    const r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let r;
+    try {
+      r = await fetch(process.env.XTTS_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } catch (e) {
+      throw new Error(`XTTS voice server isn't running at ${process.env.XTTS_URL}. Start it (local-voice-server/start-xtts.command), or switch the voice engine to "edge-tts" (cloud) or "Piper" (offline) in Settings.`);
+    }
     if (!r.ok) throw new Error(`XTTS server ${r.status}: ${(await r.text()).slice(0, 160)}`);
     const p = join(PUBLIC, `vpart${i}.wav`);
     writeFileSync(p, Buffer.from(await r.arrayBuffer()));
