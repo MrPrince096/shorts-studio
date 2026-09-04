@@ -72,6 +72,16 @@
   .topbar h1{font-size:26px;margin:0}
   .topbar .sub{color:var(--muted);margin-top:3px}
   .topbar .sp{flex:1}
+  .enginebar{display:flex;align-items:center;gap:14px;padding:7px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .estat{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+  .estat i{width:8px;height:8px;border-radius:50%;background:var(--faint);transition:background .25s,box-shadow .25s}
+  .estat.up i{background:var(--ok);box-shadow:0 0 8px rgba(57,217,138,.75)}
+  .estat.up{color:var(--text)}
+  .estat.down i{background:var(--err);box-shadow:0 0 8px rgba(255,92,108,.55)}
+  .estat.pending i{background:var(--gold);animation:epulse 1s ease-in-out infinite}
+  @keyframes epulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .estart{padding:6px 12px;font-size:12px;font-weight:600}
+  @media(max-width:900px){.enginebar .estat{display:none}.enginebar{padding:0;background:none;border:none}}
   .iconbtn{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px;transition:border-color .14s,background .14s}
   .iconbtn:hover{border-color:var(--accent);background:var(--panel2)}
   .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
@@ -265,6 +275,12 @@
         <div class="sub">Create. Inspire. Go Viral.</div>
       </div>
       <div class="sp"></div>
+      <div class="enginebar" id="engineBar" title="Local engine status">
+        <span class="estat" data-eng="xtts"><i></i>Voice</span>
+        <span class="estat" data-eng="comfy"><i></i>Images</span>
+        <span class="estat" data-eng="ollama"><i></i>AI</span>
+        <button class="btn ghost estart" id="startServers" hidden>Start local servers</button>
+      </div>
       <button class="iconbtn" id="navSettings2" title="Settings"><span data-icon="gear"></span></button>
       <button class="btn grad" onclick="document.querySelector('[data-nav=shorts]').click()"><span data-icon="plus"></span>New Project</button>
     </div>
@@ -758,6 +774,32 @@ document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySe
   const set=o=>{app.classList.toggle('sbopen',o);try{localStorage.setItem('sbopen',o?'1':'0')}catch{}};
   tg.onclick=()=>set(!app.classList.contains('sbopen'));
   try{if(localStorage.getItem('sbopen')==='1')set(true)}catch{}
+})();
+// ---- engine status strip + one-click start ----
+(function(){
+  const bar=document.getElementById('engineBar'); if(!bar)return;
+  const btn=document.getElementById('startServers');
+  const setDot=(eng,state)=>{const el=bar.querySelector('.estat[data-eng="'+eng+'"]');if(!el)return;el.classList.remove('up','down','pending');el.classList.add(state);
+    el.title=({xtts:'XTTS voice server (:7870)',comfy:'ComfyUI image server (:7801)',ollama:'Ollama LLM (:11434)'}[eng]||'')+' — '+(state==='up'?'running':state==='pending'?'starting…':'not running');};
+  let polling=false;
+  async function refresh(){
+    try{const h=await(await fetch('/api/health')).json();
+      setDot('xtts',h.xtts?'up':'down'); setDot('comfy',h.comfy?'up':'down'); setDot('ollama',h.ollama?'up':'down');
+      // offer Start only when a server we manage (XTTS/ComfyUI) is down
+      if(!polling) btn.hidden = (h.xtts && h.comfy);
+      return h;
+    }catch{return null;}
+  }
+  btn.onclick=async()=>{
+    btn.disabled=true; btn.textContent='Starting…'; polling=true;
+    bar.querySelectorAll('.estat.down').forEach(e=>{e.classList.remove('down');e.classList.add('pending');});
+    try{await fetch('/api/servers/start',{method:'POST'});}catch{}
+    let n=0; const iv=setInterval(async()=>{n++;const h=await refresh();
+      const done = h && h.xtts && h.comfy;
+      if(done||n>=30){clearInterval(iv);polling=false;btn.disabled=false;btn.textContent='Start local servers';btn.hidden=!!(h&&h.xtts&&h.comfy);}
+    },3000);
+  };
+  refresh(); setInterval(()=>{if(!polling)refresh();}, 12000);
 })();
 // ---- accent colour theming (pick any colour, recolours whole app) ----
 (function(){

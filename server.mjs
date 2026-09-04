@@ -1217,6 +1217,37 @@ app.get("/api/status/:id", (req, res) => {
   });
 });
 
+// ---- engine health + one-click local-server start ----
+async function portUp(url) {
+  try {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 2500);
+    await fetch(url, { signal: c.signal });   // any HTTP response (even 404) = server is up
+    clearTimeout(t);
+    return true;
+  } catch { return false; }
+}
+app.get("/api/health", async (_req, res) => {
+  const xttsUrl = (getEnvValue("XTTS_URL") || "http://localhost:7870/generate").replace(/\/generate$/, "/");
+  const localImg = (getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate").replace(/\/generate$/, "/health");
+  const ollama = (getEnvValue("OLLAMA_URL") || "http://localhost:11434") + "/api/tags";
+  const [xtts, comfy, llm] = await Promise.all([portUp(xttsUrl), portUp(localImg), portUp(ollama)]);
+  res.json({ xtts, comfy, ollama: llm });
+});
+let startingServers = false;
+app.post("/api/servers/start", (_req, res) => {
+  const script = join(ROOT, "start-local-servers.command");
+  if (!existsSync(script)) return res.status(404).json({ error: "launcher script missing" });
+  if (startingServers) return res.json({ ok: true, already: true });
+  startingServers = true;
+  setTimeout(() => { startingServers = false; }, 90000);
+  try {
+    const p = spawn("bash", [script], { cwd: ROOT, detached: true, stdio: "ignore", env: { ...process.env } });
+    p.unref();
+    res.json({ ok: true });
+  } catch (e) { startingServers = false; res.status(500).json({ error: e.message }); }
+});
+
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n🎬 Shorts Studio running at ${url}\n`);
