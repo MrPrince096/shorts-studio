@@ -22,26 +22,25 @@
   .btn{transition:transform .1s,box-shadow .12s}
   .btn.grad:hover:not(:disabled){transform:translateY(-1px)}
   a{color:var(--accent2);text-decoration:none}
-  .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  .app{display:grid;grid-template-columns:88px 1fr;min-height:100vh}
   /* sidebar */
-  .sidebar{background:linear-gradient(180deg,rgba(255,255,255,.015),transparent 30%),var(--bg2);border-right:1px solid var(--line-soft);padding:20px 14px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain}
-  .sidebar::-webkit-scrollbar{width:8px}
+  /* slim icon rail (Kling-style) */
+  .sidebar{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent 26%),var(--bg2);border-right:1px solid var(--line-soft);padding:16px 8px 14px;display:flex;flex-direction:column;gap:4px;align-items:stretch;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain}
+  .sidebar::-webkit-scrollbar{width:6px}
   .sidebar::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
   .sidebar::-webkit-scrollbar-thumb:hover{background:var(--muted)}
   .nav{flex:0 0 auto}
-  .brand{display:flex;align-items:center;gap:11px;padding:6px 6px 20px;white-space:nowrap;flex-wrap:nowrap}
-  .brand b{white-space:nowrap}
-  .brand .logo{width:36px;height:36px;border-radius:11px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 6px 18px -4px rgba(124,92,255,.6),inset 0 1px 0 rgba(255,255,255,.25)}
-  .brand b{font-size:16px;letter-spacing:.2px}
-  .brand .pro{font-size:9.5px;font-weight:700;letter-spacing:.4px;background:linear-gradient(135deg,rgba(139,107,255,.28),rgba(91,147,255,.18));color:#c9bcff;border:1px solid rgba(139,107,255,.4);padding:2px 8px;border-radius:20px;margin-left:2px}
-  .navlabel{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);padding:16px 12px 6px}
-  .nav{position:relative;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;color:var(--muted);cursor:pointer;font-weight:600;font-size:14px;transition:background .14s,color .14s}
-  .nav:hover{background:rgba(255,255,255,.035);color:var(--text)}
-  .nav.active{background:linear-gradient(135deg,rgba(139,107,255,.16),rgba(91,147,255,.07));color:#fff}
-  .nav.active::before{content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--grad);box-shadow:0 0 12px rgba(139,107,255,.7)}
-  .nav .ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:0 0 30px;transition:background .14s,color .14s,box-shadow .14s}
+  .brand{display:flex;align-items:center;justify-content:center;padding:4px 0 14px}
+  .brand b,.brand .pro{display:none}
+  .brand .logo{width:42px;height:42px;border-radius:13px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 8px 20px -5px rgba(124,92,255,.65),inset 0 1px 0 rgba(255,255,255,.28)}
+  .navlabel{height:1px;overflow:hidden;font-size:0;background:var(--line);margin:8px 12px;padding:0}
+  .nav{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 3px;border-radius:13px;color:var(--muted);cursor:pointer;font-weight:600;font-size:10.5px;line-height:1.15;text-align:center;transition:background .14s,color .14s}
+  .nav:hover{background:rgba(255,255,255,.04);color:var(--text)}
+  .nav.active{background:linear-gradient(160deg,rgba(139,107,255,.2),rgba(91,147,255,.09));color:#fff;box-shadow:inset 0 0 0 1px rgba(139,107,255,.22)}
+  .nav .ic{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:0 0 34px;transition:background .14s,color .14s,box-shadow .14s}
+  .nav .ic svg{width:19px;height:19px}
   .nav:hover .ic{background:rgba(255,255,255,.05);color:var(--text)}
-  .nav.active .ic{background:linear-gradient(135deg,rgba(139,107,255,.34),rgba(91,147,255,.18));color:#d6ccff;box-shadow:inset 0 0 0 1px rgba(139,107,255,.34),0 4px 12px -4px rgba(124,92,255,.5)}
+  .nav.active .ic{background:linear-gradient(135deg,rgba(139,107,255,.4),rgba(91,147,255,.2));color:#e2dbff;box-shadow:inset 0 0 0 1px rgba(139,107,255,.4),0 6px 14px -4px rgba(124,92,255,.6)}
   .ic svg{width:18px;height:18px;display:block}
   .iconbtn svg{width:18px;height:18px}
   .tab svg{width:15px;height:15px;vertical-align:-2px;margin-right:3px}
