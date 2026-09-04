@@ -1220,5 +1220,7 @@ app.get("/api/status/:id", (req, res) => {
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n🎬 Shorts Studio running at ${url}\n`);
-  open(url).catch(() => {});
+  // Don't pop a browser tab when we're the engine inside the desktop app.
+  const inDesktop = process.env.SHORTS_DESKTOP === "1" || process.env.ELECTRON_RUN_AS_NODE === "1";
+  if (!inDesktop) open(url).catch(() => {});
 });

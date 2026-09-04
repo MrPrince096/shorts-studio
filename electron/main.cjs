@@ -41,7 +41,7 @@ function startServer() {
   // Use the same Node that launched Electron so the server runs identically.
   serverProc = spawn(process.execPath, [path.join(ROOT, "server.mjs")], {
     cwd: ROOT,
-    env: { ...process.env, PATH: resolveUserPath(), PORT: String(PORT), ELECTRON_RUN_AS_NODE: "1" },
+    env: { ...process.env, PATH: resolveUserPath(), PORT: String(PORT), ELECTRON_RUN_AS_NODE: "1", SHORTS_DESKTOP: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   serverProc.stdout.on("data", (d) => process.stdout.write(`[server] ${d}`));
