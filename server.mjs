@@ -307,7 +307,7 @@ const VIDEO_SOURCES = [
   { id: "pexels", label: "Pexels stock footage — free, unlimited" },
   { id: "image", label: "AI images: Pollinations — free, no key" },
   { id: "hf", label: "AI images: Hugging Face FLUX — free credits, then paid" },
-  { id: "local", label: "AI images: Local server — free & unlimited (you run it)" },
+  { id: "local", label: "AI images: Local (ComfyUI/SDXL) — free, unlimited, offline" },
   { id: "fal-image", label: "AI images: fal.ai FLUX — paid, best quality" },
   { id: "fal", label: "AI video: fal.ai — paid (Seedance / Veo / Kling)" },
 ];
