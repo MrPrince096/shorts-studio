@@ -68,6 +68,10 @@
   .vcard{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel2);transition:transform .12s,border-color .12s}
   .vcard:hover{transform:translateY(-2px);border-color:var(--accent)}
   .vcard .thumb{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000;display:block;cursor:pointer}
+  .findgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+  .findgrid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:border-color .1s,transform .1s;display:block}
+  .findgrid img:hover{transform:translateY(-2px)}
+  .findgrid img.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(124,92,255,.4)}
   .galbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   .galbar .seg button{min-width:auto;padding:7px 12px}
   .vcard .vinfo{padding:10px 11px 11px}
@@ -183,6 +187,7 @@
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
+    <div class="nav" data-nav="find"><span class="ic" data-icon="search"></span> Find</div>
     <div class="navlabel">Library</div>
     <div class="nav" data-nav="library"><span class="ic" data-icon="video"></span> My Videos</div>
     <div class="nav" data-nav="editor"><span class="ic" data-icon="sliders"></span> Editor</div>
@@ -463,6 +468,28 @@
       </div>
     </div>
 
+    <!-- FIND (search free images + music -> render) -->
+    <div class="gal" id="find">
+      <div class="card">
+        <h2><span data-icon="search"></span> Find <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· search free images &amp; music, pick, render</span></h2>
+        <div class="cardsub">Search free stock photos (Pexels), pick the ones you want, add music, and make a video.</div>
+        <div class="withbtn"><input id="findQ" class="big" placeholder="search images… e.g. himalayas, krishna, city night, coffee" /><button class="btn grad" id="findGo">Search</button></div>
+        <div id="findResults" class="findgrid" style="margin-top:14px"></div>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <h2><span data-icon="film"></span> Selected <span id="findCount" class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· 0</span></h2>
+        <div id="findTray" class="findgrid"><div class="muted" style="font-size:12px">Click images above to add them here.</div></div>
+        <div class="row" style="margin-top:14px"><div><label>Title</label><input id="findTitle" placeholder="My video" /></div><div><label>Aspect</label><select id="findAspect"></select></div></div>
+        <div class="row"><div><label>Music</label><select id="findMusic"></select></div><div><label>&nbsp;</label><button class="btn ghost" id="findMusicUp" style="width:100%">Upload music</button></div></div>
+        <input type="file" id="findMusicFile" accept="audio/*" hidden />
+        <div class="row"><div><label>Visual effect 🎬</label><select id="findEffect"></select></div><div><label>Watermark</label><input id="findWm" placeholder="@yourchannel" /></div></div>
+        <label>On-screen text <span class="muted">— optional, one line each (spreads over the music)</span></label>
+        <textarea id="findLines" rows="3" placeholder="Line 1&#10;Line 2&#10;..."></textarea>
+        <button class="btn grad big" id="findCreate" style="width:100%;margin-top:16px"><span data-icon="film"></span>Create video from selection</button>
+        <div id="findStatus" style="margin-top:10px;font-size:13px"></div>
+      </div>
+    </div>
+
     <!-- LIBRARY (My Videos) -->
     <div class="gal" id="library">
       <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2>
@@ -609,7 +636,7 @@ function applyTabSettings(tab){
   ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
 }
 function switchTab(name){
-  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show');
+  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show'); $('#find').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#workspace').style.display='grid';
   applyTabSettings(name);
@@ -617,9 +644,10 @@ function switchTab(name){
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
-  if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
-  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');
+  if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
+  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');
   if(v==='editor'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.add('show');showEditor();return;}
+  if(v==='find'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#find').classList.add('show');showFind();return;}
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
     $('#galFilterBar').style.display=(v==='library')?'flex':'none';
@@ -982,6 +1010,60 @@ $('#edRevoice').onclick=async()=>{const f=$('#edVideo').value;if(!f){alert('Pick
     if(r.error){$('#edRevoiceStatus').innerHTML=`<span class="err">${r.error}</span>`;b.disabled=false;}
     else edPoll(r.jobId);
   }catch(e){$('#edRevoiceStatus').innerHTML=`<span class="err">${e.message}</span>`;b.disabled=false;}
+};
+
+// ---- Find (search free images + music -> render) ----
+let FINDSEL=[];
+async function showFind(){
+  if(!$('#findAspect').options.length){
+    [['9:16','9:16 Vertical'],['1:1','1:1 Square'],['16:9','16:9 Landscape'],['4:5','4:5 Portrait']].forEach(([v,l])=>$('#findAspect').appendChild(opt(v,l)));
+    $('#findEffect').innerHTML=$('#effect').innerHTML; $('#findEffect').value='none';
+  }
+  await findLoadMusic();
+  if(!$('#findResults').children.length)$('#findResults').innerHTML='<div class="muted" style="font-size:12px">Search above to find free images.</div>';
+}
+async function findLoadMusic(){
+  const l=await(await fetch('/api/music')).json(); const sel=$('#findMusic'); const cur=sel.value; sel.innerHTML='';
+  sel.appendChild(opt('','— pick music —'));
+  (l||[]).forEach(m=>sel.appendChild(opt(m.file,(m.kind==='upload'?'🎵 ':'♪ ')+m.label)));
+  if(cur&&[...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+function findTray(){
+  $('#findCount').textContent='· '+FINDSEL.length;
+  const t=$('#findTray');
+  if(!FINDSEL.length){t.innerHTML='<div class="muted" style="font-size:12px">Click images above to add them here.</div>';return;}
+  t.innerHTML=FINDSEL.map((u,i)=>`<img src="${u}" data-i="${i}" title="click to remove">`).join('');
+  t.querySelectorAll('img').forEach(im=>im.onclick=()=>{FINDSEL.splice(+im.dataset.i,1);findTray();findSyncSel();});
+}
+function findSyncSel(){document.querySelectorAll('#findResults img').forEach(im=>im.classList.toggle('sel',FINDSEL.includes(im.dataset.url)));}
+async function findSearch(){
+  const q=$('#findQ').value.trim(); if(!q)return;
+  const g=$('#findResults'); g.innerHTML='<div class="muted"><span class="spin"></span> Searching…</div>';
+  try{const r=await(await fetch('/api/find/images?q='+encodeURIComponent(q))).json();
+    if(r.error){g.innerHTML=`<div class="err">${r.error}</div>`;return;}
+    if(!r.length){g.innerHTML='<div class="muted" style="font-size:12px">No results. Try another word.</div>';return;}
+    g.innerHTML=r.map(im=>`<img loading="lazy" src="${im.thumb}" data-url="${im.url}" class="${FINDSEL.includes(im.url)?'sel':''}" title="${esc(im.alt)}">`).join('');
+    g.querySelectorAll('img').forEach(im=>im.onclick=()=>{const u=im.dataset.url;if(FINDSEL.includes(u)){FINDSEL=FINDSEL.filter(x=>x!==u);im.classList.remove('sel');}else{FINDSEL.push(u);im.classList.add('sel');}findTray();});
+  }catch(e){g.innerHTML=`<div class="err">${e.message}</div>`;}
+}
+$('#findGo').onclick=findSearch; $('#findQ').addEventListener('keydown',e=>{if(e.key==='Enter')findSearch();});
+$('#findMusicUp').onclick=()=>$('#findMusicFile').click();
+$('#findMusicFile').onchange=()=>{const f=$('#findMusicFile').files[0];if(!f)return;if(f.size>30*1024*1024){alert('Max 30 MB.');return;}const rd=new FileReader();rd.onload=()=>{window.__findMusicData=rd.result;const o=document.createElement('option');o.value='__upload';o.textContent='🎵 '+f.name;$('#findMusic').prepend(o);$('#findMusic').value='__upload';};rd.readAsDataURL(f);};
+async function findPoll(id){try{const s=await(await fetch('/api/status/'+id)).json();
+  if(s.status==='running'){$('#findStatus').innerHTML=`<span class="spin"></span> ${(s.log||[]).slice(-1)[0]||'Working…'}`;setTimeout(()=>findPoll(id),1500);}
+  else if(s.status==='done'){$('#findStatus').innerHTML='<span class="ok">✅ Done! It\'s in My Videos.</span>';$('#findCreate').disabled=false;refreshRecent();}
+  else{$('#findStatus').innerHTML=`<span class="err">❌ Failed — ${(s.log||[]).slice(-1)[0]||''}</span>`;$('#findCreate').disabled=false;}
+}catch(e){$('#findStatus').innerHTML=`<span class="err">${e.message}</span>`;$('#findCreate').disabled=false;}}
+$('#findCreate').onclick=async()=>{
+  if(!FINDSEL.length){alert('Select at least one image.');return;}
+  const mv=$('#findMusic').value;
+  const music=mv==='__upload'?{dataUrl:window.__findMusicData}:(mv?{file:mv}:null);
+  if(!music){alert('Pick or upload a music track.');return;}
+  const b=$('#findCreate');b.disabled=true;$('#findStatus').innerHTML='<span class="spin"></span> Starting…';
+  try{const r=await(await fetch('/api/find/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:FINDSEL,music,lines:$('#findLines').value,title:$('#findTitle').value.trim(),aspect:$('#findAspect').value,effect:$('#findEffect').value,watermark:$('#findWm').value.trim()})})).json();
+    if(r.error){$('#findStatus').innerHTML=`<span class="err">${r.error}</span>`;b.disabled=false;}
+    else findPoll(r.jobId);
+  }catch(e){$('#findStatus').innerHTML=`<span class="err">${e.message}</span>`;b.disabled=false;}
 };
 
 injectIcons();loadConfig();loadPiperVoices();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();

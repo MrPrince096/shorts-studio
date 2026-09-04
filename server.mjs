@@ -896,6 +896,62 @@ app.post("/api/song", (req, res) => {
   })();
 });
 
+// ---- Find: search free stock images (Pexels) + build a video from picked media ----
+app.get("/api/find/images", async (req, res) => {
+  const key = getEnvValue("PEXELS_API_KEY");
+  if (!key) return res.status(400).json({ error: "Add a Pexels key in Settings." });
+  const q = String(req.query.q || "").trim();
+  if (!q) return res.json([]);
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const orient = ["landscape", "portrait", "square"].includes(String(req.query.orientation)) ? `&orientation=${req.query.orientation}` : "";
+  try {
+    const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=30&page=${page}${orient}`, { headers: { Authorization: key } });
+    if (!r.ok) return res.status(502).json({ error: `Pexels ${r.status}` });
+    const d = await r.json();
+    res.json((d.photos || []).map((p) => ({ id: p.id, thumb: p.src.medium, url: p.src.large2x || p.src.large, w: p.width, h: p.height, alt: p.alt || "" })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/find/create", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const images = Array.isArray(b.images) ? b.images.filter(Boolean).slice(0, 40) : [];
+  if (!images.length) return res.status(400).json({ error: "Select at least one image." });
+  const songPath = join(PUBLIC, "voiceover.mp3");
+  const mu = b.music || {};
+  if (mu.dataUrl) {
+    const m = String(mu.dataUrl).match(/^data:audio\/[^;]+;base64,(.+)$/);
+    if (!m) return res.status(400).json({ error: "That audio file couldn't be read." });
+    const raw = join(PUBLIC, "song_raw"); writeFileSync(raw, Buffer.from(m[1], "base64"));
+    try { execFileSync("ffmpeg", ["-y", "-i", raw, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); } catch { return res.status(400).json({ error: "That audio file couldn't be read." }); }
+  } else if (mu.file) {
+    const f = String(mu.file).replace(/[^a-z0-9._-]/gi, ""); const mp = join(MUSIC_DIR, f);
+    if (!existsSync(mp)) return res.status(400).json({ error: "Music track not found." });
+    try { execFileSync("ffmpeg", ["-y", "-i", mp, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); } catch { return res.status(400).json({ error: "Music error." }); }
+  } else return res.status(400).json({ error: "Pick a music track." });
+  let dur = 20; try { dur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", songPath]).toString().trim()) || 20; } catch {}
+  const lines = String(b.lines || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  const per = dur / Math.max(1, lines.length);
+  const lyricLines = lines.map((text, i) => ({ text, start: i * per, end: (i + 1) * per }));
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const lang = resolveLang(b.language || "en");
+  const config = {
+    title: String(b.title || "My Video").slice(0, 100), slug: slugify(b.title || "find-video") || ("find-" + Date.now().toString(36)),
+    description: "", tags: [], songMode: true, voice: "", rate: "0%", music: "", width, height,
+    source: "pexels", videoModel: "", imageStyle: "",
+    watermark: b.watermark || "", watermarkImage: b.watermarkImage ? watermarkFile() : "",
+    captionPos: b.captionPos || "bottom", motion: b.motion || "subtle", effect: (b.effect && b.effect !== "auto") ? b.effect : "none",
+    reuseVisuals: 0, langCode: b.language || "en", font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
+    lyricLines, scenes: images.map((u) => ({ text: "", query: "", imageUrl: u })),
+  };
+  busy = true;
+  const job = newJob(1);
+  res.json({ jobId: job.id });
+  (async () => {
+    try { pushLog(job, `🎬 Building a ${Math.round(dur)}s video from ${images.length} picked images…`); await runAll([config], job); }
+    catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
 // ---- manual: explicit scenes -> render one ----
 app.post("/api/render", (req, res) => {
   if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });

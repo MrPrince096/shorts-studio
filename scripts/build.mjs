@@ -380,7 +380,14 @@ const GEN = {
   "fal-image": falImage,
   fal: falVideo,
 };
-const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video", upload: "🖼️ Your product" };
+// a scene with an explicit imageUrl (hand-picked in the Find tab) is downloaded directly
+async function pickedImage(scene, outFile) {
+  const r = await fetch(scene.imageUrl);
+  if (!r.ok) throw new Error(`picked image ${r.status}`);
+  writeFileSync(outFile, Buffer.from(await r.arrayBuffer()));
+  return { w: OUT_W, h: OUT_H };
+}
+const TAG = { pexels: "🎬 Pexels", image: "🎨 Pollinations", hf: "🎨 HuggingFace", local: "🎨 Local", "fal-image": "🎨 fal image", fal: "🤖 fal video", upload: "🖼️ Your product", picked: "🖼️ Picked" };
 const IMG_SOURCES = new Set(["image", "hf", "local", "fal-image"]);
 const srcIsImage = (s) => IMG_SOURCES.has(s);
 // key checks for the base (fallback) source
@@ -411,18 +418,20 @@ if (config.uploadFile) {
 // "reuse visuals" mode: generate only N unique clips and cycle them across all
 // scenes — makes long (and offline-AI-image) videos far faster. Off for product ads.
 const reuseN = Math.max(0, parseInt(config.reuseVisuals) || 0);
-const doReuse = reuseN >= 2 && reuseN < config.scenes.length && !config.uploadFile;
+const anyPicked = config.scenes.some((s) => s.imageUrl);
+const doReuse = reuseN >= 2 && reuseN < config.scenes.length && !config.uploadFile && !anyPicked;
 if (doReuse) console.log(`♻️  Reuse mode: ${reuseN} unique visuals across ${config.scenes.length} scenes`);
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
-  const useUpload = !!config.uploadFile && !!config.scenes[i].showProduct;
-  const isImg = useUpload ? !!config.uploadIsImage : srcIsImage(src);
+  const picked = !!config.scenes[i].imageUrl;
+  const useUpload = !picked && !!config.uploadFile && !!config.scenes[i].showProduct;
+  const isImg = picked ? true : (useUpload ? !!config.uploadIsImage : srcIsImage(src));
   const slot = doReuse ? (i % reuseN) : i;
   const file = `scene${slot}.${isImg ? "jpg" : "mp4"}`;
   const needGen = !doReuse || i < reuseN;
   if (needGen) {
-    const gen = useUpload ? uploadMedia : (GEN[src] || GEN.pexels);
-    process.stdout.write(`${useUpload ? TAG.upload : (TAG[src] || "🎬")} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query}" ... `);
+    const gen = picked ? pickedImage : (useUpload ? uploadMedia : (GEN[src] || GEN.pexels));
+    process.stdout.write(`${picked ? TAG.picked : (useUpload ? TAG.upload : (TAG[src] || "🎬"))} [${i + 1}/${config.scenes.length}] "${config.scenes[i].query || 'picked'}" ... `);
     try {
       const b = await gen(config.scenes[i], join(PUBLIC, file));
       console.log(`ok (${b.w}x${b.h})`);
