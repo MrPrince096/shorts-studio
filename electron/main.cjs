@@ -93,6 +93,24 @@ function createWindow() {
   });
 }
 
+// Run one of the local-server launcher scripts (detached, full PATH) and report.
+function runLocalScript(scriptName, label) {
+  const script = path.join(ROOT, scriptName);
+  const p = spawn("bash", [script], {
+    cwd: ROOT, detached: true,
+    env: { ...process.env, PATH: resolveUserPath() },
+    stdio: "ignore",
+  });
+  p.unref();
+  dialog.showMessageBox(win, {
+    type: "info", title: "Shorts Studio",
+    message: label,
+    detail: scriptName.startsWith("start")
+      ? "Voice (XTTS) and images (ComfyUI) are starting in the background. First load takes ~30–60s each. You can keep working — cloud mode works immediately."
+      : "Local voice and image servers have been stopped. Cloud voice/images still work.",
+  });
+}
+
 function buildMenu() {
   const isMac = process.platform === "darwin";
   const template = [
@@ -111,6 +129,15 @@ function buildMenu() {
         { type: "separator" },
         { role: "togglefullscreen" },
         { role: "toggleDevTools" },
+      ],
+    },
+    {
+      label: "Local Servers",
+      submenu: [
+        { label: "Start voice + images (offline mode)", click: () => runLocalScript("start-local-servers.command", "Starting local servers…") },
+        { label: "Stop local servers", click: () => runLocalScript("stop-local-servers.command", "Stopping local servers…") },
+        { type: "separator" },
+        { label: "What is this?", click: () => dialog.showMessageBox(win, { type: "info", title: "Local Servers", message: "Fully-offline generation", detail: "Start these to generate voice (XTTS) and AI images (ComfyUI/SDXL) entirely on your Mac — no internet, no keys. Without them, Shorts Studio uses cloud voice/images instead." }) },
       ],
     },
     { role: "windowMenu" },

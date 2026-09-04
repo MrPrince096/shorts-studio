@@ -61,6 +61,22 @@ npm run desktop     # opens the Electron window
 > find `node`, `ffmpeg`, and `python3`). Keep the folder where it is, or rebuild
 > the app after moving it.
 
+Copy `Shorts Studio.app` into **/Applications** to get it in Spotlight/Launchpad.
+From the app's **Local Servers** menu you can start/stop the offline voice + image
+servers without touching the terminal.
+
+### Local servers in one click
+
+For fully-offline generation you need the voice (XTTS) and image (ComfyUI) servers
+running. Start both — only the ones that aren't already up — with:
+
+```bash
+bash start-local-servers.command      # or double-click it in Finder
+bash stop-local-servers.command       # stop them
+```
+
+(The same actions are in the desktop app's **Local Servers** menu.)
+
 ## 🔎 Find tab — free images & music
 
 Search free stock photos (Pexels) and free Creative-Commons music, hand-pick
