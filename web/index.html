@@ -146,6 +146,16 @@
   .qacard .qi svg{width:22px;height:22px;color:#c9bcff}
   .qacard .qt{font-weight:700;font-size:15px}
   .qacard .qd{color:var(--muted);font-size:12.5px;margin-top:4px;line-height:1.4}
+  /* dashboard hero */
+  .hero{position:relative;overflow:hidden;border-radius:20px;border:1px solid var(--line);padding:34px 34px;background:
+    radial-gradient(620px 320px at 90% -30%,rgba(139,107,255,.4),transparent 62%),
+    radial-gradient(520px 300px at 4% 130%,rgba(91,147,255,.24),transparent 60%),
+    linear-gradient(140deg,#181528,#0d0f17)}
+  .hero-badge{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#c9bcff;background:rgba(139,107,255,.14);border:1px solid rgba(139,107,255,.34);padding:5px 12px;border-radius:20px}
+  .hero-title{font-size:30px;font-weight:800;letter-spacing:-.7px;margin:15px 0 9px;line-height:1.08;background:linear-gradient(120deg,#fff 30%,#c9bcff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;max-width:600px}
+  .hero-sub{color:#a9b1c4;font-size:14.5px;max-width:540px;margin:0 0 22px;line-height:1.55}
+  .hero-cta{display:flex;gap:10px;flex-wrap:wrap}
+  @media(max-width:640px){.hero-title{font-size:24px}}
   .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
   @media(max-width:720px){.stats4{grid-template-columns:1fr 1fr}}
   /* ads studio */
@@ -433,6 +443,16 @@
     <!-- DASHBOARD (overview) -->
     <div class="gal" id="dashboard">
       <div class="dashgrid">
+        <div class="hero">
+          <span class="hero-badge">✨ Local · Free · Offline</span>
+          <h1 class="hero-title">Turn any idea into a video that goes viral</h1>
+          <p class="hero-sub">AI writes the script, voices it, adds captions and footage — then renders it right on your Mac. No subscriptions, no watermarks, no limits.</p>
+          <div class="hero-cta">
+            <button class="btn grad" data-go="shorts"><span data-icon="spark"></span>Create a Short</button>
+            <button class="btn ghost" data-go="story"><span data-icon="film"></span>Tell a Story</button>
+            <button class="btn ghost" data-go="find"><span data-icon="search"></span>Find footage</button>
+          </div>
+        </div>
         <div class="card">
           <div class="sectitle"><span data-icon="zap"></span> Quick actions</div>
           <div class="qa">
@@ -692,7 +712,7 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
     else {$('#libTitle').textContent=(v==='projects'?'Projects':'My Videos');$('#gallery').className='vgrid';refreshGallery();}
   } else switchTab(v);
 });
-document.querySelectorAll('.qacard[data-go]').forEach(c=>c.onclick=()=>document.querySelector('[data-nav='+c.dataset.go+']').click());
+document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySelector('[data-nav='+c.dataset.go+']').click());
 async function showDashboard(){
   loadStats();
   VIDEOS=await(await fetch('/api/videos')).json(); const g=$('#dashRecent');
