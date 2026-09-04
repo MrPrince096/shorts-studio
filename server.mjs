@@ -1271,6 +1271,59 @@ app.delete("/api/voices/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- voice preview (Voice Lab): speak arbitrary text in any engine/voice ----
+app.post("/api/voice/preview", async (req, res) => {
+  const b = req.body || {};
+  const engine = String(b.engine || "edge");
+  const text = String(b.text || "").slice(0, 500).trim();
+  const language = String(b.language || "en");
+  const voice = String(b.voice || "");
+  if (!text) return res.status(400).json({ error: "Type some text to preview." });
+  const tmp = join(PUBLIC, "preview_" + Date.now().toString(36));
+  try {
+    if (engine === "kokoro") {
+      const url = getEnvValue("KOKORO_URL") || "http://localhost:7880/generate";
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, language, speaker: voice || undefined }) });
+      if (!r.ok) throw new Error(`Kokoro not reachable — turn Local engines ON (or run setup-kokoro.sh).`);
+      res.setHeader("Content-Type", "audio/wav"); return res.send(Buffer.from(await r.arrayBuffer()));
+    }
+    if (engine === "xtts") {
+      const url = getEnvValue("XTTS_URL") || "http://localhost:7870/generate";
+      const body = { text, language };
+      if (voice.startsWith("clone:")) { const p = join(VOICE_DIR, voice.slice(6) + ".wav"); if (existsSync(p)) body.speaker_wav = p; }
+      else if (voice.startsWith("builtin:")) body.speaker = voice.slice(8);
+      else if (voice) body.speaker = voice;
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(`XTTS not reachable — turn Local engines ON.`);
+      res.setHeader("Content-Type", "audio/wav"); return res.send(Buffer.from(await r.arrayBuffer()));
+    }
+    if (engine === "piper") {
+      const py = getEnvValue("PIPER_PYTHON"), model = voice || getEnvValue("PIPER_MODEL");
+      if (!py || !model) throw new Error("Piper isn't set up in Settings.");
+      const wav = tmp + ".wav";
+      execFileSync(py, ["-m", "piper", "-m", model, "-f", wav], { input: text });
+      const buf = readFileSync(wav); try { unlinkSync(wav); } catch {}
+      res.setHeader("Content-Type", "audio/wav"); return res.send(buf);
+    }
+    if (engine === "eleven") {
+      const key = getEnvValue("ELEVEN_API_KEY");
+      if (!key) throw new Error("Add an ElevenLabs API key in Settings.");
+      const vid = voice || getEnvValue("ELEVEN_VOICE") || "21m00Tcm4TlvDq8ikWAM";
+      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vid}`, {
+        method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
+        body: JSON.stringify({ text, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.4, similarity_boost: 0.85, style: 0.6, use_speaker_boost: true } }),
+      });
+      if (!r.ok) throw new Error(`ElevenLabs ${r.status}: ${(await r.text()).slice(0, 120)}`);
+      res.setHeader("Content-Type", "audio/mpeg"); return res.send(Buffer.from(await r.arrayBuffer()));
+    }
+    // edge (cloud, default)
+    const mp3 = tmp + ".mp3";
+    execFileSync("edge-tts", ["--voice", voice || "en-US-AriaNeural", "--text", text, "--write-media", mp3], { stdio: "ignore" });
+    const buf = readFileSync(mp3); try { unlinkSync(mp3); } catch {}
+    res.setHeader("Content-Type", "audio/mpeg"); return res.send(buf);
+  } catch (e) { res.status(500).json({ error: e.message || "Preview failed." }); }
+});
+
 // ---- engine health + one-click local-server start ----
 async function portUp(url) {
   try {

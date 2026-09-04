@@ -266,6 +266,7 @@
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
     <div class="nav" data-nav="find"><span class="ic" data-icon="search"></span> Find</div>
+    <div class="nav" data-nav="voices"><span class="ic" data-icon="mic"></span> Voices</div>
     <div class="navlabel">Library</div>
     <div class="nav" data-nav="library"><span class="ic" data-icon="video"></span> My Videos</div>
     <div class="nav" data-nav="editor"><span class="ic" data-icon="sliders"></span> Editor</div>
@@ -592,6 +593,27 @@
       </div>
     </div>
 
+    <!-- VOICE LAB (preview any voice, then use it) -->
+    <div class="gal" id="voices">
+      <div class="card">
+        <h2><span data-icon="mic"></span> Voice Lab <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· hear any voice, then use it</span></h2>
+        <div class="cardsub">Type text, pick an engine and voice, and preview it out loud. Then set it as the voice for your videos.</div>
+        <div class="row">
+          <div><label>Engine</label><select id="vlEngine"></select></div>
+          <div><label>Voice</label><select id="vlVoice"></select></div>
+          <div><label>Language</label><select id="vlLang"></select></div>
+        </div>
+        <label style="margin-top:12px">Text to speak</label>
+        <textarea id="vlText" rows="3">Hello! This is a preview of the voice. It runs on your Mac and sounds natural.</textarea>
+        <div class="withbtn" style="margin-top:14px">
+          <button class="btn grad" id="vlSpeak"><span data-icon="play"></span> Speak it</button>
+          <button class="btn ghost" id="vlUse">Use this voice for my videos</button>
+        </div>
+        <div id="vlStatus" style="margin-top:12px;font-size:13px"></div>
+        <audio id="vlAudio" controls style="width:100%;margin-top:12px;display:none"></audio>
+      </div>
+    </div>
+
     <!-- LIBRARY (My Videos) -->
     <div class="gal" id="library">
       <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2>
@@ -772,7 +794,7 @@ function applyTabSettings(tab){
   ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
 }
 function switchTab(name){
-  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show'); $('#find').classList.remove('show');
+  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show'); $('#find').classList.remove('show'); $('#voices').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#workspace').style.display='grid';
   applyTabSettings(name);
@@ -781,9 +803,10 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
   if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
-  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');
+  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');$('#voices').classList.remove('show');
   if(v==='editor'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.add('show');showEditor();return;}
   if(v==='find'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#find').classList.add('show');showFind();return;}
+  if(v==='voices'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#voices').classList.add('show');showVoices();return;}
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
     $('#galFilterBar').style.display=(v==='library')?'flex':'none';
@@ -935,6 +958,54 @@ async function loadConfig(){
   $('#statLangs').textContent=LANGS.length;
 }
 
+// ---- Voice Lab (preview any engine/voice, then use it) ----
+let VL={};
+async function showVoices(){
+  const [v,c,s]=await Promise.all([
+    fetch('/api/voices').then(r=>r.json()).catch(()=>({})),
+    fetch('/api/config').then(r=>r.json()).catch(()=>({})),
+    fetch('/api/settings').then(r=>r.json()).catch(()=>({})),
+  ]);
+  VL={voices:v,cfg:c,settings:s};
+  const lang=$('#vlLang'); const cl=lang.value; lang.innerHTML='';
+  (c.languages||[{id:'en',label:'English'}]).forEach(l=>lang.appendChild(opt(l.id,l.label))); if(cl)lang.value=cl;
+  const eng=$('#vlEngine'); const ce=eng.value; eng.innerHTML='';
+  const list=[['edge','edge-tts — cloud, all languages'],['kokoro','Kokoro — local, fast & natural'],['xtts','XTTS — local, expressive + cloning']];
+  if(s.voiceEngines?.piper) list.push(['piper','Piper — local']);
+  if(s.voiceEngines?.eleven) list.push(['eleven','ElevenLabs — cloud']);
+  list.forEach(([val,l])=>eng.appendChild(opt(val,l)));
+  eng.value=(ce&&[...eng.options].some(o=>o.value===ce))?ce:'kokoro';
+  vlVoices();
+}
+function vlVoices(){
+  const e=$('#vlEngine').value, sel=$('#vlVoice'); sel.innerHTML='';
+  if(e==='kokoro'){ if(!(VL.voices?.kokoro||[]).length)sel.appendChild(opt('','Default')); (VL.voices?.kokoro||[]).forEach(v=>sel.appendChild(opt(v,kokoroLabel(v)))); }
+  else if(e==='xtts'){ sel.appendChild(opt('','Default (built-in narrator)')); (VL.voices?.speakers||[]).forEach(v=>sel.appendChild(opt('builtin:'+v,v))); (VL.voices?.clones||[]).forEach(c=>sel.appendChild(opt('clone:'+c.id,'🎙️ '+c.name+' (cloned)'))); }
+  else if(e==='edge'){ const L=(VL.cfg?.languages||[]).find(x=>x.id===$('#vlLang').value); (L?.voices||[]).forEach(v=>sel.appendChild(opt(v.id,v.label))); if(!sel.options.length)sel.appendChild(opt('en-US-AriaNeural','Aria — US Female')); }
+  else if(e==='piper'){ sel.appendChild(opt('','Default (from Settings)')); }
+  else if(e==='eleven'){ sel.appendChild(opt('','Default (your ElevenLabs voice)')); }
+}
+document.addEventListener('change',e=>{ if(e.target?.id==='vlEngine')vlVoices(); if(e.target?.id==='vlLang'&&$('#vlEngine')?.value==='edge')vlVoices(); });
+document.addEventListener('click',async e=>{ if(!e.target?.closest?.('#vlSpeak'))return;
+  const text=$('#vlText').value.trim(); if(!text){alert('Type some text to preview.');return;}
+  const btn=$('#vlSpeak'); btn.disabled=true; $('#vlStatus').innerHTML='<span class="spin"></span> Generating…';
+  try{
+    const r=await fetch('/api/voice/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({engine:$('#vlEngine').value,voice:$('#vlVoice').value,text,language:$('#vlLang').value})});
+    if(!r.ok){const er=await r.json().catch(()=>({error:'Failed'})); $('#vlStatus').innerHTML='<span class="err">'+esc(er.error||'Failed')+'</span>'; btn.disabled=false; return;}
+    const url=URL.createObjectURL(await r.blob()); const a=$('#vlAudio'); a.src=url; a.style.display='block'; a.play().catch(()=>{});
+    $('#vlStatus').innerHTML='<span class="ok">✅ Playing — press ▶ to replay.</span>';
+  }catch(err){$('#vlStatus').innerHTML='<span class="err">'+esc(err.message)+'</span>';}
+  btn.disabled=false;
+});
+document.addEventListener('click',async e=>{ if(e.target?.id!=='vlUse')return;
+  const eng=$('#vlEngine').value, v=$('#vlVoice').value;
+  $('#language').value=$('#vlLang').value; $('#language').dispatchEvent(new Event('change'));
+  $('#voiceEngine').value=eng; window.__voiceTouched=true; togglePiperVoice();
+  if(eng==='kokoro'){ if($('#kokoroVoice').options.length<=1)await loadKokoroVoices(); $('#kokoroVoice').value=v; }
+  else if(eng==='edge'){ if([...$('#voice').options].some(o=>o.value===v))$('#voice').value=v; }
+  else if(eng==='xtts'){ await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({xttsVoice:v})}); }
+  $('#vlStatus').innerHTML='<span class="ok">✅ Set as your video voice ('+esc(eng)+'). Open <b>Shorts</b> and generate!</span>';
+});
 // ---- voice cloning ----
 async function loadVoices(selected){
   let d; try{ d=await(await fetch('/api/voices')).json(); }catch{ return; }
