@@ -480,13 +480,17 @@ const reuseN = Math.max(0, parseInt(config.reuseVisuals) || 0);
 const anyPicked = config.scenes.some((s) => s.imageUrl);
 const doReuse = reuseN >= 2 && reuseN < config.scenes.length && !config.uploadFile && !anyPicked;
 if (doReuse) console.log(`♻️  Reuse mode: ${reuseN} unique visuals across ${config.scenes.length} scenes`);
+// Hero-clip mode: animate the FIRST scene's image into a real LTX video clip
+// (local, ~5-8 min). Off by default (slow); great for the opening hook.
+const ANIMATE_URL = (process.env.LOCAL_IMAGE_URL || "http://localhost:7801/generate").replace(/\/generate$/, "/animate");
+const heroOn = !!config.heroVideo && !doReuse && !config.songMode;
 const sceneOut = [];
 for (let i = 0; i < config.scenes.length; i++) {
   const picked = !!config.scenes[i].imageUrl;
   const useUpload = !picked && !!config.uploadFile && !!config.scenes[i].showProduct;
   const isImg = picked ? true : (useUpload ? !!config.uploadIsImage : srcIsImage(src));
   const slot = doReuse ? (i % reuseN) : i;
-  const file = `scene${slot}.${isImg ? "jpg" : "mp4"}`;
+  let file = `scene${slot}.${isImg ? "jpg" : "mp4"}`;
   const needGen = !doReuse || i < reuseN;
   if (needGen) {
     const gen = picked ? pickedImage : (useUpload ? uploadMedia : (GEN[src] || GEN.pexels));
@@ -497,6 +501,20 @@ for (let i = 0; i < config.scenes.length; i++) {
     } catch (e) {
       console.log("FAILED:", e.message);
       process.exit(1);
+    }
+    // animate the hero (first) scene into a video clip
+    if (heroOn && i === 0 && isImg) {
+      const vidName = `scene${slot}_v.mp4`;
+      process.stdout.write(`🎬 Animating the hero scene into video (LTX — this takes ~5-8 min)… `);
+      try {
+        const img = readFileSync(join(PUBLIC, file));
+        const r = await fetch(ANIMATE_URL, { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: `data:image/jpeg;base64,${img.toString("base64")}`, prompt: `cinematic ${config.scenes[0].query || "scene"}, gentle camera motion, subtle movement, high detail`, width: OUT_W > OUT_H ? 768 : 480, height: OUT_W > OUT_H ? 480 : 768, frames: 49, steps: 12 }) });
+        if (!r.ok) throw new Error(`animate ${r.status}: ${(await r.text()).slice(0, 120)}`);
+        writeFileSync(join(PUBLIC, vidName), Buffer.from(await r.arrayBuffer()));
+        file = vidName;
+        console.log("ok 🎥");
+      } catch (e) { console.log(`hero animate skipped (${e.message}) — using the still image`); }
     }
   } else {
     console.log(`♻️  [${i + 1}/${config.scenes.length}] reusing ${file}`);

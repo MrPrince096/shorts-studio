@@ -106,10 +106,80 @@ async function generate({ prompt, width, height }) {
   return { buf: Buffer.from(await r.arrayBuffer()), w, h };
 }
 
+// ---- LTX-Video: animate an image into a short clip (local, on ComfyUI) ----
+const LTX_CKPT = process.env.LTX_CKPT || "ltxv-2b-0.9.6-distilled.safetensors";
+const LTX_T5 = process.env.LTX_T5 || "t5xxl_fp8_e4m3fn.safetensors";
+async function uploadImage(buf) {
+  const fd = new FormData();
+  fd.append("image", new Blob([buf], { type: "image/png" }), "ltxsrc.png");
+  fd.append("overwrite", "true");
+  const r = await fetch(`${COMFY}/upload/image`, { method: "POST", body: fd });
+  if (!r.ok) throw new Error(`image upload -> ${r.status}`);
+  return (await r.json()).name;
+}
+function ltxDims(w, h) { // LTX wants multiples of 32; cap for M1 speed
+  w = w || 768; h = h || 512; const cap = 704; const s = Math.min(1, cap / Math.max(w, h));
+  const snap = (x) => Math.max(224, Math.round(x * s / 32) * 32);
+  return [snap(w), snap(h)];
+}
+function ltxWf(imageName, prompt, w, h, frames, steps, seed) {
+  return {
+    "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: LTX_CKPT } },
+    "2": { class_type: "CLIPLoader", inputs: { clip_name: LTX_T5, type: "ltxv", device: "default" } },
+    "3": { class_type: "CLIPTextEncode", inputs: { text: prompt, clip: ["2", 0] } },
+    "4": { class_type: "CLIPTextEncode", inputs: { text: "low quality, worst quality, deformed, distorted, blurry, jitter, flicker, artifacts, watermark, text", clip: ["2", 0] } },
+    "5": { class_type: "LoadImage", inputs: { image: imageName } },
+    "6": { class_type: "LTXVImgToVideo", inputs: { positive: ["3", 0], negative: ["4", 0], vae: ["1", 2], image: ["5", 0], width: w, height: h, length: frames, batch_size: 1, strength: 1.0 } },
+    "7": { class_type: "LTXVConditioning", inputs: { positive: ["6", 0], negative: ["6", 1], frame_rate: 25 } },
+    "8": { class_type: "LTXVScheduler", inputs: { steps, max_shift: 2.05, base_shift: 0.95, stretch: true, terminal: 0.1 } },
+    "9": { class_type: "KSamplerSelect", inputs: { sampler_name: "euler" } },
+    "10": { class_type: "SamplerCustom", inputs: { model: ["1", 0], add_noise: true, noise_seed: seed, cfg: 3, positive: ["7", 0], negative: ["7", 1], sampler: ["9", 0], sigmas: ["8", 0], latent_image: ["6", 2] } },
+    "11": { class_type: "VAEDecode", inputs: { samples: ["10", 0], vae: ["1", 2] } },
+    "12": { class_type: "CreateVideo", inputs: { images: ["11", 0], fps: 24 } },
+    "13": { class_type: "SaveVideo", inputs: { video: ["12", 0], filename_prefix: "ltxclip", format: "mp4", codec: "h264" } },
+  };
+}
+async function animate({ imageBuf, prompt, width, height, frames, steps }) {
+  const name = await uploadImage(imageBuf);
+  const [w, h] = ltxDims(width, height);
+  const { prompt_id } = await jf(`${COMFY}/prompt`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: ltxWf(name, prompt, w, h, frames, steps, Math.floor(Math.random() * 1e9)), client_id: randomUUID() }) });
+  const deadline = Date.now() + 1500000; // 25 min
+  let vid = null;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2500));
+    let hist; try { hist = await jf(`${COMFY}/history/${prompt_id}`); } catch { continue; }
+    const e = hist[prompt_id]; if (!e) continue;
+    if (e.status && e.status.status_str === "error") throw new Error("LTX render error (see ComfyUI console).");
+    const outs = e.outputs || {};
+    for (const nid of Object.keys(outs)) { const o = outs[nid]; const f = (o.images || o.gifs || o.video || [])[0]; if (f && f.filename) { vid = f; break; } }
+    if (vid) break;
+  }
+  if (!vid) throw new Error("Timed out waiting for LTX video.");
+  const qs = new URLSearchParams({ filename: vid.filename, subfolder: vid.subfolder || "", type: vid.type || "output" });
+  const r = await fetch(`${COMFY}/view?${qs}`);
+  if (!r.ok) throw new Error(`fetch video -> ${r.status}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ ok: true, comfy: COMFY, ckpt: CKPT, steps: STEPS }));
+    return res.end(JSON.stringify({ ok: true, comfy: COMFY, ckpt: CKPT, steps: STEPS, ltx: LTX_CKPT }));
+  }
+  if (req.method === "POST" && req.url.startsWith("/animate")) {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 2e7) req.destroy(); });
+    req.on("end", async () => {
+      try {
+        const b = JSON.parse(body || "{}");
+        const m = String(b.image || "").match(/^data:image\/[^;]+;base64,(.+)$/);
+        if (!m) throw new Error("missing image (data URL)");
+        const out = await animate({ imageBuf: Buffer.from(m[1], "base64"), prompt: String(b.prompt || "gentle cinematic camera motion, subtle movement, high detail"), width: +b.width || 768, height: +b.height || 512, frames: +b.frames || 49, steps: +b.steps || 12 });
+        res.writeHead(200, { "Content-Type": "video/mp4" });
+        res.end(out);
+      } catch (e) { res.writeHead(500, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
   }
   if (req.method !== "POST" || !req.url.startsWith("/generate")) {
     res.writeHead(404); return res.end("Not found");

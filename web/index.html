@@ -451,6 +451,7 @@
             <div><label>Motion / zoom</label><select id="motion"></select></div>
           </div>
           <div class="row" id="qsEffect"><div><label>Visual effect 🎬 <span class="muted">— camera look</span></label><select id="effect"></select></div></div>
+          <div class="row" id="qsHero"><div style="flex:1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="heroVideo" style="width:auto;margin:0"> Hero clip — animate the first scene into real AI video 🎥 <span class="muted">(local LTX, adds ~5–8 min)</span></label><div class="muted" style="font-size:11px;margin-top:4px">The opening shot becomes a moving video clip instead of a still. Needs Local engines ON (ComfyUI). Rest of the scenes stay images.</div></div></div>
           <div class="row" id="qsMusicReuse">
             <div><label>Background music 🎵</label><select id="musicMood"><option value="none">None</option><option value="auto">Auto (match mood)</option><optgroup label="Music"><option value="calm">Calm</option><option value="scary">Suspense</option><option value="uplifting">Uplifting</option></optgroup><optgroup label="Nature ambience"><option value="rain">🌧️ Rain</option><option value="ocean">🌊 Ocean waves</option><option value="wind">🍃 Wind</option><option value="stream">💧 Stream</option><option value="fire">🔥 Fire crackle</option><option value="forest">🌲 Forest</option></optgroup></select></div>
             <div><label>Reuse visuals <span class="muted">— faster long videos</span></label><select id="reuseVisuals"></select></div>
@@ -590,6 +591,20 @@
         <textarea id="findLines" rows="3" placeholder="Line 1&#10;Line 2&#10;..."></textarea>
         <button class="btn grad big" id="findCreate" style="width:100%;margin-top:16px"><span data-icon="film"></span>Create video from selection</button>
         <div id="findStatus" style="margin-top:10px;font-size:13px"></div>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <h2><span data-icon="film"></span> Animate an image → video clip <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· local AI video, ~5–8 min</span></h2>
+        <div class="cardsub">Turn one image into a short moving video clip (LTX-Video, on your Mac). Perfect for a hero/hook shot. Needs Local engines ON.</div>
+        <div class="row">
+          <div><label>Image to animate</label><button class="btn ghost" id="anUp" style="width:100%">＋ Upload an image</button><input type="file" id="anFile" accept="image/*" hidden></div>
+          <div><label>Aspect</label><select id="anAspect"><option value="9:16">9:16 Vertical</option><option value="16:9">16:9 Landscape</option><option value="1:1">1:1 Square</option></select></div>
+        </div>
+        <img id="anPreview" style="display:none;max-height:170px;border-radius:10px;margin-top:10px">
+        <label style="margin-top:12px">Motion prompt <span class="muted">— describe the camera / movement</span></label>
+        <input id="anPrompt" placeholder="slow cinematic push-in, drifting mist, subtle motion, high detail">
+        <button class="btn grad big" id="anGo" style="width:100%;margin-top:14px"><span data-icon="film"></span> Animate into video (~5–8 min)</button>
+        <div id="anStatus" style="margin-top:10px;font-size:13px"></div>
+        <video id="anVideo" controls loop style="width:100%;max-height:360px;border-radius:12px;margin-top:12px;display:none"></video>
       </div>
     </div>
 
@@ -1134,7 +1149,7 @@ $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPla
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
 
-const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,effect:$('#effect').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value,kokoroVoice:$('#kokoroVoice').value,musicMood:$('#musicMood').value,reuseVisuals:$('#reuseVisuals').value});
+const fmt=()=>({language:$('#language').value,voice:$('#voice').value,aspect:$('#aspect').value,quality:$('#quality').value,rate:$('#rate').value+'%',source:$('#source').value,videoModel:$('#videoModel').value,imageStyle:$('#imageStyle').value,duration:$('#lenPick').value,llmProvider:$('#llmPick').value,genre:$('#genre').value,country:$('#country').value,watermark:$('#watermark').value.trim(),watermarkImage:!!window.__hasWM,captionPos:$('#captionPos').value,motion:$('#motion').value,effect:$('#effect').value,voiceEngine:$('#voiceEngine').value,piperVoice:$('#piperVoice').value,kokoroVoice:$('#kokoroVoice').value,heroVideo:$('#heroVideo').checked,musicMood:$('#musicMood').value,reuseVisuals:$('#reuseVisuals').value});
 $('#wmPick').onclick=()=>$('#wmFile').click();
 $('#wmFile').onchange=()=>{const f=$('#wmFile').files[0];if(!f)return;if(f.size>5*1024*1024){alert('Logo max 5 MB.');return;}const rd=new FileReader();rd.onload=()=>fetch('/api/watermark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})}).then(()=>{window.__hasWM=true;$('#wmName').value=f.name;});rd.readAsDataURL(f);};
 $('#wmClear').onclick=()=>{window.__hasWM=false;$('#wmName').value='';$('#wmFile').value='';fetch('/api/watermark',{method:'DELETE'});};
@@ -1380,6 +1395,22 @@ $('#findCreate').onclick=async()=>{
   }catch(e){$('#findStatus').innerHTML=`<span class="err">${e.message}</span>`;b.disabled=false;}
 };
 
+// ---- Animate an image -> video clip (standalone) ----
+$('#anUp')&&($('#anUp').onclick=()=>$('#anFile').click());
+$('#anFile')&&($('#anFile').onchange=()=>{const f=$('#anFile').files[0];if(!f)return;if(f.size>12*1024*1024){alert('Please use an image under 12 MB.');return;}const rd=new FileReader();rd.onload=()=>{window.__anImg=rd.result;$('#anPreview').src=rd.result;$('#anPreview').style.display='block';};rd.readAsDataURL(f);});
+async function anPoll(id,clipUrl){try{const s=await(await fetch('/api/status/'+id)).json();
+  if(s.status==='running'){$('#anStatus').innerHTML=`<span class="spin"></span> ${esc((s.log||[]).slice(-1)[0]||'Animating…')}`;setTimeout(()=>anPoll(id,clipUrl),3000);}
+  else if(s.status==='done'){$('#anStatus').innerHTML='<span class="ok">✅ Done! Clip saved (also in your data/clips).</span>';const v=$('#anVideo');v.src=clipUrl+'?t='+Date.now();v.style.display='block';v.play().catch(()=>{});$('#anGo').disabled=false;}
+  else{$('#anStatus').innerHTML=`<span class="err">❌ ${esc((s.log||[]).slice(-1)[0]||'Failed')}</span>`;$('#anGo').disabled=false;}
+}catch(e){$('#anStatus').innerHTML=`<span class="err">${esc(e.message)}</span>`;$('#anGo').disabled=false;}}
+$('#anGo')&&($('#anGo').onclick=async()=>{
+  if(!window.__anImg){alert('Upload an image to animate first.');return;}
+  const b=$('#anGo');b.disabled=true;$('#anStatus').innerHTML='<span class="spin"></span> Starting…';$('#anVideo').style.display='none';
+  try{const r=await(await fetch('/api/animate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:window.__anImg,prompt:$('#anPrompt').value.trim(),aspect:$('#anAspect').value})})).json();
+    if(r.error){$('#anStatus').innerHTML=`<span class="err">${esc(r.error)}</span>`;b.disabled=false;}
+    else anPoll(r.jobId,r.clipUrl);
+  }catch(e){$('#anStatus').innerHTML=`<span class="err">${esc(e.message)}</span>`;b.disabled=false;}
+});
 injectIcons();loadConfig();loadPiperVoices();loadSettings();loadStats();refreshRecent();refreshGallery();refreshSeries();sceneRow();sceneRow();
 document.querySelector('[data-nav=dashboard]').click();
 </script>

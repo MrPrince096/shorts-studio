@@ -184,6 +184,7 @@ app.post("/api/edit/revoice", (req, res) => {
   config.voiceEngine = b.voiceEngine || config.voiceEngine || "edge";
   if (typeof b.piperVoice === "string") config.piperVoice = b.piperVoice;
   if (typeof b.kokoroVoice === "string") config.kokoroVoice = b.kokoroVoice;
+  if (typeof b.heroVideo !== "undefined") config.heroVideo = !!b.heroVideo;
   config.font = lang.font; config.fontCss = lang.fontCss; config.rtl = lang.rtl;
   config.slug = base; // keep the same filename so it overwrites this video
   busy = true;
@@ -761,7 +762,8 @@ app.post("/api/generate", async (req, res) => {
         c.talkingAvatar = !!b.talkingAvatar; // bring the creator photo to life (needs an avatar API key)
         c.voiceEngine = b.voiceEngine || "edge"; // "edge" (cloud) or "piper" (offline)
         c.piperVoice = b.piperVoice || "";
-    c.kokoroVoice = b.kokoroVoice || ""; // chosen local Piper voice file (optional)
+    c.kokoroVoice = b.kokoroVoice || "";
+    c.heroVideo = !!b.heroVideo; // chosen local Piper voice file (optional)
         c.musicMood = resolveMood(b.musicMood, { genre });
         c.reuseVisuals = b.reuseVisuals || 0;
         c.langCode = b.language || "en";
@@ -818,6 +820,7 @@ app.post("/api/story", (req, res) => {
       config.voiceEngine = b.voiceEngine || "edge";
       config.piperVoice = b.piperVoice || "";
     config.kokoroVoice = b.kokoroVoice || "";
+    config.heroVideo = !!b.heroVideo;
       config.musicMood = resolveMood(b.musicMood || "auto", { storyType: b.storyType || "story" });
       config.reuseVisuals = b.reuseVisuals || 0;
       config.pitch = pr.pitch;          // edge-tts pitch for emotion
@@ -1034,6 +1037,7 @@ app.post("/api/render", (req, res) => {
     voiceEngine: b.voiceEngine || "edge",
     piperVoice: b.piperVoice || "",
     kokoroVoice: b.kokoroVoice || "",
+    heroVideo: !!b.heroVideo,
     musicMood: resolveMood(b.musicMood, {}),
     reuseVisuals: b.reuseVisuals || 0,
     langCode: b.language || "en",
@@ -1269,6 +1273,42 @@ app.delete("/api/voices/:id", (req, res) => {
   if (existsSync(wav)) { try { unlinkSync(wav); } catch {} }
   if (getEnvValue("XTTS_VOICE") === "clone:" + id) setEnvValue("XTTS_VOICE", "");
   res.json({ ok: true });
+});
+
+// ---- Animate: turn one image into a short LTX video clip (local) ----
+const CLIPS_DIR = join(DATA, "clips");
+if (!existsSync(CLIPS_DIR)) mkdirSync(CLIPS_DIR, { recursive: true });
+app.use("/data/clips", express.static(CLIPS_DIR));
+app.get("/api/clips", (_req, res) => {
+  const list = existsSync(CLIPS_DIR)
+    ? readdirSync(CLIPS_DIR).filter((f) => f.endsWith(".mp4")).map((f) => ({ id: f.replace(/\.mp4$/, ""), url: "/data/clips/" + f }))
+    : [];
+  res.json(list.reverse());
+});
+app.post("/api/animate", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render or animation is already running. Please wait." });
+  const b = req.body || {};
+  if (!/^data:image\/[^;]+;base64,/.test(String(b.image || ""))) return res.status(400).json({ error: "Upload an image to animate." });
+  const id = "clip-" + Date.now().toString(36);
+  const clipUrl = "/data/clips/" + id + ".mp4";
+  const animateUrl = (getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate").replace(/\/generate$/, "/animate");
+  const vertical = (b.aspect || "9:16") === "9:16" || (b.aspect || "") === "4:5";
+  busy = true;
+  const job = newJob(1);
+  res.json({ jobId: job.id, clipUrl });
+  (async () => {
+    try {
+      pushLog(job, "🎬 Animating your image into a video clip (LTX — this takes ~5–8 min on an M1)…");
+      const r = await fetch(animateUrl, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: b.image, prompt: String(b.prompt || "gentle cinematic camera motion, subtle movement, high detail"), width: vertical ? 480 : 768, height: vertical ? 768 : 480, frames: Math.min(97, Math.max(25, parseInt(b.frames) || 49)), steps: 12 }),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `animate failed (${r.status}) — is ComfyUI/Local engines ON?`); }
+      writeFileSync(join(CLIPS_DIR, id + ".mp4"), Buffer.from(await r.arrayBuffer()));
+      pushLog(job, "✅ Done! Your clip is ready.");
+      job.files = [clipUrl]; job.status = "done"; busy = false;
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
 });
 
 // ---- voice preview (Voice Lab): speak arbitrary text in any engine/voice ----
