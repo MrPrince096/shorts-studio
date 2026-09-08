@@ -62,15 +62,44 @@ function prepareStore() {
 
 const ROOT = prepareStore();
 
-// Bundled ffmpeg/ffprobe ship inside Remotion's compositor package, so a fresh
-// Mac needs no Homebrew ffmpeg. They load sibling .dylibs by bare name, hence
-// DYLD_LIBRARY_PATH. Returns the dir (on PATH) or "" if not found.
+// Bundled ffmpeg/ffprobe ship inside Remotion's compositor package (so a fresh
+// Mac needs no Homebrew ffmpeg). Location, if present.
 function compositorDir() {
   for (const a of ["darwin-arm64", "darwin-x64"]) {
     const d = path.join(ROOT, "node_modules", "@remotion", "compositor-" + a);
     if (fs.existsSync(path.join(d, "ffmpeg"))) return d;
   }
   return "";
+}
+
+// Is a system ffmpeg already on the user's normal PATH? If so we use it and
+// leave the environment untouched — never override a working ffmpeg.
+function hasSystemFfmpeg() {
+  const dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", `${process.env.HOME}/.local/bin`];
+  const extra = (process.env.PATH || "").split(":");
+  return [...dirs, ...extra].some((d) => d && fs.existsSync(path.join(d, "ffmpeg")));
+}
+
+// Only when there's NO system ffmpeg: expose the bundled binaries through tiny
+// wrapper scripts that set DYLD_LIBRARY_PATH *for themselves* (the compositor
+// ffmpeg loads its sibling libav*.dylib by bare name). Setting it inside the
+// wrapper — not as a global env var — keeps every OTHER subprocess (python,
+// edge-tts, node…) on a clean, unpolluted environment. Returns the bin dir,
+// or "" if a system ffmpeg exists or the bundle isn't found.
+function ffmpegBinDir() {
+  if (hasSystemFfmpeg()) return "";
+  const comp = compositorDir();
+  if (!comp) return "";
+  const bin = path.join(ROOT, "runtime-bin");
+  try {
+    fs.mkdirSync(bin, { recursive: true });
+    for (const tool of ["ffmpeg", "ffprobe"]) {
+      const shim = path.join(bin, tool);
+      const body = `#!/bin/bash\nexport DYLD_LIBRARY_PATH="${comp}:$DYLD_LIBRARY_PATH"\nexec "${comp}/${tool}" "$@"\n`;
+      fs.writeFileSync(shim, body); fs.chmodSync(shim, 0o755);
+    }
+    return bin;
+  } catch { return ""; }
 }
 
 // Some Macs crash Electron's GPU/network service process (exit_code=15) which
@@ -96,18 +125,19 @@ function resolveUserPath() {
     const sh = process.env.SHELL || "/bin/zsh";
     shellPath = execSync(`${sh} -ilc 'echo -n $PATH'`, { timeout: 4000 }).toString().trim();
   } catch {}
-  const comp = compositorDir(); // bundled ffmpeg/ffprobe first, so we don't need system ffmpeg
-  const parts = new Set([...(comp ? [comp] : []), ...(shellPath ? shellPath.split(":") : []), ...(process.env.PATH ? process.env.PATH.split(":") : []), ...common].filter(Boolean));
+  const parts = new Set([...(shellPath ? shellPath.split(":") : []), ...(process.env.PATH ? process.env.PATH.split(":") : []), ...common].filter(Boolean));
   return [...parts].join(":");
 }
 
-// Env for the server + render subprocesses: our resolved PATH (bundled ffmpeg
-// first) and DYLD_LIBRARY_PATH so that ffmpeg finds its sibling libav*.dylib.
+// Env for the server + render subprocesses. Uses the user's real PATH; only if
+// there's no system ffmpeg do we prepend the bundled-ffmpeg shim dir. No global
+// DYLD_LIBRARY_PATH — the shims set it just for themselves — so python/edge-tts
+// and every other tool run in a clean, unmodified environment.
 function childEnv(extra = {}) {
-  const comp = compositorDir();
-  const env = { ...process.env, PATH: resolveUserPath(), ...extra };
-  if (comp) env.DYLD_LIBRARY_PATH = [comp, process.env.DYLD_LIBRARY_PATH].filter(Boolean).join(":");
-  return env;
+  const ffdir = ffmpegBinDir();
+  const base = resolveUserPath();
+  const PATH = ffdir ? `${ffdir}:${base}` : base;
+  return { ...process.env, PATH, ...extra };
 }
 
 let restarts = 0;
