@@ -49,45 +49,85 @@ function computePower(chip, ramGB) {
 
 // Tier presets. Each preset is the *ceiling* for that class of machine — the
 // generation code reads these caps instead of hard-coding 768px / 2s clips.
+// ---- model catalog -------------------------------------------------------
+// One entry per downloadable model, with an approximate on-disk size. The
+// tiers below reference these by key, so upgrading the catalog (new/better
+// models) or adding a chip class is a data change, not a code change. A more
+// powerful Mac simply points at a bigger row here.
+const MODELS = {
+  // text (local LLM via Ollama) — bigger = more coherent, long-form writing
+  "gemma3-4b":    { label: "Gemma 3 4B",      tag: "gemma3:4b",     size: "3.3 GB", engine: "ollama", cap: "text" },
+  "llama31-8b":   { label: "Llama 3.1 8B",    tag: "llama3.1:8b",   size: "4.9 GB", engine: "ollama", cap: "text" },
+  "qwen25-32b":   { label: "Qwen 2.5 32B",    tag: "qwen2.5:32b",   size: "20 GB",  engine: "ollama", cap: "text" },
+  "llama33-70b":  { label: "Llama 3.3 70B",   tag: "llama3.3:70b",  size: "43 GB",  engine: "ollama", cap: "text" },
+  // images (via ComfyUI)
+  "sdxl-lightning": { label: "SDXL-Lightning (4-step)",   size: "7.3 GB", engine: "comfy", cap: "image" },
+  "sdxl-full":      { label: "SDXL (full) + refiner",     size: "13 GB",  engine: "comfy", cap: "image" },
+  "flux-schnell":   { label: "FLUX.1 [schnell] (fp8)",    size: "12 GB",  engine: "comfy", cap: "image" },
+  "flux-dev":       { label: "FLUX.1 [dev]",              size: "24 GB",  engine: "comfy", cap: "image" },
+  // video (via ComfyUI)
+  "ltx-2b":       { label: "LTX-Video 2B (distilled)",  size: "3.9 GB", engine: "comfy", cap: "video" },
+  "ltx-2b-full":  { label: "LTX-Video 2B (full)",       size: "8.8 GB", engine: "comfy", cap: "video" },
+  "hunyuan":      { label: "HunyuanVideo (HD)",         size: "25 GB",  engine: "comfy", cap: "video" },
+  // shared deps + voice
+  "t5xxl":  { label: "T5-XXL text encoder (fp8)", size: "4.9 GB", engine: "comfy", cap: "dep" },
+  "kokoro": { label: "Kokoro voices (ONNX)",      size: "0.3 GB", engine: "kokoro", cap: "voice" },
+  "xtts":   { label: "XTTS v2 (voice cloning)",   size: "1.8 GB", engine: "xtts",  cap: "voice" },
+};
+const M = (key, extra = {}) => ({ key, model: MODELS[key].label, ...extra });
+
+// Tiers pick the BEST model each Mac class can run, per capability. `models`
+// carries the extra downloads that tier needs beyond the base set.
 const TIERS = {
   lite: {
     id: "lite",
     name: "Lite",
     blurb: "Tuned for 8-16GB Apple Silicon. Fast, light models; short clips.",
-    image: { model: "SDXL-Lightning (4-step)", steps: 4, maxDim: 768, batch: 1 },
-    video: { model: "LTX-Video 2B (distilled)", maxSeconds: 3, fps: 24, maxDim: 512 },
+    text:  M("gemma3-4b", { note: "snappy scriptwriting" }),
+    image: M("sdxl-lightning", { steps: 4, maxDim: 768, batch: 1 }),
+    video: M("ltx-2b", { maxSeconds: 3, fps: 24, maxDim: 512 }),
+    models: ["gemma3-4b", "sdxl-lightning", "ltx-2b", "t5xxl", "kokoro"],
     concurrency: 1,
     keepModelsWarm: false,
   },
   standard: {
     id: "standard",
     name: "Standard",
-    blurb: "For M-series Pro/Max or 32GB+. Full-quality images, longer clips.",
-    image: { model: "SDXL (full) + Lightning LoRA", steps: 8, maxDim: 1024, batch: 1 },
-    video: { model: "LTX-Video 2B (distilled)", maxSeconds: 5, fps: 25, maxDim: 704 },
+    blurb: "For M-series Pro/Max or 32GB+. Fuller models, longer clips.",
+    text:  M("llama31-8b", { note: "richer, more coherent scripts" }),
+    image: M("sdxl-full", { steps: 8, maxDim: 1024, batch: 1 }),
+    video: M("ltx-2b-full", { maxSeconds: 5, fps: 25, maxDim: 704 }),
+    models: ["llama31-8b", "sdxl-full", "ltx-2b-full", "t5xxl", "kokoro", "xtts"],
     concurrency: 1,
     keepModelsWarm: true,
   },
   pro: {
     id: "pro",
     name: "Pro",
-    blurb: "For Max/Ultra or 64GB+. High-res images, multi-second HD clips.",
-    image: { model: "SDXL (full), 25 steps", steps: 25, maxDim: 1280, batch: 2 },
-    video: { model: "LTX-Video 2B, longer horizon", maxSeconds: 8, fps: 30, maxDim: 768 },
+    blurb: "For Max/Ultra or 64GB+. FLUX images, multi-second HD clips.",
+    text:  M("qwen25-32b", { note: "long-form, nuanced writing" }),
+    image: M("flux-schnell", { steps: 8, maxDim: 1280, batch: 2 }),
+    video: M("ltx-2b-full", { maxSeconds: 8, fps: 30, maxDim: 768 }),
+    models: ["qwen25-32b", "flux-schnell", "ltx-2b-full", "t5xxl", "kokoro", "xtts"],
     concurrency: 2,
     keepModelsWarm: true,
   },
   ultra: {
     id: "ultra",
     name: "Ultra",
-    blurb: "For M-Ultra / M5+ / 128GB+. Everything unlocked, longest clips.",
-    image: { model: "SDXL (full), 30 steps, hi-res fix", steps: 30, maxDim: 1536, batch: 3 },
-    video: { model: "LTX-Video 2B, HD, long horizon", maxSeconds: 12, fps: 30, maxDim: 1024 },
+    blurb: "For M-Ultra / M5+ / 128GB+. Best local models, longest HD clips.",
+    text:  M("llama33-70b", { note: "top-tier local writing" }),
+    image: M("flux-dev", { steps: 25, maxDim: 1536, batch: 3 }),
+    video: M("hunyuan", { maxSeconds: 12, fps: 30, maxDim: 1024 }),
+    models: ["llama33-70b", "flux-dev", "hunyuan", "t5xxl", "kokoro", "xtts"],
     concurrency: 3,
     keepModelsWarm: true,
   },
 };
 
+// Power thresholds. A future chip (M5/M6, more cores + RAM) scores higher and
+// therefore lands in a higher tier automatically — that's what makes new Macs
+// pick up FLUX / 70B-class models without any code change here.
 function tierForPower(power, ramGB) {
   // RAM is a hard gate — no chip is allowed above its memory budget.
   if (power >= 70 && ramGB >= 96) return "ultra";
@@ -96,19 +136,15 @@ function tierForPower(power, ramGB) {
   return "lite";
 }
 
-// Model download plan the setup screen shows. Sizes are approximate on-disk.
-function downloadPlan(tierId) {
-  const base = [
-    { key: "sdxl", label: "SDXL base checkpoint", size: "6.9 GB", for: "images", tiers: ["lite", "standard", "pro", "ultra"] },
-    { key: "sdxl-lightning", label: "SDXL Lightning 4-step LoRA", size: "0.4 GB", for: "fast images", tiers: ["lite", "standard", "pro", "ultra"] },
-    { key: "ltx", label: "LTX-Video 2B (distilled)", size: "3.9 GB", for: "video clips", tiers: ["lite", "standard", "pro", "ultra"] },
-    { key: "t5xxl", label: "T5-XXL text encoder (fp8)", size: "4.9 GB", for: "video prompts", tiers: ["lite", "standard", "pro", "ultra"] },
-    { key: "kokoro", label: "Kokoro voices (ONNX)", size: "0.3 GB", for: "voice", tiers: ["lite", "standard", "pro", "ultra"] },
-    { key: "xtts", label: "XTTS v2 (voice cloning)", size: "1.8 GB", for: "voice cloning", tiers: ["standard", "pro", "ultra"] },
-  ];
-  return base
-    .filter((m) => m.tiers.includes(tierId))
-    .map(({ tiers, ...m }) => m);
+// Model download plan the setup screen shows — the actual models THIS tier
+// uses, tagged by what they power, with approximate on-disk sizes.
+export function downloadPlan(tierId) {
+  const tier = TIERS[tierId] || TIERS.lite;
+  const forLabel = { text: "AI script writing", image: "images", video: "video clips", dep: "video prompts", voice: "voice" };
+  return (tier.models || []).map((key) => {
+    const m = MODELS[key];
+    return { key, label: m.label, size: m.size, for: forLabel[m.cap] || m.cap };
+  });
 }
 
 let _cache = null;

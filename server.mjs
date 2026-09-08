@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
-import { detectHardware, tierConfig } from "./scripts/hardware.mjs";
+import { detectHardware, tierConfig, downloadPlan } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
 // re-encode any image (HEIC, tiff, cmyk jpg, etc.) into a Chromium-decodable JPEG.
@@ -1570,7 +1570,9 @@ app.get("/api/hardware", (req, res) => {
   const hw = detectHardware({ fresh: req.query.fresh === "1" });
   const override = getEnvValue("HW_TIER") || "";
   const active = tierConfig(override);
-  res.json({ ...hw, override, activeTier: active, auto: !override });
+  // downloads follow the ACTIVE tier (what you'll actually run), so a manual
+  // override shows the models that override needs — not the auto-detected set.
+  res.json({ ...hw, override, activeTier: active, auto: !override, downloads: downloadPlan(active.id) });
 });
 app.post("/api/hardware/tier", (req, res) => {
   const t = String((req.body || {}).tier || "");

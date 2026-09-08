@@ -939,8 +939,9 @@ async function loadHardware(){
     const a=hw.activeTier;
     card.innerHTML=`<div class="hwtier"><span class="dot"></span> ${a.name} tier${hw.auto?'':' <span class="muted" style="font-size:11px;font-weight:600">(manual override)</span>'}</div>
       <div class="hwrow"><span><b>${esc(hw.chip)}</b></span><span><b>${hw.ramGB}</b> GB RAM</span>${hw.gpuCores?`<span><b>${hw.gpuCores}</b>-core GPU</span>`:''}<span><b>${hw.cpuCores}</b> CPU cores</span></div>
-      <div class="hwrow"><span>Images: <b>${esc(a.image.model)}</b> · up to <b>${a.image.maxDim}px</b></span></div>
-      <div class="hwrow"><span>Video: <b>${esc(a.video.model)}</b> · up to <b>${a.video.maxSeconds}s</b> @ ${a.video.fps}fps</span></div>`;
+      <div class="hwrow"><span>✍️ Text: <b>${esc(a.text.model)}</b>${a.text.note?` · ${esc(a.text.note)}`:''}</span></div>
+      <div class="hwrow"><span>🖼️ Images: <b>${esc(a.image.model)}</b> · up to <b>${a.image.maxDim}px</b></span></div>
+      <div class="hwrow"><span>🎬 Video: <b>${esc(a.video.model)}</b> · up to <b>${a.video.maxSeconds}s</b> @ ${a.video.fps}fps</span></div>`;
   }else if(card){card.innerHTML='<span class="err">Couldn’t scan this Mac.</span>';}
   const grid=document.getElementById('tierGrid');
   if(grid&&hw){
