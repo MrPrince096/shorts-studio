@@ -313,6 +313,13 @@ const VIDEO_SOURCES = [
   { id: "fal-image", label: "AI images: fal.ai FLUX — paid, best quality" },
   { id: "fal", label: "AI video: fal.ai — paid (Seedance / Veo / Kling)" },
 ];
+const IMAGE_LAB_PROVIDERS = [
+  { id: "auto", label: "Auto — local first, cloud fallback" },
+  { id: "local", label: "Local ComfyUI / SDXL — offline" },
+  { id: "image", label: "Pollinations FLUX — free cloud" },
+  { id: "hf", label: "Hugging Face FLUX — cloud" },
+  { id: "fal-image", label: "fal.ai FLUX — cloud" },
+];
 const FAL_MODELS = [
   { id: "fal-ai/bytedance/seedance/v1/lite/text-to-video", label: "Seedance 1.0 Lite (cheapest)" },
   { id: "fal-ai/bytedance/seedance/v1/pro/text-to-video", label: "Seedance 1.0 Pro" },
@@ -332,6 +339,17 @@ const IMAGE_STYLES = [
   { id: "3D render, Pixar animation style, soft lighting", label: "3D animation" },
   { id: "bold comic book art, ink outlines, dynamic, vivid", label: "Comic book" },
   { id: "soft vintage watercolor painting, artistic", label: "Watercolor" },
+];
+const IMAGE_FILTERS = [
+  { id: "none", label: "Clean" },
+  { id: "cinematic", label: "Cinematic contrast" },
+  { id: "warm", label: "Warm golden" },
+  { id: "cool", label: "Cool teal" },
+  { id: "vibrant", label: "Vibrant pop" },
+  { id: "vintage", label: "Vintage film" },
+  { id: "noir", label: "Noir B&W" },
+  { id: "dreamy", label: "Dreamy glow" },
+  { id: "sharp", label: "Sharp detail" },
 ];
 
 // language -> label, caption font (Google Noto for the script), rtl, and voices
@@ -1273,6 +1291,60 @@ app.delete("/api/voices/:id", (req, res) => {
   if (existsSync(wav)) { try { unlinkSync(wav); } catch {} }
   if (getEnvValue("XTTS_VOICE") === "clone:" + id) setEnvValue("XTTS_VOICE", "");
   res.json({ ok: true });
+});
+
+// ---- Image Lab: generate one image from a prompt, local or cloud ----
+async function falQueue(model, body) {
+  const key = getEnvValue("FAL_KEY");
+  if (!key) throw new Error("Add a fal.ai key in Settings.");
+  const auth = { Authorization: `Key ${key}`, "Content-Type": "application/json" };
+  const s = await fetch(`https://queue.fal.run/${model}`, { method: "POST", headers: auth, body: JSON.stringify(body) });
+  if (!s.ok) throw new Error(`fal ${s.status}`);
+  const j = await s.json();
+  const statusUrl = j.status_url || `https://queue.fal.run/${model}/requests/${j.request_id}/status`;
+  const respUrl = j.response_url || `https://queue.fal.run/${model}/requests/${j.request_id}`;
+  const t0 = Date.now();
+  while (Date.now() - t0 < 180000) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const sd = await (await fetch(statusUrl, { headers: auth })).json();
+    if (sd.status === "COMPLETED") break;
+    if (sd.status === "FAILED" || sd.status === "ERROR") throw new Error("fal generation failed");
+  }
+  return (await fetch(respUrl, { headers: auth })).json();
+}
+app.post("/api/image/preview", async (req, res) => {
+  const b = req.body || {};
+  const source = String(b.source || "image");
+  const prompt = String(b.prompt || "").slice(0, 800).trim();
+  if (!prompt) return res.status(400).json({ error: "Type a prompt to generate an image." });
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  try {
+    let buf, ctype = "image/jpeg";
+    if (source === "local") {
+      const url = getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate";
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, width, height }) });
+      if (!r.ok) throw new Error("Local ComfyUI not reachable — turn Local engines ON.");
+      buf = Buffer.from(await r.arrayBuffer()); ctype = r.headers.get("content-type") || "image/png";
+    } else if (source === "hf") {
+      const token = getEnvValue("HF_TOKEN"); if (!token) throw new Error("Add a Hugging Face token in Settings.");
+      const sc = Math.min(1, 1440 / Math.max(width, height));
+      const w = Math.round(width * sc / 8) * 8, h = Math.round(height * sc / 8) * 8;
+      const r = await fetch("https://router.huggingface.co/fal-ai/fal-ai/flux/schnell", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_size: { width: w, height: h }, num_images: 1 }) });
+      if (!r.ok) { if (r.status === 402) throw new Error("HF free credits used up this month."); throw new Error(`HF ${r.status}`); }
+      const j = await r.json(); const u = j?.images?.[0]?.url || j?.image?.url || j?.url; if (!u) throw new Error("HF: no image");
+      buf = Buffer.from(await (await fetch(u)).arrayBuffer());
+    } else if (source === "fal-image") {
+      const rd = await falQueue("fal-ai/flux/schnell", { prompt, image_size: { width, height }, num_images: 1 });
+      const u = rd?.images?.[0]?.url || rd?.image?.url || rd?.url; if (!u) throw new Error("fal: no image");
+      buf = Buffer.from(await (await fetch(u)).arrayBuffer());
+    } else { // pollinations (free, cloud)
+      const seed = Math.floor(Math.random() * 1e6);
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&nologo=true&model=flux&seed=${seed}`;
+      const r = await fetch(url); if (!r.ok) throw new Error(`Pollinations ${r.status}`);
+      buf = Buffer.from(await r.arrayBuffer());
+    }
+    res.setHeader("Content-Type", ctype); res.send(buf);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ---- Animate: turn one image into a short LTX video clip (local) ----

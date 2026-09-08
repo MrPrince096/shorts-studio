@@ -267,6 +267,7 @@
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
     <div class="nav" data-nav="find"><span class="ic" data-icon="search"></span> Find</div>
     <div class="nav" data-nav="voices"><span class="ic" data-icon="mic"></span> Voices</div>
+    <div class="nav" data-nav="imagelab"><span class="ic" data-icon="image"></span> Images</div>
     <div class="navlabel">Library</div>
     <div class="nav" data-nav="library"><span class="ic" data-icon="video"></span> My Videos</div>
     <div class="nav" data-nav="editor"><span class="ic" data-icon="sliders"></span> Editor</div>
@@ -629,6 +630,27 @@
       </div>
     </div>
 
+    <!-- IMAGE LAB (generate an image, local or cloud, from a prompt) -->
+    <div class="gal" id="imagelab">
+      <div class="card">
+        <h2><span data-icon="image"></span> Image Lab <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· generate from a prompt — local or cloud</span></h2>
+        <div class="cardsub">Type what you want, pick a source, and generate. Flip between free cloud (Pollinations), your local ComfyUI/SDXL, HuggingFace FLUX, or fal.ai — all in one place.</div>
+        <label>Prompt</label>
+        <textarea id="ilPrompt" rows="3" placeholder="e.g. a serene himalayan temple at golden sunrise, cinematic, misty, ultra detailed"></textarea>
+        <div class="row" style="margin-top:8px">
+          <div><label>Source <span class="muted">— local or cloud</span></label><select id="ilSource"></select></div>
+          <div><label>Aspect</label><select id="ilAspect"><option value="9:16">9:16 Vertical</option><option value="1:1">1:1 Square</option><option value="16:9">16:9 Landscape</option><option value="4:5">4:5 Portrait</option></select></div>
+        </div>
+        <div class="withbtn" style="margin-top:14px">
+          <button class="btn grad big" id="ilGo" style="flex:1"><span data-icon="spark"></span> Generate image</button>
+          <button class="btn ghost" id="ilAnimate" title="Animate this image into a video clip" disabled>🎬 Animate</button>
+        </div>
+        <div id="ilStatus" style="margin-top:10px;font-size:13px"></div>
+        <img id="ilImg" style="display:none;width:100%;max-height:460px;object-fit:contain;border-radius:12px;margin-top:12px;background:#000">
+        <video id="ilVideo" controls loop style="display:none;width:100%;max-height:460px;border-radius:12px;margin-top:12px"></video>
+      </div>
+    </div>
+
     <!-- LIBRARY (My Videos) -->
     <div class="gal" id="library">
       <div class="card"><h2><span data-icon="video"></span> <span id="libTitle">My Videos</span></h2>
@@ -809,7 +831,7 @@ function applyTabSettings(tab){
   ['qsVoice','qsEngine','qsGenre','qsAILen','qsAspect','qsSource','qsRate','qsCapMotion','qsEffect','qsMusicReuse','qsWatermark','qsLenCol'].forEach(id=>{const el=$('#'+id);if(el)el.style.display=hide.has(id)?'none':'';});
 }
 function switchTab(name){
-  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show'); $('#find').classList.remove('show'); $('#voices').classList.remove('show');
+  $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show'); $('#find').classList.remove('show'); $('#voices').classList.remove('show'); $('#imagelab').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#workspace').style.display='grid';
   applyTabSettings(name);
@@ -818,10 +840,11 @@ document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); n.classList.add('active');
   const v=n.dataset.nav;
   if(v==='dashboard'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');$('#dashboard').classList.add('show');showDashboard();return;}
-  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');$('#voices').classList.remove('show');
+  $('#dashboard').classList.remove('show');$('#editor').classList.remove('show');$('#find').classList.remove('show');$('#voices').classList.remove('show');$('#imagelab').classList.remove('show');
   if(v==='editor'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#editor').classList.add('show');showEditor();return;}
   if(v==='find'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#find').classList.add('show');showFind();return;}
   if(v==='voices'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#voices').classList.add('show');showVoices();return;}
+  if(v==='imagelab'){$('#workspace').style.display='none';$('#library').classList.remove('show');$('#imagelab').classList.add('show');showImageLab();return;}
   if(['library','projects','drafts','assets'].includes(v)){
     $('#workspace').style.display='none'; $('#library').classList.add('show');
     $('#galFilterBar').style.display=(v==='library')?'flex':'none';
@@ -1395,6 +1418,41 @@ $('#findCreate').onclick=async()=>{
   }catch(e){$('#findStatus').innerHTML=`<span class="err">${e.message}</span>`;b.disabled=false;}
 };
 
+// ---- Image Lab (generate from prompt, local or cloud) ----
+let ilImgData=null;
+async function showImageLab(){
+  const sel=$('#ilSource'); if(sel.options.length)return;
+  let s={}; try{s=await(await fetch('/api/settings')).json();}catch{}
+  const opts=[['image','Pollinations — cloud, free'],['local','Local (ComfyUI / SDXL) — offline']];
+  if(s.keys&&s.keys.hf&&s.keys.hf.set) opts.push(['hf','HuggingFace FLUX — cloud']);
+  if(s.keys&&s.keys.fal&&s.keys.fal.set) opts.push(['fal-image','fal.ai FLUX — cloud, paid']);
+  opts.forEach(([v,l])=>sel.appendChild(opt(v,l)));
+}
+$('#ilGo')&&($('#ilGo').onclick=async()=>{
+  const p=$('#ilPrompt').value.trim(); if(!p){alert('Type a prompt first.');return;}
+  const b=$('#ilGo'); b.disabled=true; $('#ilAnimate').disabled=true; $('#ilVideo').style.display='none';
+  $('#ilStatus').innerHTML='<span class="spin"></span> Generating…';
+  try{
+    const r=await fetch('/api/image/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,source:$('#ilSource').value,aspect:$('#ilAspect').value})});
+    if(!r.ok){const e=await r.json().catch(()=>({error:'Failed'}));$('#ilStatus').innerHTML='<span class="err">'+esc(e.error||'Failed')+'</span>';b.disabled=false;return;}
+    const blob=await r.blob();
+    const rd=new FileReader(); rd.onload=()=>{ilImgData=rd.result;$('#ilImg').src=rd.result;$('#ilImg').style.display='block';$('#ilAnimate').disabled=false;}; rd.readAsDataURL(blob);
+    $('#ilStatus').innerHTML='<span class="ok">✅ Done. Right-click the image to save, or 🎬 Animate it into video.</span>';
+  }catch(e){$('#ilStatus').innerHTML='<span class="err">'+esc(e.message)+'</span>';}
+  b.disabled=false;
+});
+async function ilAnPoll(id,clipUrl){try{const s=await(await fetch('/api/status/'+id)).json();
+  if(s.status==='running'){$('#ilStatus').innerHTML='<span class="spin"></span> '+esc((s.log||[]).slice(-1)[0]||'Animating…');setTimeout(()=>ilAnPoll(id,clipUrl),3000);}
+  else if(s.status==='done'){$('#ilStatus').innerHTML='<span class="ok">✅ Video ready!</span>';const v=$('#ilVideo');v.src=clipUrl+'?t='+Date.now();v.style.display='block';v.play().catch(()=>{});$('#ilAnimate').disabled=false;}
+  else{$('#ilStatus').innerHTML='<span class="err">❌ '+esc((s.log||[]).slice(-1)[0]||'Failed')+'</span>';$('#ilAnimate').disabled=false;}
+}catch(e){$('#ilStatus').innerHTML='<span class="err">'+esc(e.message)+'</span>';$('#ilAnimate').disabled=false;}}
+$('#ilAnimate')&&($('#ilAnimate').onclick=async()=>{
+  if(!ilImgData)return; const b=$('#ilAnimate'); b.disabled=true; $('#ilStatus').innerHTML='<span class="spin"></span> Starting animation (~5–8 min)…';
+  try{const r=await(await fetch('/api/animate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:ilImgData,prompt:$('#ilPrompt').value.trim(),aspect:$('#ilAspect').value})})).json();
+    if(r.error){$('#ilStatus').innerHTML='<span class="err">'+esc(r.error)+'</span>';b.disabled=false;return;}
+    ilAnPoll(r.jobId,r.clipUrl);
+  }catch(e){$('#ilStatus').innerHTML='<span class="err">'+esc(e.message)+'</span>';b.disabled=false;}
+});
 // ---- Animate an image -> video clip (standalone) ----
 $('#anUp')&&($('#anUp').onclick=()=>$('#anFile').click());
 $('#anFile')&&($('#anFile').onchange=()=>{const f=$('#anFile').files[0];if(!f)return;if(f.size>12*1024*1024){alert('Please use an image under 12 MB.');return;}const rd=new FileReader();rd.onload=()=>{window.__anImg=rd.result;$('#anPreview').src=rd.result;$('#anPreview').style.display='block';};rd.readAsDataURL(f);});
