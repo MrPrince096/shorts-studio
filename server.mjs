@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
@@ -457,7 +457,7 @@ function maskKey(v) {
   return v.length <= 4 ? "••••" : "••••••" + v.slice(-4);
 }
 
-const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "calm", tech: "calm", documentary: "calm", motivational: "uplifting", cooking: "uplifting", fashion: "uplifting", educational: "calm", history: "calm", war: "scary", story: "calm" };
+const MOOD_FOR_STORY = { scary: "scary", bedtime: "calm", biography: "calm", tech: "calm", documentary: "calm", motivational: "uplifting", cooking: "uplifting", fashion: "uplifting", educational: "calm", history: "calm", war: "scary", mythology: "uplifting", psychology: "calm", philosophy: "calm", folklore: "calm", mystery: "scary", space: "uplifting", science: "calm", truecrime: "scary", sports: "uplifting", finance: "uplifting", story: "calm" };
 // a full VISUAL THEME per story type — imageStyle (AI images), motion, captions —
 // so a scary story and a bedtime story actually look different, not just sound it.
 const STORY_THEMES = {
@@ -472,10 +472,20 @@ const STORY_THEMES = {
   educational: { imageStyle: "clean bright explainer visuals, clear, colorful, friendly, well-lit, detailed", motion: "in", captionPos: "bottom", effect: "none" },
   history: { imageStyle: "epic historical documentary still, aged film look, dramatic lighting, sweeping, richly detailed", motion: "in", captionPos: "bottom", effect: "vintage" },
   war: { imageStyle: "gritty war documentary, desaturated, dramatic smoke and shadow, cinematic, intense", motion: "in", captionPos: "bottom", effect: "vintage" },
+  mythology: { imageStyle: "epic mythological art, divine golden light, ancient gods and heroes, ornate, painterly, dramatic, richly detailed", motion: "in", captionPos: "bottom", effect: "vintage" },
+  psychology: { imageStyle: "clean thoughtful conceptual art, mind and brain motifs, soft modern lighting, minimal, intriguing, detailed", motion: "in", captionPos: "bottom", effect: "cold" },
+  philosophy: { imageStyle: "contemplative cinematic, soft timeless light, thoughtful, minimal, atmospheric, painterly", motion: "subtle", captionPos: "bottom", effect: "warm" },
+  folklore: { imageStyle: "folk-tale illustration, warm firelight, mystical, rustic, storybook, atmospheric, detailed", motion: "subtle", captionPos: "bottom", effect: "dreamy" },
+  mystery: { imageStyle: "moody mysterious cinematic, fog, low key light, noir, intriguing, richly detailed", motion: "in", captionPos: "bottom", effect: "noir" },
+  space: { imageStyle: "breathtaking space art, nebulae, planets, stars, cosmic scale, deep vivid colors, ultra detailed, cinematic", motion: "in", captionPos: "bottom", effect: "cold" },
+  science: { imageStyle: "vivid science visualization, clean, colorful, bright, detailed, engaging", motion: "in", captionPos: "bottom", effect: "vibrant" },
+  truecrime: { imageStyle: "dark investigative cinematic, moody noir, grainy, tense, detailed", motion: "in", captionPos: "bottom", effect: "noir" },
+  sports: { imageStyle: "dynamic sports cinematic, motion blur, stadium light, intense, high energy, detailed", motion: "in", captionPos: "bottom", effect: "vibrant" },
+  finance: { imageStyle: "sleek modern finance visuals, clean, gold and green accents, professional, crisp, detailed", motion: "in", captionPos: "bottom", effect: "cold" },
   story: { imageStyle: "cinematic film still, dramatic lighting, highly detailed, atmospheric", motion: "in", captionPos: "bottom", effect: "none" },
 };
 // best-fit XTTS-v2 built-in voice per story type (safe: server falls back if missing)
-const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", cooking: "Sofia Hellen", fashion: "Alison Dietlinde", educational: "Andrew Chipper", history: "Viktor Menelaos", war: "Damien Black", story: "Damien Black" };
+const XTTS_VOICE_FOR = { scary: "Damien Black", bedtime: "Sofia Hellen", biography: "Royston Min", tech: "Andrew Chipper", documentary: "Viktor Menelaos", motivational: "Craig Gutsy", cooking: "Sofia Hellen", fashion: "Alison Dietlinde", educational: "Andrew Chipper", history: "Viktor Menelaos", war: "Damien Black", mythology: "Viktor Menelaos", psychology: "Andrew Chipper", philosophy: "Viktor Menelaos", folklore: "Sofia Hellen", mystery: "Damien Black", space: "Viktor Menelaos", science: "Andrew Chipper", truecrime: "Damien Black", sports: "Craig Gutsy", finance: "Craig Gutsy", story: "Damien Black" };
 // emotional delivery per story type: edge-tts rate/pitch + Piper length-scale (pace)
 const PROSODY = {
   scary: { rate: "-12%", pitch: "-6Hz", length: 1.18 },
@@ -489,6 +499,16 @@ const PROSODY = {
   educational: { rate: "+2%", pitch: "0Hz", length: 0.98 },
   history: { rate: "-4%", pitch: "-2Hz", length: 1.08 },
   war: { rate: "-5%", pitch: "-3Hz", length: 1.1 },
+  mythology: { rate: "-4%", pitch: "-2Hz", length: 1.1 },
+  psychology: { rate: "+1%", pitch: "0Hz", length: 1.0 },
+  philosophy: { rate: "-6%", pitch: "-2Hz", length: 1.12 },
+  folklore: { rate: "-6%", pitch: "-1Hz", length: 1.14 },
+  mystery: { rate: "-6%", pitch: "-3Hz", length: 1.12 },
+  space: { rate: "-3%", pitch: "-1Hz", length: 1.06 },
+  science: { rate: "+2%", pitch: "0Hz", length: 0.98 },
+  truecrime: { rate: "-6%", pitch: "-3Hz", length: 1.12 },
+  sports: { rate: "+6%", pitch: "+3Hz", length: 0.95 },
+  finance: { rate: "+3%", pitch: "+1Hz", length: 0.97 },
   story: { rate: "-4%", pitch: "0Hz", length: 1.08 },
 };
 function resolveMood(sel, ctx = {}) {
@@ -1067,6 +1087,24 @@ app.post("/api/render", (req, res) => {
   const job = newJob(1);
   res.json({ jobId: job.id, dims: `${width}x${height}` });
   runAll([config], job);
+});
+
+// ---- 🎲 endless topics (dice): invent one fresh topic, optionally from a hint ----
+app.post("/api/topic", async (req, res) => {
+  const b = req.body || {};
+  try {
+    const topic = await generateTopic({
+      forType: String(b.forType || "shorts"),
+      type: String(b.type || "").trim(),
+      hint: String(b.hint || "").trim(),
+      genre: String(b.genre || "").trim(),
+      country: String(b.country || "").trim(),
+      language: resolveLang(b.language || "en").label,
+      llmProvider: b.llmProvider || "",
+    });
+    if (!topic) throw new Error("no topic");
+    res.json({ topic });
+  } catch (e) { res.status(500).json({ error: e.message || "Couldn't roll a topic — try again." }); }
 });
 
 // ---- Ideas (VidIQ-style: niche -> viral ideas + titles + tags) ----

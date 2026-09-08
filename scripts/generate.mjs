@@ -184,6 +184,26 @@ Return ONLY JSON: {"ideas":[{"title":"","hook":"","why":"","tags":["",""]}]}`;
   return (data.ideas || []).filter((i) => i && i.title).slice(0, count);
 }
 
+// 🎲 endless topics: invent ONE fresh, specific, clickable topic — optionally
+// seeded by a hint / story type / genre / country. Returns a plain-text topic.
+const TOPIC_WHAT = { shorts: "short-form vertical video", story: "narrated story/explainer video", ads: "product advertisement", song: "song / music video" };
+export async function generateTopic({ forType = "shorts", type = "", hint = "", genre = "", country = "", language = "English", llmProvider } = {}) {
+  const what = TOPIC_WHAT[forType] || TOPIC_WHAT.shorts;
+  const bits = [
+    type && `a "${type}" style`,
+    hint && `loosely inspired by: "${hint}" (invent something NEW and different, don't just repeat it)`,
+    genre && `in the "${genre}" genre`,
+    country && `connected to ${country}`,
+  ].filter(Boolean).join(", ");
+  const prompt = `Invent ONE fresh, specific, highly clickable topic for a ${what}${bits ? ", " + bits : ""}.
+Make it novel, intriguing and surprising — not a generic or common topic. It should make someone want to watch immediately.
+${language && language.toLowerCase() !== "english" ? `Write it in ${language}. ` : ""}Return ONLY the topic itself as one short line (under 12 words), no quotes, no numbering, no explanation.`;
+  let t = String(await callLLM(prompt, llmProvider) || "").trim();
+  t = t.replace(/^```[a-z]*\s*|\s*```$/gi, "").split("\n").map((x) => x.trim()).filter(Boolean)[0] || t;
+  t = t.replace(/^["'“”\-\d.\)\s]+|["'“”\s]+$/g, "").replace(/\s+/g, " ").trim();
+  return t.slice(0, 120);
+}
+
 // ---- Long-form storytelling (3-10 min). Chunked (outline -> per-beat scenes) so
 // small local models never truncate one giant JSON. Great for bedtime / scary /
 // biography / tech-explainer narration videos. ----
@@ -199,6 +219,16 @@ export const STORY_STYLES = {
   educational: "Clear, curious explainer narration — break down how it works with concrete examples and satisfying 'aha' moments.",
   history: "Vivid, immersive historical narration — set the scene, the people, the stakes and the turning points like a great documentary.",
   war: "Gripping, respectful war-history narration — the tension, the strategy, the human cost and the turning points of the conflict.",
+  mythology: "Epic, reverent mythological narration — gods, heroes and ancient legends, cosmic stakes and timeless wonder.",
+  psychology: "Insightful, curious psychology narration — how the mind works and why we behave as we do, with relatable examples and aha-moment reveals.",
+  philosophy: "Reflective, profound philosophy narration — big questions and deep ideas in a calm, contemplative tone.",
+  folklore: "Warm, mysterious folklore narration — old tales and local legends passed down through generations, with a touch of magic.",
+  mystery: "Gripping, suspenseful mystery narration — unsolved puzzles and eerie clues, building intrigue toward a reveal.",
+  space: "Awe-inspiring cosmic narration — planets, stars and the universe, conveying scale and wonder.",
+  science: "Clear, exciting science narration — how the world really works, surprising facts and vivid concrete examples.",
+  truecrime: "Tense, measured true-crime narration — the case, the timeline and the twists, gripping yet respectful.",
+  sports: "High-energy sports narration — the drama, the stakes and the legendary moments, momentum building throughout.",
+  finance: "Sharp, practical money narration — wealth, markets and smart lessons, clear and confident.",
   story: "Engaging narrative storytelling with a clear beginning, middle and satisfying end.",
 };
 // build a rich subject when a country is chosen (great for cooking / history / culture per country)
