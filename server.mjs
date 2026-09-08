@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
+import { detectHardware, tierConfig } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
 // re-encode any image (HEIC, tiff, cmyk jpg, etc.) into a Chromium-decodable JPEG.
@@ -540,9 +541,21 @@ function dims(aspect, quality) {
 let busy = false;
 const jobs = new Map();
 let seq = 0;
-function newJob(total) {
+// Rough per-unit time estimates (seconds) used to show an ETA while a job
+// runs. Scaled by the machine's tier — a Lite M1 is slower than a Pro/Ultra.
+// `kind` is set by each endpoint; falls back to a generic render estimate.
+const ETA_BASE = { render: 55, animate: 430, image: 45, voice: 6, series: 70 };
+function etaScale() {
+  const t = detectHardware().tierId;
+  return { lite: 1, standard: 0.65, pro: 0.45, ultra: 0.32 }[t] || 1;
+}
+function newJob(total, kind = "render") {
   const id = String(++seq);
-  const job = { id, status: "running", log: [], files: [], total, current: 0, title: "" };
+  const perUnit = Math.round((ETA_BASE[kind] || ETA_BASE.render) * etaScale());
+  const job = {
+    id, status: "running", log: [], files: [], total, current: 0, title: "",
+    kind, startedAt: Date.now(), perUnit, etaTotal: perUnit * Math.max(1, total),
+  };
   jobs.set(id, job);
   return job;
 }
@@ -1311,9 +1324,21 @@ app.post("/api/series/continue", (req, res) => {
 app.get("/api/status/:id", (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: "unknown job" });
+  // Freeze the clock the first time we observe a finished job, so "time taken"
+  // reflects the actual run, not how long since it finished.
+  if (job.status !== "running" && !job.finishedAt) job.finishedAt = Date.now();
+  const end = job.finishedAt || Date.now();
+  const elapsed = Math.round((end - (job.startedAt || end)) / 1000);
+  // ETA: units already finished contribute their real cost; the rest are
+  // estimated. While a unit is in flight, don't let "remaining" run negative.
+  const doneUnits = Math.max(0, (job.current || 1) - 1);
+  const estTotal = job.etaTotal || (job.perUnit || 55) * Math.max(1, job.total || 1);
+  let remaining = job.status === "running" ? Math.max(0, estTotal - elapsed) : 0;
   res.json({
     status: job.status, title: job.title, total: job.total, current: job.current,
     files: job.files, log: job.log.slice(-26),
+    kind: job.kind, elapsed, etaTotal: estTotal, remaining,
+    doneUnits,
   });
 });
 
@@ -1394,7 +1419,11 @@ app.post("/api/image/preview", async (req, res) => {
     let buf, ctype = "image/jpeg";
     if (source === "local") {
       const url = getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate";
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, width, height }) });
+      // Clamp to the tier's image ceiling so a weaker Mac doesn't OOM on 1536px.
+      const tc = tierConfig(getEnvValue("HW_TIER"));
+      const sc = Math.min(1, tc.image.maxDim / Math.max(width, height));
+      const lw = Math.round((width * sc) / 8) * 8, lh = Math.round((height * sc) / 8) * 8;
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, width: lw, height: lh, steps: tc.image.steps }) });
       if (!r.ok) throw new Error("Local ComfyUI not reachable — turn Local engines ON.");
       buf = Buffer.from(await r.arrayBuffer()); ctype = r.headers.get("content-type") || "image/png";
     } else if (source === "hf") {
@@ -1438,14 +1467,23 @@ app.post("/api/animate", (req, res) => {
   const animateUrl = (getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate").replace(/\/generate$/, "/animate");
   const vertical = (b.aspect || "9:16") === "9:16" || (b.aspect || "") === "4:5";
   busy = true;
-  const job = newJob(1);
+  const job = newJob(1, "animate");
   res.json({ jobId: job.id, clipUrl });
   (async () => {
     try {
-      pushLog(job, "🎬 Animating your image into a video clip (LTX — this takes ~5–8 min on an M1)…");
+      // Match the clip to what this Mac can handle: the tier caps resolution,
+      // clip length (seconds→frames) and — via the timer — how long we warn.
+      const tc = tierConfig(getEnvValue("HW_TIER"));
+      const cap = tc.video.maxDim;
+      const long = Math.min(cap, cap >= 704 ? 704 : cap);       // long edge
+      const shortEdge = Math.round((long * 480) / 768 / 8) * 8; // keep ~ same ratio
+      const width = vertical ? shortEdge : long, height = vertical ? long : shortEdge;
+      const maxFrames = Math.max(25, Math.round(tc.video.maxSeconds * tc.video.fps));
+      const frames = Math.min(maxFrames, Math.max(25, parseInt(b.frames) || 49));
+      pushLog(job, `🎬 Animating with ${tc.video.model} at ${width}×${height}, ${(frames / tc.video.fps).toFixed(1)}s (${tc.name} tier)…`);
       const r = await fetch(animateUrl, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: b.image, prompt: String(b.prompt || "gentle cinematic camera motion, subtle movement, high detail"), width: vertical ? 480 : 768, height: vertical ? 768 : 480, frames: Math.min(97, Math.max(25, parseInt(b.frames) || 49)), steps: 12 }),
+        body: JSON.stringify({ image: b.image, prompt: String(b.prompt || "gentle cinematic camera motion, subtle movement, high detail"), width, height, frames, steps: 12 }),
       });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `animate failed (${r.status}) — is ComfyUI/Local engines ON?`); }
       writeFileSync(join(CLIPS_DIR, id + ".mp4"), Buffer.from(await r.arrayBuffer()));
@@ -1525,6 +1563,22 @@ app.get("/api/health", async (_req, res) => {
   const ollama = (getEnvValue("OLLAMA_URL") || "http://localhost:11434") + "/api/tags";
   const [xtts, kokoro, comfy, llm] = await Promise.all([portUp(xttsUrl), portUp(kokUrl), portUp(localImg), portUp(ollama)]);
   res.json({ xtts, kokoro, comfy, ollama: llm });
+});
+
+// ---- hardware scan + tier (adapts the app to whatever Mac it's on) ----
+app.get("/api/hardware", (req, res) => {
+  const hw = detectHardware({ fresh: req.query.fresh === "1" });
+  const override = getEnvValue("HW_TIER") || "";
+  const active = tierConfig(override);
+  res.json({ ...hw, override, activeTier: active, auto: !override });
+});
+app.post("/api/hardware/tier", (req, res) => {
+  const t = String((req.body || {}).tier || "");
+  const valid = ["", "auto", "lite", "standard", "pro", "ultra"];
+  if (!valid.includes(t)) return res.status(400).json({ error: "unknown tier" });
+  setEnvValue("HW_TIER", t === "auto" ? "" : t);   // empty = follow the auto scan
+  const override = getEnvValue("HW_TIER") || "";
+  res.json({ ok: true, override, activeTier: tierConfig(override), auto: !override });
 });
 let startingServers = false;
 app.post("/api/servers/start", (_req, res) => {

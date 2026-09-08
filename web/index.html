@@ -89,7 +89,26 @@
   .etsw input:checked+.ettk{background:linear-gradient(135deg,rgba(var(--accent-rgb),.9),rgba(var(--accent2-rgb),.85));border-color:transparent}
   .etsw input:checked+.ettk::before{transform:translateX(16px);background:#fff}
   .engtoggle.pending .ettk::before{background:var(--gold);animation:epulse 1s ease-in-out infinite}
+  .tierchip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--accent-tint);background:rgba(var(--accent-rgb),.14);border:1px solid rgba(var(--accent-rgb),.38);padding:4px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;transition:background .14s}
+  .tierchip:hover{background:rgba(var(--accent-rgb),.24)}
   @media(max-width:960px){.enginebar .estat{display:none}.enginebar{padding:5px 10px}.engtoggle{border-left:none}}
+  /* System panel (Settings) */
+  .hwcard{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel2);font-size:13px;line-height:1.5}
+  .hwcard .hwrow{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;color:var(--muted);font-size:12px}
+  .hwcard .hwrow b{color:var(--text);font-weight:700}
+  .hwcard .hwtier{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:800}
+  .hwcard .hwtier .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px rgba(57,217,138,.7)}
+  .tiergrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+  .tieropt{border:1px solid var(--line);border-radius:11px;padding:10px;cursor:pointer;background:var(--panel2);transition:border-color .14s,background .14s}
+  .tieropt:hover{border-color:var(--accent)}
+  .tieropt.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.12)}
+  .tieropt .tn{font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px}
+  .tieropt .tn .auto{font-size:9px;font-weight:700;letter-spacing:.4px;color:var(--accent-tint);background:rgba(var(--accent-rgb),.2);padding:1px 6px;border-radius:10px}
+  .tieropt .td{color:var(--muted);font-size:11px;margin-top:4px;line-height:1.35}
+  .dllist{display:flex;flex-direction:column;gap:6px}
+  .dlitem{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
+  .dlitem .dlfor{color:var(--faint);font-size:11px}
+  .dlitem .dlsize{margin-left:auto;color:var(--accent-tint);font-weight:700;font-variant-numeric:tabular-nums}
   .iconbtn{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px;transition:border-color .14s,background .14s}
   .iconbtn:hover{border-color:var(--accent);background:var(--panel2)}
   .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
@@ -214,6 +233,10 @@
   #log{background:#07090e;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#9fd0ff;max-height:150px;overflow:auto;white-space:pre-wrap;margin-top:8px}
   .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
   @keyframes s{to{transform:rotate(360deg)}}
+  .timer{display:inline-block;margin-left:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .timer b{color:var(--accent-tint);font-weight:700}
+  .pbar{height:5px;border-radius:5px;background:rgba(var(--accent-rgb),.14);margin-top:9px;overflow:hidden}
+  .pbar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,rgba(var(--accent-rgb),.9),rgba(var(--accent2-rgb),.9));transition:width .8s ease}
   .idea{border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:8px;background:var(--panel2)}
   .idea .it{font-weight:700}.idea .ih{color:var(--muted);font-size:12.5px;margin:3px 0}
   .tag{display:inline-block;background:#07090e;border:1px solid var(--line);color:#9fd0ff;border-radius:6px;padding:1px 7px;font-size:10.5px;margin:2px 3px 0 0}
@@ -286,6 +309,7 @@
       </div>
       <div class="sp"></div>
       <div class="enginebar" id="engineBar" title="Local engine status">
+        <span class="tierchip" id="tierChip" title="This Mac's performance tier — click for details">⚙︎ …</span>
         <span class="estat" data-eng="xtts"><i></i>Voice</span>
         <span class="estat" data-eng="comfy"><i></i>Images</span>
         <span class="estat" data-eng="ollama"><i></i>AI</span>
@@ -681,6 +705,17 @@
     <div class="mbody">
 
       <div class="setsec">
+        <div class="sechead"><span data-icon="cpu"></span> System &amp; performance</div>
+        <p class="muted" style="font-size:12px;margin:0 0 10px">Shorts Studio scans this Mac and picks a performance tier — how big the local AI models are and how long clips can get. It adapts on its own to whatever machine it's installed on.</p>
+        <div id="hwCard" class="hwcard"><span class="spin"></span> Scanning this Mac…</div>
+        <label style="margin-top:14px">Performance tier</label>
+        <div class="tiergrid" id="tierGrid"></div>
+        <div class="muted" style="font-size:11px;margin-top:8px">Leave on <b>Auto</b> to match your chip. Pick a lighter tier to save memory, or a heavier one to push quality (may be slow or run out of memory on smaller Macs).</div>
+        <label style="margin-top:14px">Recommended local models for this Mac</label>
+        <div id="hwDownloads" class="dllist"></div>
+      </div>
+
+      <div class="setsec">
         <div class="sechead"><span data-icon="palette"></span> Appearance</div>
         <label>Accent colour <span class="muted">— recolours the whole app, live</span></label>
         <div class="swatches" id="swatches"></div>
@@ -893,6 +928,38 @@ document.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>document.querySe
   });
   refresh(); setInterval(()=>{if(!busy)refresh();}, 12000);
 })();
+// ---- hardware scan + performance tier (adapts to whatever Mac it's on) ----
+let __hw=null;
+async function loadHardware(){
+  try{__hw=await(await fetch('/api/hardware')).json();}catch{__hw=null;}
+  const hw=__hw; const chip=document.getElementById('tierChip');
+  if(chip&&hw){chip.textContent='⚙︎ '+hw.activeTier.name+(hw.auto?'':' (manual)');chip.title=hw.summary+' — click for details';}
+  const card=document.getElementById('hwCard');
+  if(card&&hw){
+    const a=hw.activeTier;
+    card.innerHTML=`<div class="hwtier"><span class="dot"></span> ${a.name} tier${hw.auto?'':' <span class="muted" style="font-size:11px;font-weight:600">(manual override)</span>'}</div>
+      <div class="hwrow"><span><b>${esc(hw.chip)}</b></span><span><b>${hw.ramGB}</b> GB RAM</span>${hw.gpuCores?`<span><b>${hw.gpuCores}</b>-core GPU</span>`:''}<span><b>${hw.cpuCores}</b> CPU cores</span></div>
+      <div class="hwrow"><span>Images: <b>${esc(a.image.model)}</b> · up to <b>${a.image.maxDim}px</b></span></div>
+      <div class="hwrow"><span>Video: <b>${esc(a.video.model)}</b> · up to <b>${a.video.maxSeconds}s</b> @ ${a.video.fps}fps</span></div>`;
+  }else if(card){card.innerHTML='<span class="err">Couldn’t scan this Mac.</span>';}
+  const grid=document.getElementById('tierGrid');
+  if(grid&&hw){
+    const opts=[{id:'auto',name:'Auto',blurb:'Match this Mac automatically (recommended).'},...hw.allTiers];
+    grid.innerHTML=opts.map(t=>{
+      const on=(t.id==='auto')?hw.auto:(!hw.auto&&hw.override===t.id);
+      const isDetected=(t.id===hw.tierId);
+      return `<div class="tieropt${on?' on':''}" onclick="setTier('${t.id}')"><div class="tn">${esc(t.name)}${(t.id==='auto'&&isDetected)?'':''}${isDetected&&t.id!=='auto'?'<span class="auto">detected</span>':''}</div><div class="td">${esc(t.blurb)}</div></div>`;
+    }).join('');
+  }
+  const dl=document.getElementById('hwDownloads');
+  if(dl&&hw){dl.innerHTML=(hw.downloads||[]).map(m=>`<div class="dlitem"><span>${esc(m.label)}</span><span class="dlfor">${esc(m.for)}</span><span class="dlsize">${esc(m.size)}</span></div>`).join('');}
+}
+async function setTier(t){
+  try{await fetch('/api/hardware/tier',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tier:t})});}catch{}
+  loadHardware();
+}
+document.getElementById('tierChip')&&(document.getElementById('tierChip').onclick=()=>{const o=document.getElementById('settingsOverlay');o.classList.add('open');loadHardware();});
+loadHardware();
 // ---- accent colour theming (pick any colour, recolours whole app) ----
 (function(){
   const PRESETS=['#8b6bff','#5b93ff','#22d3ee','#2dd4bf','#34d399','#a3e635','#eab308','#f59e0b','#fb7185','#f43f5e','#ec4899','#c084fc'];
@@ -1117,7 +1184,7 @@ function applyAvatarUI(){
   $('#ugcTalkNote').textContent=ap?`(via ${ap})`:'(needs a fal.ai / D-ID / HeyGen key in Settings)';
 }
 $('#llmProvider').onchange=toggleLlm;
-const openS=()=>{loadSettings();$('#settingsOverlay').classList.add('open');};
+const openS=()=>{loadSettings();loadHardware();$('#settingsOverlay').classList.add('open');};
 $('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
 $('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
@@ -1193,12 +1260,16 @@ function startP(){$('#log').hidden=false;$('#result').innerHTML='';$('#log').tex
   else h.style.display='none';
   ACT.forEach(s=>$(s).disabled=true);}
 function endP(){$('#renderHint').style.display='none';ACT.forEach(s=>$(s).disabled=false);}
+// ---- render timer (elapsed + approx time left, from the server's estimate) ----
+// (reuses fmtDur below — m:ss — for a compact, consistent readout)
+function timerLine(s){if(!s||s.elapsed==null)return '';const rem=(s.remaining>0)?` · about <b>${fmtDur(s.remaining)}</b> left`:' · finishing up…';return `<span class="timer">⏱ ${fmtDur(s.elapsed)} elapsed${rem}</span>`;}
+function timerBar(s){if(!s||!s.etaTotal)return '';const pct=Math.min(99,Math.round((s.elapsed/s.etaTotal)*100));return `<div class="pbar"><i style="width:${pct}%"></i></div>`;}
 async function poll(id){
   const s=await(await fetch('/api/status/'+id)).json();
   $('#log').textContent=(s.log||[]).join('\n');$('#log').scrollTop=$('#log').scrollHeight;
-  if(s.status==='running'){const of=s.total>1?` (video ${s.current} of ${s.total})`:'';$('#status').innerHTML=`<span class="spin"></span> Working${of} — <b>${s.title||'…'}</b>`;}
+  if(s.status==='running'){const of=s.total>1?` (video ${s.current} of ${s.total})`:'';$('#status').innerHTML=`<span class="spin"></span> Working${of} — <b>${s.title||'…'}</b> ${timerLine(s)}${timerBar(s)}`;}
   else{clearInterval(polling);polling=null;endP();
-    if(s.status==='done'){$('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s)</span>`;
+    if(s.status==='done'){$('#status').innerHTML=`<span class="ok">✅ Done — ${(s.files||[]).length} video(s) in ${fmtDur(s.elapsed)}</span>`;
       const f=(s.files||[])[0]; if(f) showPreview(encodeURIComponent(f));
       refreshRecent();refreshGallery();refreshSeries();loadStats();}
     else{$('#status').innerHTML=`<span class="err">❌ Failed — see log.</span>`;if((s.files||[]).length){refreshRecent();refreshGallery();loadStats();}}}
@@ -1459,8 +1530,8 @@ $('#ilGo')&&($('#ilGo').onclick=async()=>{
   b.disabled=false;
 });
 async function ilAnPoll(id,clipUrl){try{const s=await(await fetch('/api/status/'+id)).json();
-  if(s.status==='running'){$('#ilStatus').innerHTML='<span class="spin"></span> '+esc((s.log||[]).slice(-1)[0]||'Animating…');setTimeout(()=>ilAnPoll(id,clipUrl),3000);}
-  else if(s.status==='done'){$('#ilStatus').innerHTML='<span class="ok">✅ Video ready!</span>';const v=$('#ilVideo');v.src=clipUrl+'?t='+Date.now();v.style.display='block';v.play().catch(()=>{});$('#ilAnimate').disabled=false;}
+  if(s.status==='running'){$('#ilStatus').innerHTML='<span class="spin"></span> '+esc((s.log||[]).slice(-1)[0]||'Animating…')+' '+timerLine(s)+timerBar(s);setTimeout(()=>ilAnPoll(id,clipUrl),3000);}
+  else if(s.status==='done'){$('#ilStatus').innerHTML='<span class="ok">✅ Video ready in '+fmtDur(s.elapsed)+'!</span>';const v=$('#ilVideo');v.src=clipUrl+'?t='+Date.now();v.style.display='block';v.play().catch(()=>{});$('#ilAnimate').disabled=false;}
   else{$('#ilStatus').innerHTML='<span class="err">❌ '+esc((s.log||[]).slice(-1)[0]||'Failed')+'</span>';$('#ilAnimate').disabled=false;}
 }catch(e){$('#ilStatus').innerHTML='<span class="err">'+esc(e.message)+'</span>';$('#ilAnimate').disabled=false;}}
 $('#ilAnimate')&&($('#ilAnimate').onclick=async()=>{
@@ -1474,8 +1545,8 @@ $('#ilAnimate')&&($('#ilAnimate').onclick=async()=>{
 $('#anUp')&&($('#anUp').onclick=()=>$('#anFile').click());
 $('#anFile')&&($('#anFile').onchange=()=>{const f=$('#anFile').files[0];if(!f)return;if(f.size>12*1024*1024){alert('Please use an image under 12 MB.');return;}const rd=new FileReader();rd.onload=()=>{window.__anImg=rd.result;$('#anPreview').src=rd.result;$('#anPreview').style.display='block';};rd.readAsDataURL(f);});
 async function anPoll(id,clipUrl){try{const s=await(await fetch('/api/status/'+id)).json();
-  if(s.status==='running'){$('#anStatus').innerHTML=`<span class="spin"></span> ${esc((s.log||[]).slice(-1)[0]||'Animating…')}`;setTimeout(()=>anPoll(id,clipUrl),3000);}
-  else if(s.status==='done'){$('#anStatus').innerHTML='<span class="ok">✅ Done! Clip saved (also in your data/clips).</span>';const v=$('#anVideo');v.src=clipUrl+'?t='+Date.now();v.style.display='block';v.play().catch(()=>{});$('#anGo').disabled=false;}
+  if(s.status==='running'){$('#anStatus').innerHTML=`<span class="spin"></span> ${esc((s.log||[]).slice(-1)[0]||'Animating…')} ${timerLine(s)}${timerBar(s)}`;setTimeout(()=>anPoll(id,clipUrl),3000);}
+  else if(s.status==='done'){$('#anStatus').innerHTML=`<span class="ok">✅ Done in ${fmtDur(s.elapsed)}! Clip saved (also in your data/clips).</span>`;const v=$('#anVideo');v.src=clipUrl+'?t='+Date.now();v.style.display='block';v.play().catch(()=>{});$('#anGo').disabled=false;}
   else{$('#anStatus').innerHTML=`<span class="err">❌ ${esc((s.log||[]).slice(-1)[0]||'Failed')}</span>`;$('#anGo').disabled=false;}
 }catch(e){$('#anStatus').innerHTML=`<span class="err">${esc(e.message)}</span>`;$('#anGo').disabled=false;}}
 $('#anGo')&&($('#anGo').onclick=async()=>{
