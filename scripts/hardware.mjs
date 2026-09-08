@@ -6,9 +6,12 @@
 // M1/16GB this stays lite; on an M5 Ultra / M6 / 128GB+ it unlocks the big
 // settings. The same code therefore adapts to whatever Mac it's installed on.
 import { execFileSync } from "node:child_process";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import os from "node:os";
 
 const GB = 1024 * 1024 * 1024;
+const HOME = os.homedir();
 
 function sysctl(key) {
   try { return execFileSync("sysctl", ["-n", key], { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); }
@@ -194,4 +197,102 @@ export function tierConfig(override) {
   const hw = detectHardware();
   const id = (override && TIERS[override]) ? override : hw.tierId;
   return TIERS[id];
+}
+
+// ---- one-click installer plan -------------------------------------------
+// Maps catalog model keys to a concrete install ACTION: an `ollama pull`, one
+// of the repo's idempotent setup-*.sh scripts, or "manual" for models we don't
+// auto-install yet. Several keys can share one action (e.g. ltx-2b + t5xxl are
+// both installed by setup-ltx-video.sh) — they dedupe to a single step.
+const P = (...s) => join(HOME, ...s);
+const fileOK = (path, minBytes = 1) => { try { return existsSync(path) && statSync(path).size >= minBytes; } catch { return false; } };
+
+const ACTIONS = {
+  "ollama:gemma3:4b":   { label: "Gemma 3 4B (LLM)",     size: "3.3 GB", kind: "ollama", tag: "gemma3:4b" },
+  "ollama:llama3.1:8b": { label: "Llama 3.1 8B (LLM)",   size: "4.9 GB", kind: "ollama", tag: "llama3.1:8b" },
+  "ollama:qwen2.5:32b": { label: "Qwen 2.5 32B (LLM)",   size: "20 GB",  kind: "ollama", tag: "qwen2.5:32b" },
+  "ollama:llama3.3:70b":{ label: "Llama 3.3 70B (LLM)",  size: "43 GB",  kind: "ollama", tag: "llama3.3:70b" },
+  "comfy-sdxl": {
+    label: "SDXL image models", size: "7.3 GB", kind: "script",
+    script: "local-image-server/setup-comfy.sh",
+    check: () => fileOK(P("ComfyUI", "models", "checkpoints", "sd_xl_base_1.0.safetensors"), 6e9),
+  },
+  "comfy-ltx": {
+    label: "LTX-Video + T5 encoder", size: "8.8 GB", kind: "script",
+    script: "local-image-server/setup-ltx-video.sh",
+    check: () => fileOK(P("ComfyUI", "models", "checkpoints", "ltxv-2b-0.9.6-distilled.safetensors"), 4e9)
+              && fileOK(P("ComfyUI", "models", "text_encoders", "t5xxl_fp8_e4m3fn.safetensors"), 3e9),
+  },
+  "kokoro": {
+    label: "Kokoro voices", size: "0.3 GB", kind: "script",
+    script: "local-voice-server/setup-kokoro.sh",
+    check: () => fileOK(P("kokoro-tts", "kokoro-v1.0.onnx"), 1e8) && fileOK(P("kokoro-tts", "voices-v1.0.bin"), 1e6),
+  },
+  // No one-click installer yet — shown so the user knows, but not auto-run.
+  "flux-schnell": { label: "FLUX.1 [schnell]", size: "12 GB", kind: "manual", note: "Install via ComfyUI Manager (no one-click yet)." },
+  "flux-dev":     { label: "FLUX.1 [dev]",     size: "24 GB", kind: "manual", note: "Install via ComfyUI Manager (no one-click yet)." },
+  "hunyuan":      { label: "HunyuanVideo (HD)", size: "25 GB", kind: "manual", note: "Install via ComfyUI Manager (no one-click yet)." },
+  "xtts":         { label: "XTTS v2 (voice cloning)", size: "1.8 GB", kind: "manual", note: "Run the XTTS setup in local-voice-server." },
+};
+const KEY_TO_ACTION = {
+  "gemma3-4b": "ollama:gemma3:4b", "llama31-8b": "ollama:llama3.1:8b",
+  "qwen25-32b": "ollama:qwen2.5:32b", "llama33-70b": "ollama:llama3.3:70b",
+  "sdxl-lightning": "comfy-sdxl", "sdxl-full": "comfy-sdxl",
+  "flux-schnell": "flux-schnell", "flux-dev": "flux-dev",
+  "ltx-2b": "comfy-ltx", "ltx-2b-full": "comfy-ltx", "t5xxl": "comfy-ltx",
+  "hunyuan": "hunyuan", "kokoro": "kokoro", "xtts": "xtts",
+};
+
+// Which Ollama model tags are already pulled (fast, tolerant of ollama being
+// absent or stopped — returns [] then, so nothing shows as satisfied).
+function ollamaTags() {
+  try {
+    const out = execFileSync("ollama", ["list"], { stdio: ["ignore", "pipe", "ignore"], timeout: 5000 }).toString();
+    return out.split("\n").slice(1).map((l) => l.trim().split(/\s+/)[0]).filter(Boolean);
+  } catch { return null; } // null = ollama not queryable
+}
+
+// Build the install plan for a tier: one step per distinct action, in order,
+// each flagged satisfied / auto / manual with an approximate size.
+export function installPlan(tierId) {
+  const tier = TIERS[tierId] || TIERS.lite;
+  const tags = ollamaTags();
+  const ollamaUp = tags !== null;
+  const seen = new Set();
+  const steps = [];
+  for (const key of (tier.models || [])) {
+    const aid = KEY_TO_ACTION[key];
+    if (!aid || seen.has(aid)) continue;
+    seen.add(aid);
+    const a = ACTIONS[aid];
+    if (!a) continue;
+    let satisfied = false;
+    if (a.kind === "ollama") satisfied = ollamaUp && tags.some((t) => t === a.tag || t.startsWith(a.tag + ":") || t === a.tag + ":latest");
+    else if (a.kind === "script") satisfied = !!(a.check && a.check());
+    else satisfied = false; // manual: we can't verify, treat as not-installed
+    steps.push({
+      id: aid, label: a.label, size: a.size, kind: a.kind,
+      tag: a.tag || null, note: a.note || (a.kind === "ollama" && !ollamaUp ? "Ollama not detected — install it first." : ""),
+      auto: a.kind === "ollama" || a.kind === "script",
+      satisfied,
+    });
+  }
+  const missing = steps.filter((s) => s.auto && !s.satisfied);
+  return {
+    tierId: tier.id, ollamaUp,
+    steps,
+    missingCount: missing.length,
+    manualCount: steps.filter((s) => s.kind === "manual").length,
+    allSet: missing.length === 0,
+  };
+}
+
+// Resolve a step to a runnable command. Returns null for manual steps.
+// `repoRoot` is the project dir (for the setup-*.sh scripts).
+export function installCommand(step, repoRoot) {
+  const a = ACTIONS[step.id];
+  if (!a) return null;
+  if (a.kind === "ollama") return { cmd: "ollama", args: ["pull", a.tag] };
+  if (a.kind === "script") return { cmd: "bash", args: [join(repoRoot, a.script)] };
+  return null; // manual
 }

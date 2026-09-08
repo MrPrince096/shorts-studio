@@ -109,6 +109,12 @@
   .dlitem{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
   .dlitem .dlfor{color:var(--faint);font-size:11px}
   .dlitem .dlsize{margin-left:auto;color:var(--accent-tint);font-weight:700;font-variant-numeric:tabular-nums}
+  .dlitem .dlmark{width:16px;text-align:center;font-size:12px}
+  .dlitem.ok{border-color:rgba(57,217,138,.35)}
+  .dlitem.ok .dlmark{color:var(--ok)}
+  .dlitem.manual{opacity:.72}
+  .dlitem.manual .dlmark{color:var(--gold)}
+  .hwlog{max-height:150px;overflow:auto;background:#000;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:10.5px;line-height:1.35;color:var(--muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
   .iconbtn{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px;transition:border-color .14s,background .14s}
   .iconbtn:hover{border-color:var(--accent);background:var(--panel2)}
   .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
@@ -713,6 +719,12 @@
         <div class="muted" style="font-size:11px;margin-top:8px">Leave on <b>Auto</b> to match your chip. Pick a lighter tier to save memory, or a heavier one to push quality (may be slow or run out of memory on smaller Macs).</div>
         <label style="margin-top:14px">Recommended local models for this Mac</label>
         <div id="hwDownloads" class="dllist"></div>
+        <div class="withbtn" style="margin-top:12px;align-items:center;gap:10px">
+          <button class="btn grad" id="hwInstall" style="padding:10px 16px"><span data-icon="download"></span> Download recommended models</button>
+          <span class="muted" id="hwInstallHint" style="font-size:11.5px"></span>
+        </div>
+        <div id="hwInstallStatus" style="font-size:12.5px;margin-top:8px"></div>
+        <pre id="hwInstallLog" class="hwlog" hidden></pre>
       </div>
 
       <div class="setsec">
@@ -855,6 +867,7 @@ const ICONS={
   cpu:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="14" x2="22" y2="14"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="14" x2="4" y2="14"/>',
   mic:'<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/>',
   wand:'<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
+  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -952,9 +965,40 @@ async function loadHardware(){
       return `<div class="tieropt${on?' on':''}" onclick="setTier('${t.id}')"><div class="tn">${esc(t.name)}${(t.id==='auto'&&isDetected)?'':''}${isDetected&&t.id!=='auto'?'<span class="auto">detected</span>':''}</div><div class="td">${esc(t.blurb)}</div></div>`;
     }).join('');
   }
-  const dl=document.getElementById('hwDownloads');
-  if(dl&&hw){dl.innerHTML=(hw.downloads||[]).map(m=>`<div class="dlitem"><span>${esc(m.label)}</span><span class="dlfor">${esc(m.for)}</span><span class="dlsize">${esc(m.size)}</span></div>`).join('');}
+  loadModelPlan();
 }
+// ---- one-click model installer ----
+let __plan=null, __installPoll=null;
+async function loadModelPlan(){
+  const dl=document.getElementById('hwDownloads'); if(!dl)return;
+  let p; try{p=await(await fetch('/api/models/plan')).json();}catch{dl.innerHTML='';return;} __plan=p;
+  const mark=(s)=>s.satisfied?'✓':(s.kind==='manual'?'✋':'⬇');
+  dl.innerHTML=(p.steps||[]).map(s=>`<div class="dlitem${s.satisfied?' ok':(s.kind==='manual'?' manual':'')}" title="${esc(s.note||'')}"><span class="dlmark">${mark(s)}</span><span>${esc(s.label)}</span>${s.note?`<span class="dlfor">${esc(s.note)}</span>`:''}<span class="dlsize">${esc(s.size)}</span></div>`).join('');
+  const btn=document.getElementById('hwInstall'), hint=document.getElementById('hwInstallHint');
+  if(btn&&!btn.dataset.busy){
+    if(p.allSet){btn.innerHTML='✓ All models installed';}
+    else{btn.innerHTML=`<span data-icon="download"></span> Download ${p.missingCount} missing (~${p.missingGB} GB)`;}
+    injectIcons&&injectIcons();
+  }
+  if(hint){const bits=[];if(p.manualCount)bits.push(`${p.manualCount} model(s) need a manual install (see notes above)`);if(!p.ollamaUp)bits.push('Ollama not detected — install it for the AI text model');hint.textContent=bits.join(' · ');}
+}
+async function installModels(){
+  const btn=document.getElementById('hwInstall'), st=document.getElementById('hwInstallStatus'), lg=document.getElementById('hwInstallLog');
+  if(__plan&&__plan.allSet){st.innerHTML='<span class="ok">Nothing to download — you’re all set.</span>';return;}
+  btn.dataset.busy='1'; btn.disabled=true; btn.innerHTML='<span class="spin"></span> Installing…';
+  lg.hidden=false; lg.textContent='';
+  let r; try{r=await(await fetch('/api/models/install',{method:'POST'})).json();}catch(e){st.innerHTML='<span class="err">'+esc(e.message)+'</span>';btn.disabled=false;delete btn.dataset.busy;return;}
+  if(r.error){st.innerHTML='<span class="err">'+esc(r.error)+'</span>';btn.disabled=false;delete btn.dataset.busy;return;}
+  const poll=async()=>{
+    let s; try{s=await(await fetch('/api/status/'+r.jobId)).json();}catch{return;}
+    lg.textContent=(s.log||[]).join('\n'); lg.scrollTop=lg.scrollHeight;
+    if(s.status==='running'){const of=s.total>1?` (${s.current}/${s.total})`:'';st.innerHTML=`<span class="spin"></span> Downloading${of} ${timerLine(s)}${timerBar(s)}`;__installPoll=setTimeout(poll,1500);}
+    else{st.innerHTML=s.status==='done'?`<span class="ok">✅ Done in ${fmtDur(s.elapsed)}. Turn Local engines ON to use them.</span>`:'<span class="err">❌ Some items didn’t finish — see log; you can re-run.</span>';
+      btn.disabled=false;delete btn.dataset.busy;loadModelPlan();}
+  };
+  poll();
+}
+document.getElementById('hwInstall')&&(document.getElementById('hwInstall').onclick=installModels);
 async function setTier(t){
   try{await fetch('/api/hardware/tier',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tier:t})});}catch{}
   loadHardware();

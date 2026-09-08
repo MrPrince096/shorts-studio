@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import open from "open";
 import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
-import { detectHardware, tierConfig, downloadPlan } from "./scripts/hardware.mjs";
+import { detectHardware, tierConfig, downloadPlan, installPlan, installCommand } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
 // re-encode any image (HEIC, tiff, cmyk jpg, etc.) into a Chromium-decodable JPEG.
@@ -544,7 +544,7 @@ let seq = 0;
 // Rough per-unit time estimates (seconds) used to show an ETA while a job
 // runs. Scaled by the machine's tier — a Lite M1 is slower than a Pro/Ultra.
 // `kind` is set by each endpoint; falls back to a generic render estimate.
-const ETA_BASE = { render: 55, animate: 430, image: 45, voice: 6, series: 70 };
+const ETA_BASE = { render: 55, animate: 430, image: 45, voice: 6, series: 70, install: 300 };
 function etaScale() {
   const t = detectHardware().tierId;
   return { lite: 1, standard: 0.65, pro: 0.45, ultra: 0.32 }[t] || 1;
@@ -1581,6 +1581,67 @@ app.post("/api/hardware/tier", (req, res) => {
   setEnvValue("HW_TIER", t === "auto" ? "" : t);   // empty = follow the auto scan
   const override = getEnvValue("HW_TIER") || "";
   res.json({ ok: true, override, activeTier: tierConfig(override), auto: !override });
+});
+
+// ---- one-click model installer (pulls the tier's recommended models) ----
+function approxGB(sizes) {
+  const n = sizes.reduce((a, s) => a + (parseFloat(s) || 0), 0);
+  return n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+}
+app.get("/api/models/plan", (_req, res) => {
+  const active = tierConfig(getEnvValue("HW_TIER"));
+  const plan = installPlan(active.id);
+  const missing = plan.steps.filter((s) => s.auto && !s.satisfied);
+  res.json({ ...plan, tierName: active.name, missingGB: approxGB(missing.map((s) => s.size)), textTag: active.text.tag || "" });
+});
+let installing = false;
+// runs one install step (ollama pull / setup script), streaming output to the job log
+function runStep(job, cmd, args) {
+  return new Promise((resolve) => {
+    const env = { ...process.env };
+    delete env.PORT; delete env.ELECTRON_RUN_AS_NODE; delete env.SHORTS_DESKTOP;
+    const child = spawn(cmd, args, { cwd: ROOT, env });
+    const onData = (d) => pushLog(job, d.toString());
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.on("error", (e) => { pushLog(job, "❌ " + e.message); resolve(1); });
+    child.on("close", (code) => resolve(code));
+  });
+}
+app.post("/api/models/install", (_req, res) => {
+  if (installing) return res.status(409).json({ error: "An install is already running." });
+  const active = tierConfig(getEnvValue("HW_TIER"));
+  const plan = installPlan(active.id);
+  const steps = plan.steps.filter((s) => s.auto && !s.satisfied);
+  const job = newJob(Math.max(1, steps.length), "install");
+  res.json({ jobId: job.id, count: steps.length, manual: plan.steps.filter((s) => s.kind === "manual") });
+  installing = true;
+  (async () => {
+    try {
+      if (!steps.length) { pushLog(job, "✅ Everything for the " + active.name + " tier is already installed."); job.status = "done"; installing = false; return; }
+      pushLog(job, `📦 Installing ${steps.length} model set(s) for the ${active.name} tier. Large downloads — keep this open; it resumes if interrupted.`);
+      let failed = 0;
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i]; job.current = i + 1;
+        pushLog(job, `\n===== ${i + 1}/${steps.length}: ${s.label} (${s.size}) =====`);
+        const c = installCommand(s, ROOT);
+        if (!c) { pushLog(job, "↷ Skipped (manual install)."); continue; }
+        const code = await runStep(job, c.cmd, c.args);
+        if (code === 0) pushLog(job, `✅ ${s.label} ready.`);
+        else { failed++; pushLog(job, `⚠️ ${s.label} did not finish (exit ${code}). You can re-run — downloads resume.`); }
+      }
+      // If the tier's recommended LLM is now available, point the app at it
+      // (model only — we don't override a cloud provider choice).
+      const tag = active.text.tag;
+      if (tag) {
+        const now = installPlan(active.id).steps.find((x) => x.tag === tag);
+        if (now && now.satisfied) { setEnvValue("OLLAMA_MODEL", tag); pushLog(job, `⚙︎ Set your local Script AI model to ${tag}.`); }
+      }
+      pushLog(job, failed ? `\nDone with ${failed} item(s) to retry.` : `\n🎉 All set! Turn Local engines ON to use them.`);
+      job.status = failed && failed === steps.length ? "error" : "done";
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; }
+    installing = false;
+  })();
 });
 let startingServers = false;
 app.post("/api/servers/start", (_req, res) => {
