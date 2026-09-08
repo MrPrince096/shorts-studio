@@ -15,19 +15,28 @@ function slug(s) {
     .slice(0, 60);
 }
 
+// Run child scripts with the SAME runtime that launched us. In the packaged
+// desktop app that's Electron behaving as Node (ELECTRON_RUN_AS_NODE=1), so a
+// fresh Mac needs no system Node install; in dev it's plain `node`.
+const NODE = process.execPath;
+const nodeEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+
 // 1. build assets + props
-execFileSync("node", [join(__dirname, "build.mjs")], { stdio: "inherit", cwd: ROOT });
+execFileSync(NODE, [join(__dirname, "build.mjs")], { stdio: "inherit", cwd: ROOT, env: nodeEnv });
 
 // 2. derive output filename — prefer the English slug (works for any language title)
 const config = JSON.parse(readFileSync(join(ROOT, "scenes.json"), "utf8"));
 const name = slug(config.slug) || slug(config.title) || `video-${Date.now()}`;
 const outPath = `out/${name}.mp4`;
 
-// 3. render
+// 3. render — invoke the Remotion CLI's JS entry directly (no `npx`, which a
+// bundled app wouldn't have) via our Node runtime.
 console.log(`\n🎥 Rendering -> ${outPath}`);
-execFileSync("npx", ["remotion", "render", "Short", outPath, "--props=public/props.json"], {
+const remotionCli = join(ROOT, "node_modules", "@remotion", "cli", "remotion-cli.js");
+execFileSync(NODE, [remotionCli, "render", "Short", outPath, "--props=public/props.json"], {
   stdio: "inherit",
   cwd: ROOT,
+  env: nodeEnv,
 });
 // supporting files live in out/data/ (separate from the final videos in out/)
 const DATA = join(ROOT, "out", "data");

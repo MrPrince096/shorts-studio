@@ -3,12 +3,75 @@
 // the UI in a native window. No browser needed. Fully local/offline.
 const { app, BrowserWindow, shell, dialog, Menu } = require("electron");
 const { spawn, execSync } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 const http = require("http");
 
-const ROOT = path.join(__dirname, "..");
+// ---------------------------------------------------------------------------
+// Portability: in a packaged .app the code lives read-only inside the bundle
+// (Contents/Resources/app). The server + renderer must WRITE (out/, uploads,
+// .env, series/…) and Remotion needs one writable project dir. So on first run
+// we lay out a writable "store" in Application Support: copy the code there and
+// symlink node_modules back to the read-only bundle (no multi-hundred-MB copy).
+// In dev (not packaged) we just run from the project folder as before.
+const BUNDLE = path.join(__dirname, "..");            // dev: project; packaged: Resources/app
 const PORT = process.env.PORT || 4321;
 const URL = `http://localhost:${PORT}`;
+
+// Code files/dirs that make up the app (everything except node_modules and the
+// runtime data dirs). Re-copied when the app version changes; data is left alone.
+const CODE_ENTRIES = [
+  "server.mjs", "package.json", "remotion.config.ts",
+  "scripts", "src", "web", "electron", "build",
+  "local-image-server", "local-voice-server",
+  "start-local-servers.command", "stop-local-servers.command",
+];
+
+function prepareStore() {
+  if (!app.isPackaged) return BUNDLE; // dev: run in place
+  // Name the data folder "Shorts Studio" (not the package name) — set before
+  // we read userData, since getPath derives the folder from the app name.
+  try { app.setName("Shorts Studio"); } catch {}
+  const store = path.join(app.getPath("appData"), "Shorts Studio", "runtime");
+  fs.mkdirSync(store, { recursive: true });
+  const verFile = path.join(store, ".appversion");
+  const cur = app.getVersion();
+  let prev = "";
+  try { prev = fs.readFileSync(verFile, "utf8").trim(); } catch {}
+  if (prev !== cur) {
+    for (const e of CODE_ENTRIES) {
+      const from = path.join(BUNDLE, e);
+      if (!fs.existsSync(from)) continue;
+      try { fs.rmSync(path.join(store, e), { recursive: true, force: true }); } catch {}
+      try { fs.cpSync(from, path.join(store, e), { recursive: true }); } catch (err) { console.error("copy", e, err.message); }
+    }
+    try { fs.writeFileSync(verFile, cur); } catch {}
+  }
+  // node_modules: symlink to the read-only bundle copy (the server only reads it).
+  const nmLink = path.join(store, "node_modules");
+  const nmReal = path.join(BUNDLE, "node_modules");
+  try {
+    const ok = fs.existsSync(nmLink) && fs.realpathSync(nmLink) === fs.realpathSync(nmReal);
+    if (!ok) { try { fs.rmSync(nmLink, { recursive: true, force: true }); } catch {} fs.symlinkSync(nmReal, nmLink, "dir"); }
+  } catch (err) { console.error("node_modules link", err.message); }
+  // Seed a public/ dir with the shipped assets (bg music beds) if absent.
+  const pub = path.join(store, "public");
+  if (!fs.existsSync(pub)) { try { fs.cpSync(path.join(BUNDLE, "public"), pub, { recursive: true }); } catch {} }
+  return store;
+}
+
+const ROOT = prepareStore();
+
+// Bundled ffmpeg/ffprobe ship inside Remotion's compositor package, so a fresh
+// Mac needs no Homebrew ffmpeg. They load sibling .dylibs by bare name, hence
+// DYLD_LIBRARY_PATH. Returns the dir (on PATH) or "" if not found.
+function compositorDir() {
+  for (const a of ["darwin-arm64", "darwin-x64"]) {
+    const d = path.join(ROOT, "node_modules", "@remotion", "compositor-" + a);
+    if (fs.existsSync(path.join(d, "ffmpeg"))) return d;
+  }
+  return "";
+}
 
 // Some Macs crash Electron's GPU/network service process (exit_code=15) which
 // leaves the window blank or unopened. This is a plain web UI — it doesn't need
@@ -33,8 +96,18 @@ function resolveUserPath() {
     const sh = process.env.SHELL || "/bin/zsh";
     shellPath = execSync(`${sh} -ilc 'echo -n $PATH'`, { timeout: 4000 }).toString().trim();
   } catch {}
-  const parts = new Set([...(shellPath ? shellPath.split(":") : []), ...(process.env.PATH ? process.env.PATH.split(":") : []), ...common].filter(Boolean));
+  const comp = compositorDir(); // bundled ffmpeg/ffprobe first, so we don't need system ffmpeg
+  const parts = new Set([...(comp ? [comp] : []), ...(shellPath ? shellPath.split(":") : []), ...(process.env.PATH ? process.env.PATH.split(":") : []), ...common].filter(Boolean));
   return [...parts].join(":");
+}
+
+// Env for the server + render subprocesses: our resolved PATH (bundled ffmpeg
+// first) and DYLD_LIBRARY_PATH so that ffmpeg finds its sibling libav*.dylib.
+function childEnv(extra = {}) {
+  const comp = compositorDir();
+  const env = { ...process.env, PATH: resolveUserPath(), ...extra };
+  if (comp) env.DYLD_LIBRARY_PATH = [comp, process.env.DYLD_LIBRARY_PATH].filter(Boolean).join(":");
+  return env;
 }
 
 let restarts = 0;
@@ -43,7 +116,7 @@ function startServer() {
   // Use the same Node that launched Electron so the server runs identically.
   serverProc = spawn(process.execPath, [path.join(ROOT, "server.mjs")], {
     cwd: ROOT,
-    env: { ...process.env, PATH: resolveUserPath(), PORT: String(PORT), ELECTRON_RUN_AS_NODE: "1", SHORTS_DESKTOP: "1" },
+    env: childEnv({ PORT: String(PORT), ELECTRON_RUN_AS_NODE: "1", SHORTS_DESKTOP: "1" }),
     stdio: ["ignore", "pipe", "pipe"],
   });
   serverUpSince = Date.now();
@@ -134,7 +207,7 @@ function runLocalScript(scriptName, label) {
   const script = path.join(ROOT, scriptName);
   const p = spawn("bash", [script], {
     cwd: ROOT, detached: true,
-    env: { ...process.env, PATH: resolveUserPath() },
+    env: childEnv(),
     stdio: "ignore",
   });
   p.unref();

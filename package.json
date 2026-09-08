@@ -23,15 +23,24 @@
       "output": "dist-app",
       "buildResources": "build"
     },
+    "asar": false,
     "files": [
       "electron/**/*",
       "server.mjs",
       "scripts/**/*",
       "src/**/*",
       "web/**/*",
-      "public/**/*",
       "remotion.config.*",
-      "package.json"
+      "package.json",
+      "build/icon.icns",
+      "build/icon.png",
+      "local-image-server/**/*",
+      "local-voice-server/**/*",
+      "start-local-servers.command",
+      "stop-local-servers.command",
+      "public/bg_*.mp3",
+      "!**/*.map",
+      "!**/{test,__tests__,tests,powered-test,example,examples}"
     ],
     "extraMetadata": {
       "main": "electron/main.cjs"
@@ -39,13 +48,21 @@
     "mac": {
       "category": "public.app-category.video",
       "icon": "build/icon.icns",
+      "identity": null,
       "target": [
         {
-          "target": "dir",
+          "target": "dmg",
           "arch": [
             "arm64"
           ]
         }
+      ]
+    },
+    "dmg": {
+      "title": "Shorts Studio",
+      "contents": [
+        { "x": 140, "y": 200 },
+        { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
       ]
     }
   },
