@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
 
@@ -901,24 +901,38 @@ function parseLyrics(raw, dur) {
 app.post("/api/song", (req, res) => {
   if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
   const b = req.body || {};
-  const m = String(b.songDataUrl || "").match(/^data:audio\/[^;]+;base64,(.+)$/);
-  if (!m) return res.status(400).json({ error: "Upload a song (mp3/wav/m4a)." });
   const lyricsRaw = String(b.lyrics || "").trim();
-  if (!lyricsRaw) return res.status(400).json({ error: "Paste the lyrics — one line per subtitle." });
-  const theme = String(b.theme || b.topic || "aesthetic cinematic art, beautiful, atmospheric").trim();
-  // save the song as the audio track, convert to mp3
-  const rawPath = join(PUBLIC, "song_raw");
-  writeFileSync(rawPath, Buffer.from(m[1], "base64"));
+  if (!lyricsRaw) return res.status(400).json({ error: "Add lyrics (or write them from a topic)." });
+  const theme = String(b.theme || b.topic || "").trim();
   const songPath = join(PUBLIC, "voiceover.mp3");
-  try { execFileSync("ffmpeg", ["-y", "-i", rawPath, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); }
-  catch (e) { return res.status(400).json({ error: "Could not read that audio file." }); }
+  const m = String(b.songDataUrl || "").match(/^data:audio\/[^;]+;base64,(.+)$/);
   let dur = 30;
-  try { dur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", songPath]).toString().trim()) || 30; } catch {}
+  if (m) {
+    // uploaded song -> the audio track
+    const rawPath = join(PUBLIC, "song_raw");
+    writeFileSync(rawPath, Buffer.from(m[1], "base64"));
+    try { execFileSync("ffmpeg", ["-y", "-i", rawPath, "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); }
+    catch (e) { return res.status(400).json({ error: "Could not read that audio file." }); }
+    try { dur = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", songPath]).toString().trim()) || 30; } catch {}
+  } else {
+    // no upload: build a music-bed backing track sized to the lyrics
+    const nLines = lyricsRaw.split(/\r?\n/).filter((l) => l.trim()).length;
+    dur = Math.max(15, Math.round(nLines * 3.2));
+    ensureBeds();
+    const mood = resolveMood(b.musicMood, {}) || "calm";
+    let bedSrc = join(MUSIC_DIR, `bed_${mood}.mp3`);
+    if (!existsSync(bedSrc)) bedSrc = join(MUSIC_DIR, "bed_calm.mp3");
+    if (!existsSync(bedSrc)) return res.status(400).json({ error: "Upload a song, or pick a music mood for the backing track." });
+    try { execFileSync("ffmpeg", ["-y", "-stream_loop", "-1", "-i", bedSrc, "-t", String(dur), "-codec:a", "libmp3lame", "-q:a", "2", songPath], { stdio: "ignore" }); }
+    catch (e) { return res.status(400).json({ error: "Couldn't build the backing track." }); }
+  }
   const lyricLines = parseLyrics(lyricsRaw, dur);
   if (lyricLines.length < 1) return res.status(400).json({ error: "Couldn't read any lyric lines." });
   const { width, height } = dims(b.aspect || "1:1", b.quality || "1080");
   const lang = resolveLang(b.language || "en");
-  const uniq = Math.max(1, Math.min(lyricLines.length, parseInt(b.reuseVisuals) || 6));
+  // per-line images: each lyric gets its own relevant image (fixes repeated/irrelevant visuals)
+  const perLine = b.perLineImages !== false;
+  const uniq = perLine ? 0 : Math.max(1, Math.min(lyricLines.length, parseInt(b.reuseVisuals) || 6));
   const config = {
     title: String(b.title || "Lyric Video").slice(0, 100),
     slug: slugify(b.title || "lyric-video") || ("song-" + Date.now().toString(36)),
@@ -932,7 +946,11 @@ app.post("/api/song", (req, res) => {
     reuseVisuals: uniq, langCode: b.language || "en",
     font: lang.font, fontCss: lang.fontCss, rtl: lang.rtl,
     lyricLines,
-    scenes: lyricLines.map((l) => ({ text: l.text, query: theme, imagePrompt: theme })),
+    scenes: lyricLines.map((l) => ({
+      text: l.text,
+      query: theme || l.text,
+      imagePrompt: perLine ? ((theme ? theme + ", " : "") + l.text) : (theme || l.text),
+    })),
   };
   busy = true;
   const job = newJob(1);
@@ -1087,6 +1105,22 @@ app.post("/api/render", (req, res) => {
   const job = newJob(1);
   res.json({ jobId: job.id, dims: `${width}x${height}` });
   runAll([config], job);
+});
+
+// ---- ✍️ write song lyrics from a topic ----
+app.post("/api/lyrics", async (req, res) => {
+  const b = req.body || {};
+  const topic = String(b.topic || "").trim();
+  if (!topic) return res.status(400).json({ error: "Give a topic for the song." });
+  try {
+    const lyrics = await generateLyrics({
+      topic, language: resolveLang(b.language || "en").label,
+      lines: Math.min(24, Math.max(6, parseInt(b.lines) || 12)),
+      mood: String(b.mood || "").trim(), llmProvider: b.llmProvider || "",
+    });
+    if (!lyrics) throw new Error("no lyrics");
+    res.json({ lyrics });
+  } catch (e) { res.status(500).json({ error: e.message || "Couldn't write lyrics — try again." }); }
 });
 
 // ---- 🎲 endless topics (dice): invent one fresh topic, optionally from a hint ----

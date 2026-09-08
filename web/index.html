@@ -339,16 +339,19 @@
         <!-- SONG (lyric / musical shorts) -->
         <div class="card tabpanel" id="tab-song" hidden>
           <h2><span data-icon="spark"></span> Song Studio</h2>
-          <div class="cardsub">Musical lyric videos — your song + synced lyrics over aesthetic art</div>
-          <label>Your song <span class="muted">— mp3 / wav / m4a (you provide it)</span></label>
-          <div class="withbtn"><input id="songName" placeholder="no song selected" readonly style="cursor:default" /><button class="btn ghost" id="songPick">Upload</button></div>
+          <div class="cardsub">Lyric videos — write lyrics from a topic (or bring your own song), with a relevant image per line</div>
+          <label>Song topic <span class="muted">— write the lyrics from just an idea 🎲</span></label>
+          <div class="withbtn"><input id="songTopic" class="big" placeholder="e.g. missing my hometown, a rainy night, Radha & Krishna" /><button class="btn ghost" id="songDice" title="Surprise me">🎲</button><button class="btn grad" id="songWrite">✨ Write lyrics</button></div>
+          <label style="margin-top:14px">Lyrics <span class="muted">— one line per subtitle (or paste an .lrc for exact timing)</span></label>
+          <textarea id="songLyrics" rows="6" placeholder="Write a topic above and hit ✨, or paste your own lyrics — one line each."></textarea>
+          <label style="margin-top:14px">Your song <span class="muted">— optional; leave empty to use a music bed (pick a mood in Song settings)</span></label>
+          <div class="withbtn"><input id="songName" placeholder="no song — will use a music bed" readonly style="cursor:default" /><button class="btn ghost" id="songPick">Upload</button></div>
           <input type="file" id="songFile" accept="audio/*" hidden />
-          <label>Lyrics <span class="muted">— one line per subtitle (or paste an .lrc for exact timing)</span></label>
-          <textarea id="songLyrics" rows="6" placeholder="Bhaamake longetodu bhaadhem theerusthaaduu&#10;Premake pongaadante praanam bhadhulisthaadu&#10;..."></textarea>
-          <label>Visual theme <span class="muted">— the art to show</span></label>
+          <label style="margin-top:14px">Visual theme <span class="muted">— optional art style; each line still gets its own image</span></label>
           <input id="songTheme" class="big" placeholder="e.g. Radha Krishna divine painting, ornate, ethereal" />
+          <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="songPerLine" checked style="width:auto;margin:0"> A unique image per lyric line <span class="muted">— relevant to each line (recommended)</span></label>
           <button class="btn grad big" id="goSong" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Create Lyric Video</button>
-          <div class="note" style="margin-top:12px">Tip: set <b>Image style → Indian mythological art</b> and <b>Aspect → 1:1</b> in Song settings for that devotional look. Lines spread evenly across the song (or exactly, with an .lrc).</div>
+          <div class="note" style="margin-top:12px">Note: this makes an <b>instrumental lyric video</b> (music + on-screen lyrics + a relevant image per line) — not AI singing. Bring your own song for vocals. Set <b>Aspect → 1:1</b> in Song settings for the classic look.</div>
         </div>
         <!-- SERIES -->
         <div class="card tabpanel" id="tab-series" hidden>
@@ -1209,7 +1212,16 @@ $('#goStory').onclick=()=>{const topic=$('#storyTopic').value.trim();const count
 // ---- Song (lyric video) ----
 $('#songPick').onclick=()=>$('#songFile').click();
 $('#songFile').onchange=()=>{const f=$('#songFile').files[0];if(!f)return;if(f.size>30*1024*1024){alert('Song max 30 MB.');return;}const rd=new FileReader();rd.onload=()=>{window.__songData=rd.result;$('#songName').value=f.name;};rd.readAsDataURL(f);};
-$('#goSong').onclick=()=>{if(!window.__songData){alert('Upload your song first.');return;}const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Paste the lyrics — one line each.');return;}run('/api/song',{songDataUrl:window.__songData,lyrics,theme:$('#songTheme').value.trim(),...fmt()});};
+$('#songDice')&&($('#songDice').onclick=(e)=>{e.preventDefault();rollTopic($('#songDice'),$('#songTopic'),{forType:'song',hint:$('#songTopic').value.trim(),language:$('#language').value,fallback:['a rainy night in the city','missing my hometown','chasing a fading dream','first love in summer','the strength inside you']});});
+$('#songWrite')&&($('#songWrite').onclick=async()=>{
+  const topic=$('#songTopic').value.trim(); if(!topic){alert('Enter a song topic first (or roll the dice 🎲).');return;}
+  const b=$('#songWrite');b.disabled=true;b.textContent='✨ Writing…';
+  try{const r=await(await fetch('/api/lyrics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,language:$('#language').value,mood:($('#musicMood')||{}).value||''})})).json();
+    if(r.lyrics){$('#songLyrics').value=r.lyrics;}else alert(r.error||'Could not write lyrics — try again.');
+  }catch(e){alert(e.message);}
+  b.disabled=false;b.textContent='✨ Write lyrics';
+});
+$('#goSong').onclick=()=>{const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Write lyrics from a topic (✨) or paste your own — one line each.');return;}run('/api/song',{songDataUrl:window.__songData||'',lyrics,topic:$('#songTopic').value.trim(),theme:$('#songTheme').value.trim(),perLineImages:$('#songPerLine').checked,...fmt()});};
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:$('#adVariations').value,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};

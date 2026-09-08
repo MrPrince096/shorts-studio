@@ -204,6 +204,19 @@ ${language && language.toLowerCase() !== "english" ? `Write it in ${language}. `
   return t.slice(0, 120);
 }
 
+// ✍️ write original song lyrics from a topic — one lyric per line (for captions).
+export async function generateLyrics({ topic, language = "English", lines = 12, mood = "", llmProvider } = {}) {
+  const prompt = `Write original, emotional song lyrics about "${topic}"${mood ? ` with a ${mood} mood` : ""}.
+Give exactly ${lines} short lyric lines — one lyric per line, vivid and singable, easy to read on screen as captions.
+${language && language.toLowerCase() !== "english" ? `Write the lyrics in ${language} (native script). ` : ""}Return ONLY the lyric lines, one per line — no title, no numbering, no [Verse]/[Chorus] labels, no extra text.`;
+  let t = String(await callLLM(prompt, llmProvider) || "").trim();
+  t = t.replace(/^```[a-z]*\s*|\s*```$/gi, "");
+  return t.split("\n")
+    .map((x) => x.replace(/^[\d.)\-*\s]+/, "").replace(/[*_`]/g, "").trim())
+    .filter((x) => x && !/^[\[(]?(verse|chorus|bridge|intro|outro|pre-chorus|hook)\b/i.test(x))
+    .slice(0, lines).join("\n");
+}
+
 // ---- Long-form storytelling (3-10 min). Chunked (outline -> per-beat scenes) so
 // small local models never truncate one giant JSON. Great for bedtime / scary /
 // biography / tech-explainer narration videos. ----
