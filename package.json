@@ -14,7 +14,8 @@
     "studio": "remotion studio",
     "render": "remotion render Short out/video.mp4 --props=public/props.json",
     "make": "node scripts/make.mjs",
-    "batch": "node scripts/batch.mjs"
+    "batch": "node scripts/batch.mjs",
+    "mcp": "node mcp/shorts-studio-mcp.mjs"
   },
   "build": {
     "appId": "com.shortsstudio.app",
