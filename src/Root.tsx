@@ -1,6 +1,12 @@
 import { Composition } from "remotion";
 import { Short } from "./Short";
 import { Comparison } from "./Comparison";
+import { Dub } from "./Dub";
+
+const dubFallback = {
+  fps: 30, width: 720, height: 1280, durationInSeconds: 10,
+  videoFile: "", audio: "", segments: [], subtitleMode: "target", fit: "contain",
+};
 
 const compFallback = {
   fps: 30, width: 720, height: 1280, durationInSeconds: 12,
@@ -62,6 +68,16 @@ export const RemotionRoot = () => {
         width={720}
         height={1280}
         defaultProps={compFallback}
+        calculateMetadata={calcMeta}
+      />
+      <Composition
+        id="Dub"
+        component={Dub as any}
+        durationInFrames={300}
+        fps={30}
+        width={720}
+        height={1280}
+        defaultProps={dubFallback}
         calculateMetadata={calcMeta}
       />
     </>

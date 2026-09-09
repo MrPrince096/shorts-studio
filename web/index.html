@@ -295,6 +295,7 @@
     <div class="nav" data-nav="story"><span class="ic" data-icon="film"></span> Story</div>
     <div class="nav" data-nav="song"><span class="ic" data-icon="spark"></span> Song</div>
     <div class="nav" data-nav="comparison"><span class="ic" data-icon="columns"></span> Compare</div>
+    <div class="nav" data-nav="dub"><span class="ic" data-icon="globe"></span> Dub</div>
     <div class="nav" data-nav="autopilot"><span class="ic" data-icon="bot"></span> Autopilot</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
@@ -387,6 +388,28 @@
           <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="songPerLine" checked style="width:auto;margin:0"> A unique image per lyric line <span class="muted">— relevant to each line (recommended)</span></label>
           <button class="btn grad big" id="goSong" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Create Lyric Video</button>
           <div class="note" style="margin-top:12px">Note: this makes an <b>instrumental lyric video</b> (music + on-screen lyrics + a relevant image per line) — not AI singing. Bring your own song for vocals. Set <b>Aspect → 1:1</b> in Song settings for the classic look.</div>
+        </div>
+        <!-- DUB -->
+        <div class="card tabpanel" id="tab-dub" hidden>
+          <h2><span data-icon="globe"></span> Dub &amp; Subtitle</h2>
+          <div class="cardsub">Upload any video → transcribe → translate → new AI voiceover + subtitles. Any language → any language.</div>
+          <div id="dubWhisper"></div>
+          <label>Your video <span class="muted">— an existing clip with people talking</span></label>
+          <div class="withbtn"><input id="dubName" placeholder="no video chosen" readonly style="cursor:default" /><button class="btn ghost" id="dubPick">Upload</button></div>
+          <input type="file" id="dubFile" accept="video/*" hidden />
+          <video id="dubPreview" class="preview" style="display:none;margin-top:10px;max-height:220px" controls muted></video>
+          <label style="margin-top:14px">Translate into <span class="muted">— the dubbed language</span></label>
+          <input id="dubTarget" class="big" placeholder="e.g. English, Hindi, Spanish, Japanese" value="English" />
+          <div class="row" style="margin-top:12px">
+            <div><label>Voice engine</label><select id="dubEngine"><option value="edge">Edge (cloud, many langs)</option><option value="kokoro">Kokoro (local)</option><option value="xtts">XTTS (local, expressive)</option><option value="clone">My cloned voice</option></select></div>
+            <div><label>Subtitles</label><select id="dubSubs"><option value="target">Translated only</option><option value="bilingual">Bilingual (both)</option><option value="off">No subtitles</option></select></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div><label>Accuracy</label><select id="dubModel"><option value="tiny">Fast (tiny)</option><option value="base" selected>Balanced (base)</option><option value="small">Best (small, slower)</option></select></div>
+            <div><label>Keep original voice under <span id="dubKeepVal" class="muted">0%</span></label><input type="range" id="dubKeep" min="0" max="60" value="0"></div>
+          </div>
+          <button class="btn grad big" id="goDub" style="width:100%;margin-top:16px"><span data-icon="globe"></span>Dub this video</button>
+          <div class="note" style="margin-top:12px">Runs locally & free. It <b>replaces the audio</b> with the new voice (mouths won't lip-sync) and uses one voice for everyone. Best on short clips — long videos take a while. Transcription runs on your Mac (first run downloads a small model).</div>
         </div>
         <!-- AUTOPILOT -->
         <div class="card tabpanel" id="tab-autopilot" hidden>
@@ -931,6 +954,7 @@ const ICONS={
   download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
   columns:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>',
   bot:'<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -950,6 +974,7 @@ function switchTab(name){
   $('#workspace').style.display='grid';
   if(typeof __apPoll!=='undefined'&&__apPoll){clearInterval(__apPoll);__apPoll=null;}
   if(name==='autopilot'&&typeof showAutopilot==='function')showAutopilot();
+  if(name==='dub'&&typeof showDub==='function')showDub();
   applyTabSettings(name);
 }
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
@@ -1433,6 +1458,22 @@ $('#songWrite')&&($('#songWrite').onclick=async()=>{
   b.disabled=false;b.textContent='✨ Write lyrics';
 });
 $('#goSong').onclick=()=>{const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Write lyrics from a topic (✨) or paste your own — one line each.');return;}run('/api/song',{songDataUrl:window.__songData||'',lyrics,topic:$('#songTopic').value.trim(),theme:$('#songTheme').value.trim(),perLineImages:$('#songPerLine').checked,...fmt()});};
+// ---- Dub & Subtitle ----
+window.__dubData='';
+async function showDub(){
+  const el=$('#dubWhisper'); let st={};
+  try{st=await(await fetch('/api/dub/status')).json();}catch{}
+  if(!st.whisperReady){el.innerHTML='<div class="note" style="margin-bottom:12px;border-color:var(--gold)">⚠️ Speech-to-text isn\'t installed yet. In Terminal run <code>bash local-voice-server/setup-whisper.sh</code> (one time), then reopen this tab.</div>';}
+  else{el.innerHTML='';}
+}
+$('#dubPick')&&($('#dubPick').onclick=()=>$('#dubFile').click());
+$('#dubFile')&&($('#dubFile').onchange=()=>{const f=$('#dubFile').files[0];if(!f)return;if(f.size>200*1024*1024){alert('Please use a video under 200 MB for now.');return;}const rd=new FileReader();rd.onload=()=>{window.__dubData=rd.result;$('#dubName').value=f.name;const v=$('#dubPreview');v.src=rd.result;v.style.display='block';};rd.readAsDataURL(f);});
+$('#dubKeep')&&($('#dubKeep').oninput=(e)=>$('#dubKeepVal').textContent=e.target.value+'%');
+$('#goDub')&&($('#goDub').onclick=()=>{
+  if(!window.__dubData){alert('Upload a video to dub first.');return;}
+  const target=$('#dubTarget').value.trim(); if(!target){alert('Enter the language to translate into.');return;}
+  run('/api/dub',{videoDataUrl:window.__dubData,targetLang:target,voiceEngine:$('#dubEngine').value,subtitleMode:$('#dubSubs').value,model:$('#dubModel').value,keepOriginal:($('#dubKeep').value/100)});
+});
 // ---- Autopilot ----
 let __apPoll=null;
 function apFmtWhen(ts){if(!ts)return'—';const d=ts-Date.now();if(d<=0)return'now';const m=Math.round(d/60000);if(m<60)return`in ${m} min`;const h=Math.floor(m/60);return`in ${h}h ${m%60}m`;}

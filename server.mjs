@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { detectHardware, tierConfig, downloadPlan, installPlan, installCommand } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
@@ -1623,6 +1623,120 @@ app.post("/api/comparison", (req, res) => {
         child.on("close", () => resolve());
       });
       if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `${leftLabel} vs ${rightLabel}`; job.status = "done"; pushLog(job, "✅ Done!"); }
+      else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
+      busy = false;
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
+// ---- Dub: transcribe an uploaded video → translate → re-voice + subtitles ---
+function whisperPython() {
+  const env = getEnvValue("WHISPER_PYTHON");
+  if (env && existsSync(env)) return env;
+  const def = join(process.env.HOME || "", "whisper-asr", "venv", "bin", "python");
+  return existsSync(def) ? def : "";
+}
+app.get("/api/dub/status", (_req, res) => {
+  res.json({ whisperReady: !!whisperPython() });
+});
+// speak one line in a target language, return the written file path
+function ttsSegment(engine, voice, text, langName, outBase) {
+  const langCode = (resolveLang(langName || "en").code || "en").slice(0, 2);
+  if (engine === "kokoro") {
+    const url = getEnvValue("KOKORO_URL") || "http://localhost:7880/generate";
+    return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, language: langCode, speaker: voice || undefined }) })
+      .then(async (r) => { if (!r.ok) throw new Error("kokoro " + r.status); const p = outBase + ".wav"; writeFileSync(p, Buffer.from(await r.arrayBuffer())); return p; });
+  }
+  if (engine === "xtts" || engine === "clone") {
+    const url = getEnvValue("XTTS_URL") || "http://localhost:7870/generate";
+    const body = { text, language: langCode === "zh" ? "zh-cn" : langCode };
+    if (engine === "clone" && voice) { const w = join(VOICE_DIR, voice.replace(/^clone:/, "") + ".wav"); if (existsSync(w)) body.speaker_wav = w; }
+    else if (voice) body.speaker = voice.replace(/^builtin:/, "");
+    return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(async (r) => { if (!r.ok) throw new Error("xtts " + r.status); const p = outBase + ".wav"; writeFileSync(p, Buffer.from(await r.arrayBuffer())); return p; });
+  }
+  // edge (cloud, default) — pick a target-language voice unless one was given
+  const v = voice || EDGE_VOICE[(langName || "").toLowerCase()] || "en-US-AriaNeural";
+  const p = outBase + ".mp3";
+  execFileSync("edge-tts", ["--voice", v, "--text", text, "--write-media", p], { stdio: "ignore" });
+  return Promise.resolve(p);
+}
+app.post("/api/dub", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  if (!/^data:video\//.test(String(b.videoDataUrl || ""))) return res.status(400).json({ error: "Upload a video to dub." });
+  const py = whisperPython();
+  if (!py) return res.status(400).json({ error: "Speech-to-text isn't installed yet — run local-voice-server/setup-whisper.sh once." });
+  const targetLang = String(b.targetLang || "English").trim() || "English";
+  const engine = ["edge", "kokoro", "xtts", "clone"].includes(b.voiceEngine) ? b.voiceEngine : "edge";
+  const voice = String(b.voice || "");
+  const subtitleMode = ["target", "bilingual", "off"].includes(b.subtitleMode) ? b.subtitleMode : "target";
+  const keepOriginal = Math.min(0.6, Math.max(0, parseFloat(b.keepOriginal) || 0));
+  const model = ["tiny", "base", "small"].includes(b.model) ? b.model : "base";
+  busy = true;
+  const job = newJob(1, "render");
+  res.json({ jobId: job.id });
+  (async () => {
+    const FF = "ffmpeg"; const src = join(PUBLIC, "dub_src.mp4"); const wav = join(PUBLIC, "dub_audio.wav");
+    try {
+      pushLog(job, "📥 Reading your video…");
+      const m = String(b.videoDataUrl).match(/^data:video\/[^;]+;base64,(.+)$/);
+      if (!m) throw new Error("bad video upload");
+      writeFileSync(src, Buffer.from(m[1], "base64"));
+      // dimensions + duration
+      let W = 720, H = 1280, DUR = 0;
+      try { const j = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-show_entries", "format=duration", "-of", "json", src]).toString()); W = j.streams?.[0]?.width || 720; H = j.streams?.[0]?.height || 1280; DUR = parseFloat(j.format?.duration) || 0; } catch {}
+      pushLog(job, "🎧 Extracting audio…");
+      execFileSync(FF, ["-y", "-i", src, "-ac", "1", "-ar", "16000", wav], { stdio: "ignore" });
+      pushLog(job, `📝 Transcribing speech (Whisper ${model})… first run downloads the model.`);
+      const raw = execFileSync(py, [join(ROOT, "local-voice-server", "whisper_transcribe.py"), wav, model], { maxBuffer: 64 * 1024 * 1024 }).toString();
+      const tr = JSON.parse(raw);
+      if (tr.error) throw new Error(tr.error);
+      const segs = (tr.segments || []).filter((s) => s.text && s.end > s.start);
+      if (!segs.length) throw new Error("No speech detected in this video.");
+      pushLog(job, `🗣️ Detected ${tr.language || "?"} — ${segs.length} lines. Translating to ${targetLang}…`);
+      const translated = await translateLines({ lines: segs.map((s) => s.text), targetLanguage: targetLang, sourceLanguage: tr.language, llmProvider: getEnvValue("LLM_PROVIDER") });
+      // re-voice each line and place it at its original start time
+      const inputs = []; const delays = [];
+      for (let i = 0; i < segs.length; i++) {
+        job.current = i + 1;
+        pushLog(job, `🎙️ Voicing line ${i + 1}/${segs.length}…`);
+        try {
+          const p = await ttsSegment(engine, voice, translated[i], targetLang, join(PUBLIC, `dseg_${i}`));
+          inputs.push(p); delays.push(Math.round(segs[i].start * 1000));
+        } catch (e) { pushLog(job, `↷ line ${i + 1} skipped (${e.message})`); }
+      }
+      if (!inputs.length) throw new Error("Could not synthesize any dubbed audio (is the chosen voice engine on?).");
+      pushLog(job, "🎚️ Mixing the dub track…");
+      const dur = DUR > 0 ? DUR.toFixed(2) : (segs[segs.length - 1].end + 1).toFixed(2);
+      // amix all the delayed voice clips (+ optional ducked original) into one track
+      const args = ["-y"]; inputs.forEach((p) => args.push("-i", p));
+      if (keepOriginal > 0) args.push("-i", src);
+      const parts = inputs.map((_, i) => `[${i}:a]adelay=${delays[i]}|${delays[i]}[a${i}]`);
+      let mixLabels = inputs.map((_, i) => `[a${i}]`).join("");
+      let n = inputs.length;
+      if (keepOriginal > 0) { parts.push(`[${inputs.length}:a]volume=${keepOriginal}[orig]`); mixLabels += "[orig]"; n += 1; }
+      const filter = `${parts.join(";")};${mixLabels}amix=inputs=${n}:normalize=0:dropout_transition=0,apad,atrim=0:${dur}[out]`;
+      const outAudio = join(PUBLIC, "dub_final.mp3");
+      args.push("-filter_complex", filter, "-map", "[out]", "-c:a", "libmp3lame", "-q:a", "3", outAudio);
+      execFileSync(FF, args, { stdio: "ignore", maxBuffer: 16 * 1024 * 1024 });
+      // props for the Dub composition
+      const props = {
+        fps: 30, width: W, height: H, durationInSeconds: Math.ceil(parseFloat(dur)) + 0.3,
+        videoFile: "dub_src.mp4", audio: "dub_final.mp3", subtitleMode,
+        fit: (b.fit === "cover" ? "cover" : "contain"),
+        segments: segs.map((s, i) => ({ start: s.start, end: s.end, text: translated[i] || s.text, orig: s.text })),
+      };
+      writeFileSync(join(PUBLIC, "dub.json"), JSON.stringify(props, null, 2));
+      const name = "dub-" + Date.now().toString(36); const outName = name + ".mp4";
+      pushLog(job, "🎬 Rendering the dubbed video…");
+      await new Promise((resolve) => {
+        const { cmd, args: rargs, env } = remotionCmd(["render", "Dub", `out/${outName}`, "--props=public/dub.json"]);
+        const child = spawn(cmd, rargs, { cwd: ROOT, env });
+        const onData = (d) => pushLog(job, d.toString()); child.stdout.on("data", onData); child.stderr.on("data", onData);
+        child.on("close", () => resolve());
+      });
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `Dub → ${targetLang}`; job.status = "done"; pushLog(job, "✅ Done!"); }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }

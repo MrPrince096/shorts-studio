@@ -217,6 +217,29 @@ ${language && language.toLowerCase() !== "english" ? `Write the lyrics in ${lang
     .slice(0, lines).join("\n");
 }
 
+// ---- Translate a list of subtitle lines to a target language (for dubbing) --
+// Keeps the array length + order so each line maps back to its timing.
+export async function translateLines({ lines = [], targetLanguage = "English", sourceLanguage = "", llmProvider } = {}) {
+  const arr = (lines || []).map((s) => String(s || ""));
+  if (!arr.length) return [];
+  const prompt = `Translate each line below ${sourceLanguage ? `from ${sourceLanguage} ` : ""}into ${targetLanguage}.
+Keep the SAME number of lines and the SAME order. Translate naturally for spoken subtitles (concise, colloquial).
+Return ONLY a JSON array of ${arr.length} strings — the translations in order, nothing else.
+
+Lines:
+${arr.map((l, i) => `${i + 1}. ${l}`).join("\n")}`;
+  try {
+    const j = parseLLMJson(await callLLM(prompt, llmProvider));
+    if (Array.isArray(j) && j.length) {
+      const out = j.map((x) => String(x || "").trim());
+      // pad/trim to match the input length so timings never desync
+      while (out.length < arr.length) out.push(arr[out.length] || "");
+      return out.slice(0, arr.length);
+    }
+  } catch {}
+  return arr; // fall back to the originals if the model misbehaves
+}
+
 // ---- Split-screen "Comparison" videos (e.g. Textbook vs Casual Japanese) ----
 // The LLM invents a consistent pair of characters (one per side), then a list of
 // scenes: each is a phrase in the target language (native script + romaji + an
