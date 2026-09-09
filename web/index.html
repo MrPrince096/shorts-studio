@@ -116,6 +116,8 @@
   .dlitem.manual .dlmark{color:var(--gold)}
   .hwlog{max-height:150px;overflow:auto;background:#000;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:10.5px;line-height:1.35;color:var(--muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
   .apbar{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-top:6px}
+  .pubbox{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}
+  .pubbox code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;font-size:11px}
   .iconbtn{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px;transition:border-color .14s,background .14s}
   .iconbtn:hover{border-color:var(--accent);background:var(--panel2)}
   .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
@@ -756,7 +758,7 @@
 <div class="overlay" id="vidOverlay">
   <div class="modal" style="width:min(400px,94vw)">
     <div class="mhead" style="padding:14px 18px"><h2 id="vidTitle" style="font-size:15px">Video</h2><div class="sp"></div><button class="close" id="vidClose">×</button></div>
-    <div class="mbody" style="padding:16px"><div id="vidPlay"></div><div id="vidMeta"></div></div>
+    <div class="mbody" style="padding:16px"><div id="vidPlay"></div><div id="vidPublish"></div><div id="vidMeta"></div></div>
   </div>
 </div>
 
@@ -1349,7 +1351,37 @@ window.openVid=(i)=>{const v=VIDEOS[i];$('#vidTitle').textContent=v.title||v.fil
   rows+=`<a class="getlink" href="/out/${encodeURIComponent(v.file)}" download>⬇ Download video</a></div>`;
   $('#vidMeta').innerHTML=rows;
   document.querySelectorAll('#vidMeta .cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1000);});
+  renderPublish(v);
   $('#vidOverlay').classList.add('open');};
+async function renderPublish(v){
+  const el=$('#vidPublish'); if(!el)return; el.innerHTML='<div class="muted" style="font-size:12px;margin-top:12px">Checking YouTube…</div>';
+  let st={}; try{st=await(await fetch('/api/youtube/status')).json();}catch{}
+  if(v.videoUrl){el.innerHTML=`<div class="pubbox"><div class="ok">✅ Published — <a href="${v.videoUrl}" target="_blank" style="color:var(--accent-tint)">${v.videoUrl}</a> <span class="muted">(${v.privacy||'private'})</span></div><button class="btn ghost" id="pubAgain" style="margin-top:8px">Publish again</button></div>`;
+    $('#pubAgain').onclick=()=>{v.videoUrl='';renderPublish(v);};return;}
+  if(!st.connected){
+    el.innerHTML=`<div class="pubbox"><div style="font-weight:700;margin-bottom:6px">▶️ Publish to YouTube</div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5">Not connected yet. One-time setup:<br>1. In Google Cloud Console make an OAuth <b>Desktop</b> client, download it as <code>client_secret.json</code> into the app folder.<br>2. Click Connect and approve in the browser.</div>
+      <button class="btn grad" id="pubConnect" style="margin-top:10px"${st.hasClientSecret?'':' title="Add client_secret.json first"'}>Connect YouTube</button>
+      <button class="btn ghost" id="pubRecheck" style="margin-top:10px;margin-left:8px">Re-check</button></div>`;
+    $('#pubConnect').onclick=async()=>{const r=await(await fetch('/api/youtube/connect',{method:'POST'})).json();if(r.error){alert(r.error);}else{alert('A browser window is opening for Google sign-in. Approve it, then click Re-check.');}};
+    $('#pubRecheck').onclick=()=>renderPublish(v);return;
+  }
+  el.innerHTML=`<div class="pubbox"><div style="font-weight:700;margin-bottom:8px">▶️ Publish to YouTube</div>
+    <label style="font-size:12px">Visibility</label>
+    <select id="pubPriv" style="margin-top:4px"><option value="private" selected>Private (only you)</option><option value="unlisted">Unlisted (anyone with the link)</option><option value="public">Public</option></select>
+    <button class="btn grad" id="pubGo" style="margin-top:10px;width:100%"><span data-icon="play"></span> Publish this video</button>
+    <div id="pubMsg" style="font-size:12px;margin-top:8px"></div></div>`;
+  injectIcons&&injectIcons();
+  $('#pubGo').onclick=async()=>{
+    const priv=$('#pubPriv').value;
+    if((priv==='public'||priv==='unlisted') && !confirm(`This will upload "${v.title||v.file}" to your YouTube as ${priv}. Continue?`))return;
+    const btn=$('#pubGo');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Uploading…';
+    try{const r=await(await fetch('/api/youtube/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:v.file,title:v.title,description:v.description,privacy:priv})})).json();
+      if(r.error){$('#pubMsg').innerHTML='<span class="err">'+esc(r.error)+'</span>';btn.disabled=false;btn.innerHTML='<span data-icon="play"></span> Publish this video';injectIcons&&injectIcons();}
+      else{v.videoUrl=r.videoUrl;v.privacy=r.privacy;renderPublish(v);}
+    }catch(e){$('#pubMsg').innerHTML='<span class="err">'+esc(e.message)+'</span>';btn.disabled=false;}
+  };
+}
 window.copyMeta=(i)=>{const v=VIDEOS[i];navigator.clipboard.writeText([v.title,v.description,v.hashtags].filter(Boolean).join('\n\n'));};
 $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';};
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};

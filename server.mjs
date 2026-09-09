@@ -2,7 +2,7 @@
 // Run: npm start   (opens http://localhost:4321)
 import express from "express";
 import { spawn, execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync, copyFileSync, renameSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync, copyFileSync, renameSync, createReadStream } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
@@ -1808,6 +1808,54 @@ app.post("/api/servers/stop", (_req, res) => {
     try { execFileSync("pkill", ["-9", "-f", pat]); } catch {}
   }
   res.json({ ok: true });
+});
+
+// ---- YouTube publish (review → one-click upload) ---------------------------
+// Uses the existing one-time OAuth (client_secret.json → token.json). Each
+// upload is a deliberate, per-video action the user clicks; defaults to PRIVATE.
+const YT_TOKEN = join(ROOT, "token.json");
+const YT_CLIENT = join(ROOT, "client_secret.json");
+app.get("/api/youtube/status", (_req, res) => {
+  res.json({ connected: existsSync(YT_TOKEN), hasClientSecret: existsSync(YT_CLIENT) });
+});
+// Kick off the one-time browser OAuth (writes token.json). Needs client_secret.json.
+app.post("/api/youtube/connect", (_req, res) => {
+  if (!existsSync(YT_CLIENT)) return res.status(400).json({ error: "Add your Google OAuth desktop client as client_secret.json in the app folder first (see the note)." });
+  try {
+    const env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" }; delete env.PORT; delete env.SHORTS_DESKTOP;
+    const p = spawn(process.execPath, [join(ROOT, "scripts", "auth-youtube.mjs")], { cwd: ROOT, detached: true, stdio: "ignore", env });
+    p.unref();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/youtube/upload", async (req, res) => {
+  const b = req.body || {};
+  const file = String(b.file || "").replace(/[^a-zA-Z0-9._-]/g, "");
+  if (!file || !existsSync(join(OUT, file))) return res.status(400).json({ error: "Video not found." });
+  if (!existsSync(YT_TOKEN)) return res.status(400).json({ error: "YouTube isn't connected yet — connect it first." });
+  const privacy = ["private", "unlisted", "public"].includes(b.privacy) ? b.privacy : "private";
+  const base = file.replace(/\.mp4$/, "");
+  let meta = {}; const mp = join(DATA, base + ".json");
+  if (existsSync(mp)) { try { meta = JSON.parse(readFileSync(mp, "utf8")); } catch {} }
+  try {
+    const { google } = await import("googleapis");
+    const auth = google.auth.fromJSON(JSON.parse(readFileSync(YT_TOKEN, "utf8")));
+    const youtube = google.youtube({ version: "v3", auth });
+    const title = String(b.title || meta.title || base).slice(0, 90) + " #shorts";
+    const description = String(b.description != null ? b.description : (meta.description || "")).slice(0, 4900);
+    const tags = Array.isArray(b.tags) ? b.tags : (Array.isArray(meta.tags) ? meta.tags : []);
+    const r = await youtube.videos.insert({
+      part: ["snippet", "status"],
+      requestBody: { snippet: { title, description, tags, categoryId: "22" }, status: { privacyStatus: privacy, selfDeclaredMadeForKids: false } },
+      media: { body: createReadStream(join(OUT, file)) },
+    });
+    const videoId = r.data.id; const url = `https://youtube.com/shorts/${videoId}`;
+    try { meta.uploaded = true; meta.videoId = videoId; meta.videoUrl = url; meta.privacy = privacy; if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true }); writeFileSync(mp, JSON.stringify(meta, null, 2)); } catch {}
+    res.json({ ok: true, videoUrl: url, videoId, privacy });
+  } catch (e) {
+    const msg = e?.errors?.[0]?.message || e?.response?.data?.error?.message || e.message || "Upload failed";
+    res.status(500).json({ error: msg });
+  }
 });
 
 // ---- Autopilot: invents topics and generates videos on a timer -------------
