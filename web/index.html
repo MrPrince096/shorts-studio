@@ -407,9 +407,10 @@
             <option value="none">Stills only — tilt-shift + gentle zoom (instant, free)</option>
           </select>
           <div class="row" style="margin-top:12px">
-            <div><label>Music</label><select id="miniMusic"><option value="uplifting">Uplifting</option><option value="calm">Calm</option></select></div>
-            <div><label style="display:flex;align-items:center;gap:8px;margin-top:24px;cursor:pointer"><input type="checkbox" id="miniCaptions" style="width:auto;margin:0"> Show captions</label></div>
+            <div><label>Music</label><select id="miniMusic"><option value="none">None (silent / no music)</option><option value="uplifting">Uplifting</option><option value="calm">Calm</option></select></div>
+            <div><label>Narration</label><select id="miniNarrate"><option value="off">No voice</option><option value="on">Narrate each scene (AI voice)</option></select></div>
           </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="miniCaptions" checked style="width:auto;margin:0"> Show subtitles/captions</label>
           <label style="margin-top:12px">Watermark <span class="muted">— optional</span></label>
           <input id="miniWatermark" class="big" placeholder="@yourchannel" />
           <button class="btn grad big" id="goMini" style="width:100%;margin-top:16px"><span data-icon="cube"></span>Create Miniature Video</button>
@@ -1490,7 +1491,7 @@ $('#miniDice')&&($('#miniDice').onclick=(e)=>{e.preventDefault();rollTopic($('#m
 $('#goMini')&&($('#goMini').onclick=()=>{
   const topic=$('#miniTopic').value.trim(); if(!topic){alert('Enter an idea (or roll the dice 🎲).');return;}
   if($('#miniMotion').value==='local' && !confirm('Local LTX animation is free but slow — about 5–8 minutes PER scene on an M1, and needs Local engines ON. Continue?'))return;
-  run('/api/miniature',{topic,count:$('#miniCount').value,motionSource:$('#miniMotion').value,imageSource:$('#miniImage').value,musicMood:$('#miniMusic').value,captions:$('#miniCaptions').checked,watermark:$('#miniWatermark').value.trim(),...fmt()});
+  run('/api/miniature',{topic,count:$('#miniCount').value,motionSource:$('#miniMotion').value,imageSource:$('#miniImage').value,musicMood:$('#miniMusic').value,narrate:$('#miniNarrate').value==='on',captions:$('#miniCaptions').checked,watermark:$('#miniWatermark').value.trim(),...fmt()});
 });
 // ---- Dub & Subtitle ----
 window.__dubData='';

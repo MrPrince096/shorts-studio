@@ -139,7 +139,7 @@ app.post("/api/edit/remix", (req, res) => {
   if (!file.endsWith(".mp4") || !existsSync(videoPath)) return res.status(404).json({ error: "Video not found." });
   const base = file.replace(/\.mp4$/, "");
   const voicePath = join(DATA, base + ".voice.mp3");
-  if (!existsSync(voicePath)) return res.status(400).json({ error: "This video was made before the Editor existed — re-render it once to enable music editing." });
+  const hasVoice = existsSync(voicePath);
   const voiceVol = Math.max(0, Math.min(2, parseFloat(b.voiceVol) || 1));
   const musicVol = Math.max(0, Math.min(1.5, parseFloat(b.musicVol) != null ? parseFloat(b.musicVol) : 0.25));
   let musicPath = "";
@@ -150,14 +150,25 @@ app.post("/api/edit/remix", (req, res) => {
   }
   const tmp = join(OUT, base + ".remix.mp4");
   try {
-    if (musicPath) {
+    // We always take the VIDEO stream only (`0:v`) and rebuild the audio, so any
+    // baked-in music is dropped and replaced by exactly what you pick — even for
+    // videos with no saved voice track (then it's music-only, or silent).
+    if (hasVoice && musicPath) {
       execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", voicePath, "-stream_loop", "-1", "-i", musicPath,
         "-filter_complex", `[1:a]volume=${voiceVol}[v];[2:a]volume=${musicVol}[m];[v][m]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
         "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-shortest", tmp], { stdio: "ignore" });
-    } else {
+    } else if (hasVoice) {
       execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", voicePath,
         "-filter_complex", `[1:a]volume=${voiceVol}[aout]`,
         "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-shortest", tmp], { stdio: "ignore" });
+    } else if (musicPath) {
+      // no voice track → just lay the chosen music over the video
+      execFileSync("ffmpeg", ["-y", "-i", videoPath, "-stream_loop", "-1", "-i", musicPath,
+        "-filter_complex", `[1:a]volume=${musicVol}[aout]`,
+        "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-shortest", tmp], { stdio: "ignore" });
+    } else {
+      // no voice, no music → strip audio entirely (removes the background music)
+      execFileSync("ffmpeg", ["-y", "-i", videoPath, "-map", "0:v", "-an", "-c:v", "copy", tmp], { stdio: "ignore" });
     }
     renameSync(tmp, videoPath);
     try { const th = join(OUT, base + ".thumb.jpg"); if (existsSync(th)) unlinkSync(th); } catch {}
@@ -1657,8 +1668,10 @@ app.post("/api/miniature", (req, res) => {
   const motionSource = b.motionSource === "cloud" ? "cloud" : (b.motionSource === "none" ? "none" : "local");
   const imageSource = b.imageSource === "local" ? "local" : "image";
   const captionsOn = !!b.captions;
+  const narrate = !!b.narrate;
+  const narrateVoice = String(b.narrateVoice || "");
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
-  const music = (b.musicMood === "calm" || b.musicMood === "bedtime") ? "bg_calm.mp3" : "bg_uplifting.mp3";
+  const music = (b.musicMood === "none") ? "" : ((b.musicMood === "calm" || b.musicMood === "bedtime") ? "bg_calm.mp3" : "bg_uplifting.mp3");
   if (motionSource === "cloud" && !getEnvValue("FAL_KEY")) return res.status(400).json({ error: "Cloud motion needs a fal.ai key — add FAL_KEY in Settings, or switch motion to Local." });
   busy = true;
   const job = newJob(count, motionSource === "cloud" ? "render" : "animate");
@@ -1685,13 +1698,35 @@ app.post("/api/miniature", (req, res) => {
             const d = ffprobeDur(join(PUBLIC, mp4)); if (d > 0.5) { sceneFile = mp4; dur = d; }
           } catch (e) { pushLog(job, `↷ animation skipped (${e.message}) — using the still.`); }
         }
-        scenes.push({ video: sceneFile, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
+        scenes.push({ video: sceneFile, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3), _narr: (s.caption || s.scene) });
         if (captionsOn && s.caption) lyric.push({ text: s.caption, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
         cursor += dur;
       }
+      // optional narration: speak a short line per scene, timed to each shot
+      let audioFile = "";
+      if (narrate) {
+        pushLog(job, "🎙️ Narrating the scenes…");
+        const parts = [];
+        for (let i = 0; i < scenes.length; i++) {
+          const line = String(scenes[i]._narr || "").split(/[.!?]/)[0].split(/\s+/).slice(0, 16).join(" ").trim();
+          if (!line) continue;
+          try { const p = await ttsSegment("edge", narrateVoice, line, "English", join(PUBLIC, `mininarr_${i}`)); parts[i] = p; } catch {}
+        }
+        const real = parts.filter(Boolean);
+        if (real.length) {
+          const args = ["-y"]; const fp = []; const lbl = [];
+          scenes.forEach((sc, i) => { if (!parts[i]) return; args.push("-i", parts[i]); });
+          let idx = 0;
+          scenes.forEach((sc, i) => { if (!parts[i]) return; const ms = Math.round(sc.start * 1000); fp.push(`[${idx}:a]adelay=${ms}|${ms}[n${idx}]`); lbl.push(`[n${idx}]`); idx++; });
+          const total = (Math.ceil(cursor) + 0.3).toFixed(2);
+          args.push("-filter_complex", `${fp.join(";")};${lbl.join("")}amix=inputs=${lbl.length}:normalize=0:dropout_transition=0,apad,atrim=0:${total}[out]`, "-map", "[out]", "-c:a", "libmp3lame", "-q:a", "3", join(PUBLIC, "mini_voice.mp3"));
+          try { execFileSync("ffmpeg", args, { stdio: "ignore", maxBuffer: 16 * 1024 * 1024 }); audioFile = "mini_voice.mp3"; } catch (e) { pushLog(job, "↷ narration mix failed (" + e.message + ")"); }
+        }
+      }
+      scenes.forEach((s) => { delete s._narr; });
       const props = {
         fps: 30, width, height, durationInSeconds: Math.ceil(cursor) + 0.3,
-        scenes, words: [], audio: "", music,
+        scenes, words: [], audio: audioFile, music,
         lyricLines: lyric, captionPos: "bottom", motion: "subtle", effect: "tiltshift",
         watermark: String(b.watermark || "").slice(0, 40), title: mw.title,
       };
@@ -1704,7 +1739,11 @@ app.post("/api/miniature", (req, res) => {
         const onData = (d) => pushLog(job, d.toString()); child.stdout.on("data", onData); child.stderr.on("data", onData);
         child.on("close", () => resolve());
       });
-      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = mw.title; job.status = "done"; pushLog(job, "✅ Done!"); }
+      if (existsSync(join(OUT, outName))) {
+        job.files = [outName]; job.title = mw.title; job.status = "done"; pushLog(job, "✅ Done!");
+        // save the narration as a voice sidecar so the Editor can remix music on it
+        try { if (audioFile && existsSync(join(PUBLIC, "mini_voice.mp3"))) { if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true }); copyFileSync(join(PUBLIC, "mini_voice.mp3"), join(DATA, outName.replace(/\.mp4$/, "") + ".voice.mp3")); } } catch {}
+      }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
