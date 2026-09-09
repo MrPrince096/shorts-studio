@@ -115,6 +115,7 @@
   .dlitem.manual{opacity:.72}
   .dlitem.manual .dlmark{color:var(--gold)}
   .hwlog{max-height:150px;overflow:auto;background:#000;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:10.5px;line-height:1.35;color:var(--muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .apbar{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-top:6px}
   .iconbtn{width:40px;height:40px;border-radius:11px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:16px;transition:border-color .14s,background .14s}
   .iconbtn:hover{border-color:var(--accent);background:var(--panel2)}
   .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:700;font-size:13.5px;cursor:pointer}
@@ -292,6 +293,7 @@
     <div class="nav" data-nav="story"><span class="ic" data-icon="film"></span> Story</div>
     <div class="nav" data-nav="song"><span class="ic" data-icon="spark"></span> Song</div>
     <div class="nav" data-nav="comparison"><span class="ic" data-icon="columns"></span> Compare</div>
+    <div class="nav" data-nav="autopilot"><span class="ic" data-icon="bot"></span> Autopilot</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
@@ -383,6 +385,38 @@
           <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="songPerLine" checked style="width:auto;margin:0"> A unique image per lyric line <span class="muted">— relevant to each line (recommended)</span></label>
           <button class="btn grad big" id="goSong" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Create Lyric Video</button>
           <div class="note" style="margin-top:12px">Note: this makes an <b>instrumental lyric video</b> (music + on-screen lyrics + a relevant image per line) — not AI singing. Bring your own song for vocals. Set <b>Aspect → 1:1</b> in Song settings for the classic look.</div>
+        </div>
+        <!-- AUTOPILOT -->
+        <div class="card tabpanel" id="tab-autopilot" hidden>
+          <h2><span data-icon="bot"></span> Autopilot</h2>
+          <div class="cardsub">A self-running channel — it invents topics and generates videos on a timer, into your library</div>
+          <div class="apbar">
+            <div><div style="font-weight:800" id="apState">Off</div><div class="muted" style="font-size:12px" id="apNext">Not scheduled</div></div>
+            <div class="sp" style="flex:1"></div>
+            <label class="engtoggle" style="border:none"><span class="etl">Enable</span><span class="etsw"><input type="checkbox" id="apEnable"><span class="ettk"></span></span></label>
+          </div>
+          <label style="margin-top:14px">Niche / channel theme <span class="muted">— seeds every topic (blank = totally random)</span></label>
+          <input id="apNiche" class="big" placeholder="e.g. space facts, stoic wisdom, weird history, Japanese phrases" />
+          <div class="row" style="margin-top:12px">
+            <div><label>What to make</label><select id="apType"><option value="shorts">Shorts (topic → short)</option><option value="story">Story (narrated)</option><option value="comparison">Comparison (split-screen)</option></select></div>
+            <div><label>Every</label><select id="apInterval"><option value="1">1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24" selected>1 day</option><option value="48">2 days</option><option value="168">1 week</option></select></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div id="apLangWrap"><label>Language</label><input id="apLanguage" placeholder="English" value="English" /></div>
+            <div id="apPerRunWrap"><label>Videos per run</label><select id="apPerRun"><option>1</option><option>2</option><option>3</option></select></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div id="apStoryWrap" hidden><label>Story style</label><input id="apStoryType" placeholder="space, history, mystery…" value="space" /></div>
+            <div id="apCompareWrap" hidden><label>Comparison language</label><input id="apCompareLang" placeholder="Japanese" value="Japanese" /></div>
+          </div>
+          <div class="row" style="margin-top:16px">
+            <button class="btn grad big" id="apSave" style="flex:1"><span data-icon="bot"></span>Save settings</button>
+            <button class="btn ghost big" id="apRunNow" style="flex:1">▶️ Run one now</button>
+          </div>
+          <div class="note" style="margin-top:12px">Autopilot runs while the app is open. It files videos into <b>My Videos</b> for you to review — it never posts anywhere on its own. Uses free cloud images by default (turn on Local engines to keep it fully offline).</div>
+          <div id="apStatus" style="margin-top:12px"></div>
+          <label style="margin-top:16px">Recent autopilot runs</label>
+          <div id="apHistory" class="dllist"></div>
         </div>
         <!-- COMPARISON (split-screen) -->
         <div class="card tabpanel" id="tab-comparison" hidden>
@@ -894,6 +928,7 @@ const ICONS={
   wand:'<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
   download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
   columns:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>',
+  bot:'<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -911,6 +946,8 @@ function switchTab(name){
   $('#dashboard').classList.remove('show'); $('#library').classList.remove('show'); $('#editor').classList.remove('show'); $('#find').classList.remove('show'); $('#voices').classList.remove('show'); $('#imagelab').classList.remove('show');
   document.querySelectorAll('.tabpanel').forEach(p=>p.hidden=p.id!=='tab-'+name);
   $('#workspace').style.display='grid';
+  if(typeof __apPoll!=='undefined'&&__apPoll){clearInterval(__apPoll);__apPoll=null;}
+  if(name==='autopilot'&&typeof showAutopilot==='function')showAutopilot();
   applyTabSettings(name);
 }
 document.querySelectorAll('.nav[data-nav]').forEach(n=>n.onclick=()=>{
@@ -1364,6 +1401,47 @@ $('#songWrite')&&($('#songWrite').onclick=async()=>{
   b.disabled=false;b.textContent='✨ Write lyrics';
 });
 $('#goSong').onclick=()=>{const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Write lyrics from a topic (✨) or paste your own — one line each.');return;}run('/api/song',{songDataUrl:window.__songData||'',lyrics,topic:$('#songTopic').value.trim(),theme:$('#songTheme').value.trim(),perLineImages:$('#songPerLine').checked,...fmt()});};
+// ---- Autopilot ----
+let __apPoll=null;
+function apFmtWhen(ts){if(!ts)return'—';const d=ts-Date.now();if(d<=0)return'now';const m=Math.round(d/60000);if(m<60)return`in ${m} min`;const h=Math.floor(m/60);return`in ${h}h ${m%60}m`;}
+function apSyncFields(){const t=$('#apType').value;$('#apStoryWrap').hidden=t!=='story';$('#apCompareWrap').hidden=t!=='comparison';$('#apPerRunWrap').style.opacity=t==='shorts'?1:0.4;$('#apLangWrap').style.opacity=t==='comparison'?0.4:1;}
+$('#apType')&&($('#apType').onchange=apSyncFields);
+function apRender(c){
+  if(!c)return;
+  $('#apState').textContent=c.enabled?(c.running?'Running…':'On'):'Off';
+  $('#apState').style.color=c.enabled?'var(--ok)':'var(--muted)';
+  $('#apNext').textContent=c.enabled?(c.running?'generating a video now':('next video '+apFmtWhen(c.nextRun))):'Not scheduled';
+  if(document.activeElement!==$('#apEnable'))$('#apEnable').checked=!!c.enabled;
+  const set=(id,v)=>{const e=$(id);if(e&&document.activeElement!==e)e.value=v;};
+  set('#apNiche',c.niche||'');set('#apLanguage',c.language||'English');set('#apStoryType',c.storyType||'space');set('#apCompareLang',c.compareLanguage||'Japanese');
+  if(document.activeElement!==$('#apType')){$('#apType').value=c.type||'shorts';}
+  if(document.activeElement!==$('#apInterval'))$('#apInterval').value=String(c.intervalHours||24);
+  if(document.activeElement!==$('#apPerRun'))$('#apPerRun').value=String(c.perRun||1);
+  apSyncFields();
+  $('#apStatus').innerHTML=c.running?'<span class="spin"></span> Generating a video…':(c.lastError?('<span class="err">Last error: '+esc(c.lastError)+'</span>'):'');
+  const h=c.history||[];
+  $('#apHistory').innerHTML=h.length?h.slice(0,12).map(e=>{
+    const ic=e.status==='done'?'✓':(e.status==='error'?'✋':'…');
+    const when=new Date(e.ts).toLocaleString();
+    const link=e.file?`<a class="dlsize" href="#" onclick="showPreview('${encodeURIComponent(e.file)}');return false">▶ watch</a>`:'<span class="dlfor">'+esc(e.error||e.status)+'</span>';
+    return `<div class="dlitem${e.status==='done'?' ok':(e.status==='error'?' manual':'')}"><span class="dlmark">${ic}</span><span>${esc(e.topic||'(random)')}</span><span class="dlfor">${esc(e.type)} · ${when}</span>${link}</div>`;
+  }).join(''):'<div class="muted" style="font-size:12px">No runs yet — hit “Run one now”.</div>';
+}
+async function apLoad(){try{apRender(await(await fetch('/api/autopilot')).json());}catch{}}
+async function apSave(enabled){
+  const body={type:$('#apType').value,niche:$('#apNiche').value.trim(),language:$('#apLanguage').value.trim()||'English',storyType:$('#apStoryType').value.trim()||'story',compareLanguage:$('#apCompareLang').value.trim()||'Japanese',intervalHours:$('#apInterval').value,perRun:$('#apPerRun').value};
+  if(enabled!==undefined)body.enabled=enabled;
+  try{apRender(await(await fetch('/api/autopilot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json());}catch{}
+}
+$('#apEnable')&&($('#apEnable').onchange=()=>apSave($('#apEnable').checked));
+$('#apSave')&&($('#apSave').onclick=()=>apSave());
+$('#apRunNow')&&($('#apRunNow').onclick=async()=>{
+  await apSave(); // persist current settings first
+  const b=$('#apRunNow');b.disabled=true;b.textContent='Starting…';
+  try{const r=await(await fetch('/api/autopilot/run',{method:'POST'})).json();if(r.error)alert(r.error);}catch(e){alert(e.message);}
+  b.disabled=false;b.textContent='▶️ Run one now';apLoad();
+});
+function showAutopilot(){apLoad();clearInterval(__apPoll);__apPoll=setInterval(apLoad,5000);}
 // ---- Comparison (split-screen) ----
 $('#cmpDice')&&($('#cmpDice').onclick=(e)=>{e.preventDefault();rollTopic($('#cmpDice'),$('#cmpTopic'),{forType:'comparison',hint:$('#cmpTopic').value.trim()||'a daily-life situation for a language comparison video',fallback:['everyday phrases','at a restaurant','meeting a friend','shopping','asking for directions','morning routine','saying thank you','at the station']});});
 $('#goComparison')&&($('#goComparison').onclick=()=>{

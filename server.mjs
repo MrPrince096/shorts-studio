@@ -1810,6 +1810,90 @@ app.post("/api/servers/stop", (_req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Autopilot: invents topics and generates videos on a timer -------------
+// A self-running "faceless channel": it picks a fresh topic (seeded by your
+// niche), drives the SAME generation endpoints a person would, and files each
+// video into your library. Review-first — it never publishes on its own.
+const AUTOPILOT_FILE = join(DATA, "autopilot.json");
+const AP_DEFAULT = {
+  enabled: false, niche: "", type: "shorts", language: "English",
+  storyType: "story", compareLanguage: "Japanese",
+  perRun: 1, intervalHours: 24,
+  lastRun: 0, nextRun: 0, running: false, lastError: "", history: [],
+};
+function loadAutopilot() {
+  try { return { ...AP_DEFAULT, ...JSON.parse(readFileSync(AUTOPILOT_FILE, "utf8")) }; }
+  catch { return { ...AP_DEFAULT }; }
+}
+function saveAutopilot(c) {
+  try { if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true }); writeFileSync(AUTOPILOT_FILE, JSON.stringify(c, null, 2)); } catch {}
+}
+// Generate exactly one batch, by calling our own HTTP endpoints (same code path
+// as the UI), then poll the job to completion and record it in history.
+async function autopilotRunOnce(cfg) {
+  cfg.running = true; cfg.lastError = ""; saveAutopilot(cfg);
+  const base = `http://localhost:${PORT}`;
+  let topic = cfg.niche || "";
+  try {
+    try {
+      const t = await generateTopic({
+        forType: cfg.type === "comparison" ? "comparison" : (cfg.type === "story" ? "story" : "shorts"),
+        type: cfg.type === "story" ? cfg.storyType : "",
+        hint: cfg.niche, language: cfg.type === "comparison" ? "English" : cfg.language,
+        llmProvider: getEnvValue("LLM_PROVIDER"),
+      });
+      if (t) topic = t;
+    } catch {}
+    let path, body;
+    if (cfg.type === "story") { path = "/api/story"; body = { topic, storyType: cfg.storyType, minutes: 3, source: "image", aspect: "9:16", quality: "1080", language: cfg.language }; }
+    else if (cfg.type === "comparison") { path = "/api/comparison"; body = { language: cfg.compareLanguage, topic, count: 6, source: "image", voice: true, music: false }; }
+    else { path = "/api/generate"; body = { topic, count: Math.min(5, Math.max(1, cfg.perRun || 1)), source: "image", aspect: "9:16", quality: "1080", language: cfg.language }; }
+    const r = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `start failed (${r.status})`); }
+    const { jobId } = await r.json();
+    let status = "running", files = [], guard = 0;
+    while (status === "running" && guard++ < 700) {  // ~35 min cap
+      await new Promise((z) => setTimeout(z, 3000));
+      try { const s = await (await fetch(`${base}/api/status/${jobId}`)).json(); status = s.status; files = s.files || []; } catch {}
+    }
+    cfg.history = [{ ts: Date.now(), topic, type: cfg.type, status, file: files[0] || "" }, ...(cfg.history || [])].slice(0, 40);
+  } catch (e) {
+    cfg.lastError = e.message;
+    cfg.history = [{ ts: Date.now(), topic, type: cfg.type, status: "error", file: "", error: e.message }, ...(cfg.history || [])].slice(0, 40);
+  }
+  cfg.lastRun = Date.now();
+  cfg.nextRun = Date.now() + Math.max(1, cfg.intervalHours || 24) * 3600e3;
+  cfg.running = false; saveAutopilot(cfg);
+  return cfg;
+}
+let apTicking = false;
+setInterval(async () => {
+  if (apTicking) return;
+  const cfg = loadAutopilot();
+  if (!cfg.enabled || cfg.running || busy) return;
+  if (Date.now() < (cfg.nextRun || 0)) return;
+  apTicking = true;
+  try { await autopilotRunOnce(cfg); } catch {} finally { apTicking = false; }
+}, 60000);
+app.get("/api/autopilot", (_req, res) => res.json(loadAutopilot()));
+app.post("/api/autopilot", (req, res) => {
+  const cur = loadAutopilot(); const b = req.body || {}; const next = { ...cur };
+  for (const k of ["niche", "type", "language", "storyType", "compareLanguage"]) if (k in b) next[k] = String(b[k] || "").slice(0, 80);
+  if ("enabled" in b) next.enabled = !!b.enabled;
+  if ("perRun" in b) next.perRun = Math.min(5, Math.max(1, parseInt(b.perRun) || 1));
+  if ("intervalHours" in b) next.intervalHours = Math.min(168, Math.max(1, parseInt(b.intervalHours) || 24));
+  if (b.enabled && !cur.enabled && !next.nextRun) next.nextRun = Date.now() + 5000; // first run soon
+  if (b.enabled && !cur.enabled && next.nextRun < Date.now()) next.nextRun = Date.now() + 5000;
+  saveAutopilot(next); res.json(next);
+});
+app.post("/api/autopilot/run", (_req, res) => {
+  const cfg = loadAutopilot();
+  if (cfg.running) return res.status(409).json({ error: "Autopilot is already generating." });
+  if (busy) return res.status(409).json({ error: "A render is running — try again in a moment." });
+  res.json({ ok: true });
+  autopilotRunOnce(cfg).catch(() => {});
+});
+
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n🎬 Shorts Studio running at ${url}\n`);
