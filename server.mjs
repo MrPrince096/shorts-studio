@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { detectHardware, tierConfig, downloadPlan, installPlan, installCommand } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
@@ -1409,6 +1409,38 @@ async function falQueue(model, body) {
   }
   return (await fetch(respUrl, { headers: auth })).json();
 }
+// Generate one image and return its bytes. Shared by the Image Lab preview and
+// the Comparison template. `source`: local | hf | fal-image | image(pollinations).
+async function genImageBuffer({ source = "image", prompt, width, height }) {
+  if (source === "local") {
+    const url = getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate";
+    const tc = tierConfig(getEnvValue("HW_TIER"));   // clamp to the Mac's tier ceiling
+    const sc = Math.min(1, tc.image.maxDim / Math.max(width, height));
+    const lw = Math.round((width * sc) / 8) * 8, lh = Math.round((height * sc) / 8) * 8;
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, width: lw, height: lh, steps: tc.image.steps }) });
+    if (!r.ok) throw new Error("Local ComfyUI not reachable — turn Local engines ON.");
+    return { buf: Buffer.from(await r.arrayBuffer()), ctype: r.headers.get("content-type") || "image/png" };
+  }
+  if (source === "hf") {
+    const token = getEnvValue("HF_TOKEN"); if (!token) throw new Error("Add a Hugging Face token in Settings.");
+    const sc = Math.min(1, 1440 / Math.max(width, height));
+    const w = Math.round(width * sc / 8) * 8, h = Math.round(height * sc / 8) * 8;
+    const r = await fetch("https://router.huggingface.co/fal-ai/fal-ai/flux/schnell", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_size: { width: w, height: h }, num_images: 1 }) });
+    if (!r.ok) { if (r.status === 402) throw new Error("HF free credits used up this month."); throw new Error(`HF ${r.status}`); }
+    const j = await r.json(); const u = j?.images?.[0]?.url || j?.image?.url || j?.url; if (!u) throw new Error("HF: no image");
+    return { buf: Buffer.from(await (await fetch(u)).arrayBuffer()), ctype: "image/jpeg" };
+  }
+  if (source === "fal-image") {
+    const rd = await falQueue("fal-ai/flux/schnell", { prompt, image_size: { width, height }, num_images: 1 });
+    const u = rd?.images?.[0]?.url || rd?.image?.url || rd?.url; if (!u) throw new Error("fal: no image");
+    return { buf: Buffer.from(await (await fetch(u)).arrayBuffer()), ctype: "image/jpeg" };
+  }
+  // pollinations (free, cloud, default)
+  const seed = Math.floor(Math.random() * 1e6);
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&nologo=true&model=flux&seed=${seed}`;
+  const r = await fetch(url); if (!r.ok) throw new Error(`Pollinations ${r.status}`);
+  return { buf: Buffer.from(await r.arrayBuffer()), ctype: "image/jpeg" };
+}
 app.post("/api/image/preview", async (req, res) => {
   const b = req.body || {};
   const source = String(b.source || "image");
@@ -1416,34 +1448,7 @@ app.post("/api/image/preview", async (req, res) => {
   if (!prompt) return res.status(400).json({ error: "Type a prompt to generate an image." });
   const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
   try {
-    let buf, ctype = "image/jpeg";
-    if (source === "local") {
-      const url = getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate";
-      // Clamp to the tier's image ceiling so a weaker Mac doesn't OOM on 1536px.
-      const tc = tierConfig(getEnvValue("HW_TIER"));
-      const sc = Math.min(1, tc.image.maxDim / Math.max(width, height));
-      const lw = Math.round((width * sc) / 8) * 8, lh = Math.round((height * sc) / 8) * 8;
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, width: lw, height: lh, steps: tc.image.steps }) });
-      if (!r.ok) throw new Error("Local ComfyUI not reachable — turn Local engines ON.");
-      buf = Buffer.from(await r.arrayBuffer()); ctype = r.headers.get("content-type") || "image/png";
-    } else if (source === "hf") {
-      const token = getEnvValue("HF_TOKEN"); if (!token) throw new Error("Add a Hugging Face token in Settings.");
-      const sc = Math.min(1, 1440 / Math.max(width, height));
-      const w = Math.round(width * sc / 8) * 8, h = Math.round(height * sc / 8) * 8;
-      const r = await fetch("https://router.huggingface.co/fal-ai/fal-ai/flux/schnell", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt, image_size: { width: w, height: h }, num_images: 1 }) });
-      if (!r.ok) { if (r.status === 402) throw new Error("HF free credits used up this month."); throw new Error(`HF ${r.status}`); }
-      const j = await r.json(); const u = j?.images?.[0]?.url || j?.image?.url || j?.url; if (!u) throw new Error("HF: no image");
-      buf = Buffer.from(await (await fetch(u)).arrayBuffer());
-    } else if (source === "fal-image") {
-      const rd = await falQueue("fal-ai/flux/schnell", { prompt, image_size: { width, height }, num_images: 1 });
-      const u = rd?.images?.[0]?.url || rd?.image?.url || rd?.url; if (!u) throw new Error("fal: no image");
-      buf = Buffer.from(await (await fetch(u)).arrayBuffer());
-    } else { // pollinations (free, cloud)
-      const seed = Math.floor(Math.random() * 1e6);
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&nologo=true&model=flux&seed=${seed}`;
-      const r = await fetch(url); if (!r.ok) throw new Error(`Pollinations ${r.status}`);
-      buf = Buffer.from(await r.arrayBuffer());
-    }
+    const { buf, ctype } = await genImageBuffer({ source, prompt, width, height });
     res.setHeader("Content-Type", ctype); res.send(buf);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1489,6 +1494,137 @@ app.post("/api/animate", (req, res) => {
       writeFileSync(join(CLIPS_DIR, id + ".mp4"), Buffer.from(await r.arrayBuffer()));
       pushLog(job, "✅ Done! Your clip is ready.");
       job.files = [clipUrl]; job.status = "done"; busy = false;
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
+// ---- Comparison (split-screen) videos: e.g. Textbook vs Casual Japanese ----
+// A recurring character per side + trilingual captions (native + romaji +
+// English), each panel a still (fast) or a short AI clip (animate, slow).
+const EDGE_VOICE = {
+  japanese: "ja-JP-NanamiNeural", korean: "ko-KR-SunHiNeural", chinese: "zh-CN-XiaoxiaoNeural",
+  spanish: "es-ES-ElviraNeural", french: "fr-FR-DeniseNeural", german: "de-DE-KatjaNeural",
+  hindi: "hi-IN-SwaraNeural", italian: "it-IT-ElsaNeural", portuguese: "pt-BR-FranciscaNeural",
+  russian: "ru-RU-SvetlanaNeural", arabic: "ar-SA-ZariyahNeural", english: "en-US-AriaNeural",
+};
+function ffprobeDur(p) {
+  try { return parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nk=1:nw=1", p]).toString().trim()) || 0; } catch { return 0; }
+}
+// pick the render command — prefer the machine's `npx remotion`, else run the
+// Remotion CLI JS entry via our own Node runtime (packaged fresh Mac).
+function remotionCmd(args) {
+  try { execFileSync("/usr/bin/env", ["npx", "--version"], { stdio: "ignore" }); return { cmd: "npx", args: ["remotion", ...args], env: process.env }; } catch {}
+  const cli = join(ROOT, "node_modules", "@remotion", "cli", "remotion-cli.js");
+  return { cmd: process.execPath, args: [cli, ...args], env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } };
+}
+async function genPanel(source, prompt, w, h, outPath) {
+  let buf;
+  try { ({ buf } = await genImageBuffer({ source, prompt, width: w, height: h })); }
+  catch (e) { if (source !== "image") ({ buf } = await genImageBuffer({ source: "image", prompt, width: w, height: h })); else throw e; }
+  const tmp = outPath + ".raw"; writeFileSync(tmp, buf);
+  if (!toJpeg(tmp, outPath)) writeFileSync(outPath, buf);
+  try { unlinkSync(tmp); } catch {}
+}
+app.post("/api/comparison", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const language = String(b.language || "Japanese").trim() || "Japanese";
+  const topic = String(b.topic || "").slice(0, 200).trim();
+  const count = Math.min(10, Math.max(2, parseInt(b.count) || 6));
+  const animate = !!b.animate;
+  const source = String(b.source || "image");
+  const leftLabel = String(b.leftLabel || `Textbook ${language}`).slice(0, 40).trim();
+  const rightLabel = String(b.rightLabel || `Casual ${language}`).slice(0, 40).trim();
+  const withVoice = b.voice !== false;
+  const edgeVoice = EDGE_VOICE[language.toLowerCase()] || "en-US-AriaNeural";
+  const animateUrl = (getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate").replace(/\/generate$/, "/animate");
+  busy = true;
+  const job = newJob(count, animate ? "animate" : "render");
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      pushLog(job, `✍️ Writing a "${leftLabel} vs ${rightLabel}" script…`);
+      const c = await generateComparison({ topic, language, count, leftLabel, rightLabel, llmProvider: getEnvValue("LLM_PROVIDER") });
+      job.total = c.scenes.length;
+      if (animate) pushLog(job, `⚠️ Animated mode makes 2 AI clips per scene (~5–8 min each on an M1). ${c.scenes.length} scenes → this can take a long time. Sit tight.`);
+      const W = 720, H = 1280, genW = 832, genH = 1216;
+      const tc = tierConfig(getEnvValue("HW_TIER"));
+      const scenes = []; let cursor = 0; const parts = [];
+      for (let i = 0; i < c.scenes.length; i++) {
+        job.current = i + 1;
+        const s = c.scenes[i];
+        pushLog(job, `🎨 [${i + 1}/${c.scenes.length}] ${s.english} — generating panels…`);
+        const lPrompt = `${c.leftCharacter}, ${s.moment}. ${leftLabel} vibe, cinematic photo, vertical portrait, sharp focus, highly detailed`;
+        const rPrompt = `${c.rightCharacter}, ${s.moment}. ${rightLabel} vibe, cinematic photo, vertical portrait, sharp focus, highly detailed`;
+        let leftMedia = `cmp_l${i}.jpg`, rightMedia = `cmp_r${i}.jpg`;
+        await genPanel(source, lPrompt, genW, genH, join(PUBLIC, leftMedia));
+        await genPanel(source, rPrompt, genW, genH, join(PUBLIC, rightMedia));
+        if (animate) {
+          const cap = Math.min(tc.video.maxDim, 704), longE = cap, shortE = Math.round((longE * 480) / 768 / 8) * 8;
+          const frames = Math.min(Math.max(25, Math.round(tc.video.maxSeconds * tc.video.fps)), 49);
+          for (const [imgFile, mp4File, tag] of [[leftMedia, `cmp_l${i}.mp4`, "left"], [rightMedia, `cmp_r${i}.mp4`, "right"]]) {
+            try {
+              pushLog(job, `🎬 [${i + 1}/${c.scenes.length}] animating ${tag} panel (LTX)…`);
+              const b64 = readFileSync(join(PUBLIC, imgFile)).toString("base64");
+              const r = await fetch(animateUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: `data:image/jpeg;base64,${b64}`, prompt: `${s.moment}, gentle natural motion, subtle movement`, width: shortE, height: longE, frames, steps: 12 }) });
+              if (!r.ok) throw new Error(`animate ${r.status}`);
+              writeFileSync(join(PUBLIC, mp4File), Buffer.from(await r.arrayBuffer()));
+              if (tag === "left") leftMedia = mp4File; else rightMedia = mp4File;
+            } catch (e) { pushLog(job, `↷ ${tag} clip skipped (${e.message}) — using the still.`); }
+          }
+        }
+        // voiceover of the native phrase (drives the scene's length)
+        let dur = 3.0;
+        if (withVoice) {
+          try {
+            const mp3 = join(PUBLIC, `cmp_v${i}.mp3`);
+            execFileSync("edge-tts", ["--voice", edgeVoice, "--text", s.native, "--write-media", mp3], { stdio: "ignore" });
+            const d = ffprobeDur(mp3); if (d > 0.3) { dur = d + 0.9; parts[i] = mp3; }
+          } catch { /* no edge-tts → silent, fixed length */ }
+        }
+        dur = Math.max(2.6, dur);
+        scenes.push({ leftMedia, rightMedia, native: s.native, romaji: s.romaji, english: s.english, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
+        cursor += dur;
+      }
+      // assemble one audio track: pad each phrase to its scene length, concat
+      let audioFile = "";
+      if (parts.some(Boolean)) {
+        const padded = [];
+        for (let i = 0; i < scenes.length; i++) {
+          const d = (scenes[i].end - scenes[i].start).toFixed(3);
+          const out = join(PUBLIC, `cmp_p${i}.mp3`);
+          try {
+            if (parts[i]) execFileSync("ffmpeg", ["-y", "-i", parts[i], "-af", `apad=whole_dur=${d}`, out], { stdio: "ignore" });
+            else execFileSync("ffmpeg", ["-y", "-f", "lavfi", "-t", d, "-i", "anullsrc=r=24000:cl=mono", out], { stdio: "ignore" });
+            padded.push(out);
+          } catch {}
+        }
+        if (padded.length === scenes.length) {
+          const list = join(PUBLIC, "cmp_list.txt");
+          writeFileSync(list, padded.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"));
+          try { execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", list, "-c:a", "libmp3lame", "-q:a", "3", join(PUBLIC, "cmp_audio.mp3")], { stdio: "ignore" }); audioFile = "cmp_audio.mp3"; } catch {}
+        }
+      }
+      const props = {
+        fps: 30, width: W, height: H, durationInSeconds: Math.ceil(cursor) + 0.3,
+        scenes, audio: audioFile, music: b.music ? "bg_calm.mp3" : "",
+        leftLabel, rightLabel, leftEmoji: c.leftEmoji, rightEmoji: c.rightEmoji,
+        watermark: String(b.watermark || "").slice(0, 40),
+      };
+      writeFileSync(join(PUBLIC, "comparison.json"), JSON.stringify(props, null, 2));
+      const name = slugify(topic || `comparison ${language}`) || "comparison";
+      const outName = `${name}.mp4`;
+      pushLog(job, "🎬 Rendering the split-screen video…");
+      await new Promise((resolve) => {
+        const { cmd, args, env } = remotionCmd(["render", "Comparison", `out/${outName}`, "--props=public/comparison.json"]);
+        const child = spawn(cmd, args, { cwd: ROOT, env });
+        const onData = (d) => pushLog(job, d.toString());
+        child.stdout.on("data", onData); child.stderr.on("data", onData);
+        child.on("close", () => resolve());
+      });
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `${leftLabel} vs ${rightLabel}`; job.status = "done"; pushLog(job, "✅ Done!"); }
+      else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
+      busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
   })();
 });

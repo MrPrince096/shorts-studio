@@ -291,6 +291,7 @@
     <div class="nav" data-nav="shorts"><span class="ic" data-icon="play"></span> Shorts</div>
     <div class="nav" data-nav="story"><span class="ic" data-icon="film"></span> Story</div>
     <div class="nav" data-nav="song"><span class="ic" data-icon="spark"></span> Song</div>
+    <div class="nav" data-nav="comparison"><span class="ic" data-icon="columns"></span> Compare</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
     <div class="nav" data-nav="ideas"><span class="ic" data-icon="bulb"></span> Ideas</div>
@@ -382,6 +383,30 @@
           <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="songPerLine" checked style="width:auto;margin:0"> A unique image per lyric line <span class="muted">— relevant to each line (recommended)</span></label>
           <button class="btn grad big" id="goSong" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Create Lyric Video</button>
           <div class="note" style="margin-top:12px">Note: this makes an <b>instrumental lyric video</b> (music + on-screen lyrics + a relevant image per line) — not AI singing. Bring your own song for vocals. Set <b>Aspect → 1:1</b> in Song settings for the classic look.</div>
+        </div>
+        <!-- COMPARISON (split-screen) -->
+        <div class="card tabpanel" id="tab-comparison" hidden>
+          <h2><span data-icon="columns"></span> Comparison Studio</h2>
+          <div class="cardsub">Split-screen videos like "Textbook vs Casual" — two AI characters, native + romaji + English captions</div>
+          <label>Target language <span class="muted">— captions get native script + reading + English</span></label>
+          <input id="cmpLang" class="big" placeholder="e.g. Japanese, Korean, Spanish, Hindi…" value="Japanese" />
+          <label style="margin-top:14px">Topic / theme <span class="muted">— what the phrases are about 🎲</span></label>
+          <div class="withbtn"><input id="cmpTopic" class="big" placeholder="e.g. everyday phrases, at a restaurant, meeting a friend" /><button class="btn ghost" id="cmpDice" title="Surprise me">🎲</button></div>
+          <div class="row" style="margin-top:14px">
+            <div><label>Left label</label><input id="cmpLeft" placeholder="Textbook Japanese" /></div>
+            <div><label>Right label</label><input id="cmpRight" placeholder="Casual Japanese" /></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div><label>How many scenes</label><select id="cmpCount"><option>3</option><option>4</option><option selected>6</option><option>8</option></select></div>
+            <div><label>Images from</label><select id="cmpSource"><option value="image">Cloud (Pollinations, free)</option><option value="local">Local (ComfyUI)</option></select></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer"><input type="checkbox" id="cmpVoice" checked style="width:auto;margin:0"> Read the phrase aloud <span class="muted">— native-language voiceover per scene</span></label>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer"><input type="checkbox" id="cmpMusic" style="width:auto;margin:0"> Background music bed</label>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer"><input type="checkbox" id="cmpAnimate" style="width:auto;margin:0"> Animate the panels <span class="muted">— real AI video motion (LTX, needs Local engines ON; ~5–8 min per clip on M1)</span></label>
+          <label style="margin-top:14px">Watermark <span class="muted">— optional handle in the corner</span></label>
+          <input id="cmpWatermark" class="big" placeholder="@yourchannel" />
+          <button class="btn grad big" id="goComparison" style="width:100%;margin-top:16px"><span data-icon="columns"></span>Create Comparison</button>
+          <div class="note" style="margin-top:12px">Static mode is fast (~1–2 min) and fully local-capable. <b>Animate</b> matches the reference's motion but is heavy — it makes <b>2 AI clips per scene</b>, so keep scenes low and expect a long wait on an M1. Renders vertical 720×1280.</div>
         </div>
         <!-- SERIES -->
         <div class="card tabpanel" id="tab-series" hidden>
@@ -868,6 +893,7 @@ const ICONS={
   mic:'<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/>',
   wand:'<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
   download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  columns:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -1338,6 +1364,19 @@ $('#songWrite')&&($('#songWrite').onclick=async()=>{
   b.disabled=false;b.textContent='✨ Write lyrics';
 });
 $('#goSong').onclick=()=>{const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Write lyrics from a topic (✨) or paste your own — one line each.');return;}run('/api/song',{songDataUrl:window.__songData||'',lyrics,topic:$('#songTopic').value.trim(),theme:$('#songTheme').value.trim(),perLineImages:$('#songPerLine').checked,...fmt()});};
+// ---- Comparison (split-screen) ----
+$('#cmpDice')&&($('#cmpDice').onclick=(e)=>{e.preventDefault();rollTopic($('#cmpDice'),$('#cmpTopic'),{forType:'comparison',hint:$('#cmpTopic').value.trim()||'a daily-life situation for a language comparison video',fallback:['everyday phrases','at a restaurant','meeting a friend','shopping','asking for directions','morning routine','saying thank you','at the station']});});
+$('#goComparison')&&($('#goComparison').onclick=()=>{
+  const language=$('#cmpLang').value.trim(); if(!language){alert('Enter a target language (e.g. Japanese).');return;}
+  if($('#cmpAnimate').checked && !confirm('Animate mode makes 2 AI clips per scene with LTX — that can take many minutes per clip on an M1, and needs Local engines ON. Continue?'))return;
+  run('/api/comparison',{
+    language, topic:$('#cmpTopic').value.trim(),
+    leftLabel:$('#cmpLeft').value.trim(), rightLabel:$('#cmpRight').value.trim(),
+    count:$('#cmpCount').value, source:$('#cmpSource').value,
+    animate:$('#cmpAnimate').checked, voice:$('#cmpVoice').checked, music:$('#cmpMusic').checked,
+    watermark:$('#cmpWatermark').value.trim()
+  });
+});
 async function refreshSeries(){const l=await(await fetch('/api/series')).json();const el=$('#seriesList');if(!l.length){el.innerHTML='';return;}el.innerHTML='<div class="muted" style="font-size:11px;margin-bottom:6px">Your series</div>'+l.map(s=>{const d=s.done>=s.total;return `<div class="vid" style="margin-bottom:8px"><div style="font-weight:600">${s.title}</div><div class="muted" style="font-size:11px">${s.language} · ${s.done}/${s.total} ${d?'· ✓':''}</div>${d?'':`<button class="btn ghost" style="margin-top:8px" onclick="continueSeries('${s.id}')">▶️ Make next</button>`}</div>`;}).join('');}
 window.continueSeries=(id)=>run('/api/series/continue',{id,batch:$('#seriesBatch').value});
 $('#goAds').onclick=()=>{const product=$('#adProduct').value.trim();if(!product){alert('Enter the product.');return;}const base={ad:true,product,benefits:$('#adBenefits').value.trim(),cta:$('#adCta').value.trim(),tone:$('#adTone').value,count:$('#adVariations').value,...fmt()};const f=$('#adImage').files[0];if(f){if(f.size>70*1024*1024){alert('Max ~70MB.');return;}const rd=new FileReader();rd.onload=()=>run('/api/generate',{...base,imageDataUrl:rd.result});rd.readAsDataURL(f);}else run('/api/generate',base);};

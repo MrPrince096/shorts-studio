@@ -217,6 +217,51 @@ ${language && language.toLowerCase() !== "english" ? `Write the lyrics in ${lang
     .slice(0, lines).join("\n");
 }
 
+// ---- Split-screen "Comparison" videos (e.g. Textbook vs Casual Japanese) ----
+// The LLM invents a consistent pair of characters (one per side), then a list of
+// scenes: each is a phrase in the target language (native script + romaji + an
+// English translation) plus a shared visual moment (both sides do the same thing).
+export async function generateComparison({ topic = "", language = "Japanese", count = 6, leftLabel = "", rightLabel = "", llmProvider } = {}) {
+  const n = Math.min(10, Math.max(2, parseInt(count) || 6));
+  const lang = language || "Japanese";
+  const prompt = `You are scripting a viral split-screen "comparison" language-learning short.
+Target language: ${lang}. Theme: "${topic || `everyday ${lang} phrases`}".
+Left side = "${leftLabel || `Textbook ${lang}`}" (formal / polite / by-the-book).
+Right side = "${rightLabel || `Casual ${lang}`}" (relaxed / casual / real-life).
+
+Invent ONE recurring character for each side (kept identical across every scene) and ${n} scenes.
+Each scene is a common daily moment (waking up, eating, greeting a friend, saying thanks, etc).
+For each scene give the SAME phrase in the target language for the native line, its romanized reading, and the English meaning.
+
+Return ONLY valid JSON, no prose, exactly:
+{
+  "leftEmoji": "single emoji for the formal side",
+  "rightEmoji": "single emoji for the casual side",
+  "leftCharacter": "vivid, fixed physical description of the formal character incl. clothing (reused every scene)",
+  "rightCharacter": "vivid, fixed physical description of the casual character incl. clothing (reused every scene)",
+  "scenes": [
+    { "native": "phrase in ${lang} native script", "romaji": "romanized reading", "english": "English meaning", "moment": "short visual description of the shared moment/action/setting" }
+  ]
+}
+Give exactly ${n} scenes. Keep native short (a greeting-length phrase). Keep 'moment' concrete (setting + action) so an image generator can draw it.`;
+  const raw = await callLLM(prompt, llmProvider);
+  const j = parseLLMJson(raw);
+  const scenes = Array.isArray(j.scenes) ? j.scenes.slice(0, n).map((s) => ({
+    native: String(s.native || "").trim(),
+    romaji: String(s.romaji || "").trim(),
+    english: String(s.english || "").trim(),
+    moment: String(s.moment || "").trim(),
+  })).filter((s) => s.native && s.english) : [];
+  if (!scenes.length) throw new Error("Comparison: the model returned no usable scenes — try again.");
+  return {
+    leftEmoji: String(j.leftEmoji || "📕").trim().slice(0, 4) || "📕",
+    rightEmoji: String(j.rightEmoji || "📚").trim().slice(0, 4) || "📚",
+    leftCharacter: String(j.leftCharacter || "a person in formal business attire").trim(),
+    rightCharacter: String(j.rightCharacter || "the same person in casual loungewear").trim(),
+    scenes,
+  };
+}
+
 // ---- Long-form storytelling (3-10 min). Chunked (outline -> per-beat scenes) so
 // small local models never truncate one giant JSON. Great for bedtime / scary /
 // biography / tech-explainer narration videos. ----
