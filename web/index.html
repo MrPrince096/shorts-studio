@@ -296,6 +296,7 @@
     <div class="nav" data-nav="song"><span class="ic" data-icon="spark"></span> Song</div>
     <div class="nav" data-nav="comparison"><span class="ic" data-icon="columns"></span> Compare</div>
     <div class="nav" data-nav="dub"><span class="ic" data-icon="globe"></span> Dub</div>
+    <div class="nav" data-nav="miniature"><span class="ic" data-icon="cube"></span> Miniature</div>
     <div class="nav" data-nav="autopilot"><span class="ic" data-icon="bot"></span> Autopilot</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
     <div class="nav" data-nav="ads"><span class="ic" data-icon="mega"></span> Ads</div>
@@ -388,6 +389,31 @@
           <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="songPerLine" checked style="width:auto;margin:0"> A unique image per lyric line <span class="muted">— relevant to each line (recommended)</span></label>
           <button class="btn grad big" id="goSong" style="width:100%;margin-top:16px"><span data-icon="spark"></span>Create Lyric Video</button>
           <div class="note" style="margin-top:12px">Note: this makes an <b>instrumental lyric video</b> (music + on-screen lyrics + a relevant image per line) — not AI singing. Bring your own song for vocals. Set <b>Aspect → 1:1</b> in Song settings for the classic look.</div>
+        </div>
+        <!-- MINIATURE WORLD -->
+        <div class="card tabpanel" id="tab-miniature" hidden>
+          <h2><span data-icon="cube"></span> Miniature World</h2>
+          <div class="cardsub">Tiny tilt-shift diorama videos — little figurine people + oversized objects, cinematic macro. From a topic.</div>
+          <label>Idea / theme <span class="muted">— what the tiny people do 🎲</span></label>
+          <div class="withbtn"><input id="miniTopic" class="big" placeholder="e.g. tiny villagers save their grain from the rain as a giant hand helps" /><button class="btn ghost" id="miniDice" title="Surprise me">🎲</button></div>
+          <div class="row" style="margin-top:12px">
+            <div><label>Scenes</label><select id="miniCount"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+            <div><label>Images from</label><select id="miniImage"><option value="image">Cloud (Pollinations, free)</option><option value="local">Local (ComfyUI)</option></select></div>
+          </div>
+          <label style="margin-top:12px">Motion</label>
+          <select id="miniMotion">
+            <option value="local">Animate locally — LTX (free/offline, softer, slow on M1)</option>
+            <option value="cloud">Animate in the cloud — Kling/Seedance via fal.ai (best, needs FAL key)</option>
+            <option value="none">Stills only — tilt-shift + gentle zoom (instant, free)</option>
+          </select>
+          <div class="row" style="margin-top:12px">
+            <div><label>Music</label><select id="miniMusic"><option value="uplifting">Uplifting</option><option value="calm">Calm</option></select></div>
+            <div><label style="display:flex;align-items:center;gap:8px;margin-top:24px;cursor:pointer"><input type="checkbox" id="miniCaptions" style="width:auto;margin:0"> Show captions</label></div>
+          </div>
+          <label style="margin-top:12px">Watermark <span class="muted">— optional</span></label>
+          <input id="miniWatermark" class="big" placeholder="@yourchannel" />
+          <button class="btn grad big" id="goMini" style="width:100%;margin-top:16px"><span data-icon="cube"></span>Create Miniature Video</button>
+          <div class="note" style="margin-top:12px">The tilt-shift look + story are done locally. For true motion like the viral clips, <b>Cloud (Kling/Seedance)</b> matches best (needs a fal.ai key); <b>Local LTX</b> is free but softer and slow (~5–8 min per scene on an M1). Renders vertical.</div>
         </div>
         <!-- DUB -->
         <div class="card tabpanel" id="tab-dub" hidden>
@@ -955,6 +981,7 @@ const ICONS={
   columns:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>',
   bot:'<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
   globe:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  cube:'<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
 };
 function injectIcons(){document.querySelectorAll('[data-icon]').forEach(e=>{const p=ICONS[e.dataset.icon];if(p)e.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;});}
 
@@ -1458,6 +1485,13 @@ $('#songWrite')&&($('#songWrite').onclick=async()=>{
   b.disabled=false;b.textContent='✨ Write lyrics';
 });
 $('#goSong').onclick=()=>{const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Write lyrics from a topic (✨) or paste your own — one line each.');return;}run('/api/song',{songDataUrl:window.__songData||'',lyrics,topic:$('#songTopic').value.trim(),theme:$('#songTheme').value.trim(),perLineImages:$('#songPerLine').checked,...fmt()});};
+// ---- Miniature World ----
+$('#miniDice')&&($('#miniDice').onclick=(e)=>{e.preventDefault();rollTopic($('#miniDice'),$('#miniTopic'),{forType:'miniature',hint:$('#miniTopic').value.trim()||'a tiny tilt-shift diorama scene with little people and a giant everyday object',fallback:['tiny villagers rescue grain from a flood as a giant hand helps','little people build a staircase up a chocolate cliff','tiny farmers harvest a giant strawberry in the rain','miniature climbers scale a steaming cup of coffee','tiny people shelter under a mushroom in a storm']});});
+$('#goMini')&&($('#goMini').onclick=()=>{
+  const topic=$('#miniTopic').value.trim(); if(!topic){alert('Enter an idea (or roll the dice 🎲).');return;}
+  if($('#miniMotion').value==='local' && !confirm('Local LTX animation is free but slow — about 5–8 minutes PER scene on an M1, and needs Local engines ON. Continue?'))return;
+  run('/api/miniature',{topic,count:$('#miniCount').value,motionSource:$('#miniMotion').value,imageSource:$('#miniImage').value,musicMood:$('#miniMusic').value,captions:$('#miniCaptions').checked,watermark:$('#miniWatermark').value.trim(),...fmt()});
+});
 // ---- Dub & Subtitle ----
 window.__dubData='';
 async function showDub(){

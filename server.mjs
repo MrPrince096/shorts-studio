@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines, generateMiniature } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { detectHardware, tierConfig, downloadPlan, installPlan, installCommand } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
@@ -1623,6 +1623,88 @@ app.post("/api/comparison", (req, res) => {
         child.on("close", () => resolve());
       });
       if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `${leftLabel} vs ${rightLabel}`; job.status = "done"; pushLog(job, "✅ Done!"); }
+      else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
+      busy = false;
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
+// ---- Miniature World: tiny tilt-shift diorama videos (local LTX or cloud) ----
+const TILT_STYLE = "miniature tilt-shift diorama, macro photography, tiny realistic figurine people, oversized real-world objects for scale, shallow depth of field, cinematic lighting, hyper-detailed, blurred bokeh background";
+// Turn one image into a motion clip — local LTX adapter or cloud fal (Kling/Seedance).
+async function animateImage(motionSource, imgPath, motionPrompt, tc) {
+  const b64 = readFileSync(imgPath).toString("base64");
+  const dataUri = `data:image/jpeg;base64,${b64}`;
+  if (motionSource === "cloud") {
+    const model = getEnvValue("VIDEO_MODEL") || "fal-ai/kling-video/v1.6/standard/image-to-video";
+    const rd = await falQueue(model, { prompt: motionPrompt + ", smooth natural motion, tilt-shift miniature", image_url: dataUri, duration: "5" });
+    const url = rd?.video?.url || rd?.video || rd?.url; if (!url) throw new Error("cloud video: no URL in response");
+    return Buffer.from(await (await fetch(url)).arrayBuffer());
+  }
+  // local LTX via the ComfyUI adapter
+  const animateUrl = (getEnvValue("LOCAL_IMAGE_URL") || "http://localhost:7801/generate").replace(/\/generate$/, "/animate");
+  const cap = Math.min(tc.video.maxDim, 704), longE = cap, shortE = Math.round((longE * 480) / 768 / 8) * 8;
+  const frames = Math.min(Math.max(25, Math.round(tc.video.maxSeconds * tc.video.fps)), 65);
+  const r = await fetch(animateUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUri, prompt: motionPrompt + ", subtle cinematic motion", width: shortE, height: longE, frames, steps: 12 }) });
+  if (!r.ok) throw new Error(`local animate ${r.status} — is ComfyUI/Local engines ON?`);
+  return Buffer.from(await r.arrayBuffer());
+}
+app.post("/api/miniature", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const topic = String(b.topic || "").slice(0, 200).trim();
+  const count = Math.min(6, Math.max(2, parseInt(b.count) || 4));
+  const motionSource = b.motionSource === "cloud" ? "cloud" : (b.motionSource === "none" ? "none" : "local");
+  const imageSource = b.imageSource === "local" ? "local" : "image";
+  const captionsOn = !!b.captions;
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  const music = (b.musicMood === "calm" || b.musicMood === "bedtime") ? "bg_calm.mp3" : "bg_uplifting.mp3";
+  if (motionSource === "cloud" && !getEnvValue("FAL_KEY")) return res.status(400).json({ error: "Cloud motion needs a fal.ai key — add FAL_KEY in Settings, or switch motion to Local." });
+  busy = true;
+  const job = newJob(count, motionSource === "cloud" ? "render" : "animate");
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      pushLog(job, `✍️ Designing a miniature-world story…`);
+      const mw = await generateMiniature({ topic, count, llmProvider: getEnvValue("LLM_PROVIDER") });
+      job.total = mw.scenes.length;
+      const tc = tierConfig(getEnvValue("HW_TIER"));
+      const scenes = []; const lyric = []; let cursor = 0;
+      for (let i = 0; i < mw.scenes.length; i++) {
+        job.current = i + 1;
+        const s = mw.scenes[i];
+        pushLog(job, `🎨 [${i + 1}/${mw.scenes.length}] ${s.scene.slice(0, 60)}…`);
+        const imgFile = `mini_${i}.jpg`;
+        await genPanel(imageSource, `${mw.cast}. ${s.scene}. ${TILT_STYLE}`, width, height, join(PUBLIC, imgFile));
+        let sceneFile = imgFile, dur = 3.6;
+        if (motionSource !== "none") {
+          try {
+            pushLog(job, `🎬 [${i + 1}/${mw.scenes.length}] animating (${motionSource === "cloud" ? "cloud Kling/Seedance" : "local LTX ~5-8 min"})…`);
+            const buf = await animateImage(motionSource, join(PUBLIC, imgFile), `${s.scene}. ${s.motion}`, tc);
+            const mp4 = `mini_${i}.mp4`; writeFileSync(join(PUBLIC, mp4), buf);
+            const d = ffprobeDur(join(PUBLIC, mp4)); if (d > 0.5) { sceneFile = mp4; dur = d; }
+          } catch (e) { pushLog(job, `↷ animation skipped (${e.message}) — using the still.`); }
+        }
+        scenes.push({ video: sceneFile, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
+        if (captionsOn && s.caption) lyric.push({ text: s.caption, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
+        cursor += dur;
+      }
+      const props = {
+        fps: 30, width, height, durationInSeconds: Math.ceil(cursor) + 0.3,
+        scenes, words: [], audio: "", music,
+        lyricLines: lyric, captionPos: "bottom", motion: "subtle", effect: "tiltshift",
+        watermark: String(b.watermark || "").slice(0, 40), title: mw.title,
+      };
+      writeFileSync(join(PUBLIC, "mini.json"), JSON.stringify(props, null, 2));
+      const outName = (slugify(mw.title || topic || "miniature") || "miniature") + ".mp4";
+      pushLog(job, "🎬 Rendering the miniature short…");
+      await new Promise((resolve) => {
+        const { cmd, args, env } = remotionCmd(["render", "Short", `out/${outName}`, "--props=public/mini.json"]);
+        const child = spawn(cmd, args, { cwd: ROOT, env });
+        const onData = (d) => pushLog(job, d.toString()); child.stdout.on("data", onData); child.stderr.on("data", onData);
+        child.on("close", () => resolve());
+      });
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = mw.title; job.status = "done"; pushLog(job, "✅ Done!"); }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }

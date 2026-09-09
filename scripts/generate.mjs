@@ -217,6 +217,34 @@ ${language && language.toLowerCase() !== "english" ? `Write the lyrics in ${lang
     .slice(0, lines).join("\n");
 }
 
+// ---- "Miniature world" videos (tiny tilt-shift diorama people, cinematic) ----
+// The LLM invents a tiny emotional/epic scene arc: a recurring cast of miniature
+// figurine people doing something against oversized everyday objects/nature.
+export async function generateMiniature({ topic = "", count = 4, llmProvider } = {}) {
+  const n = Math.min(6, Math.max(2, parseInt(count) || 4));
+  const prompt = `Design a viral "miniature world" short video — tiny clay-figurine people (macro tilt-shift diorama, cinematic, shallow depth of field) doing something touching or epic against oversized real objects or nature (a giant hand, huge fruit, rain, a teacup lake, etc). Theme: "${topic || "tiny villagers and a giant helping hand"}".
+
+Invent ONE recurring tiny cast (kept identical across scenes) and ${n} sequential scenes that tell a small satisfying story.
+
+Return ONLY valid JSON, no prose:
+{
+  "title": "short catchy title",
+  "cast": "fixed description of the tiny characters (clothing, look) reused every scene",
+  "scenes": [
+    { "scene": "vivid description of the setting + what the tiny people are doing (concrete, filmable)", "motion": "the movement/action in this shot, e.g. 'rain falls, a giant hand lowers a leaf umbrella'", "caption": "optional 3-6 word on-screen caption" }
+  ]
+}
+Give exactly ${n} scenes.`;
+  const j = parseLLMJson(await callLLM(prompt, llmProvider));
+  const scenes = Array.isArray(j.scenes) ? j.scenes.slice(0, n).map((s) => ({
+    scene: String(s.scene || "").trim(),
+    motion: String(s.motion || "gentle cinematic motion").trim(),
+    caption: String(s.caption || "").trim(),
+  })).filter((s) => s.scene) : [];
+  if (!scenes.length) throw new Error("Miniature: the model returned no scenes — try again.");
+  return { title: String(j.title || topic || "Miniature World").trim(), cast: String(j.cast || "tiny figurine villagers in simple rustic robes").trim(), scenes };
+}
+
 // ---- Translate a list of subtitle lines to a target language (for dubbing) --
 // Keeps the array length + order so each line maps back to its timing.
 export async function translateLines({ lines = [], targetLanguage = "English", sourceLanguage = "", llmProvider } = {}) {
