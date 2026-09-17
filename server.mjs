@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines, generateMiniature } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines, generateMiniature, callLLM, parseLLMJson } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { detectHardware, tierConfig, downloadPlan, installPlan, installCommand } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
@@ -2091,6 +2091,105 @@ app.post("/api/youtube/upload", async (req, res) => {
     const msg = e?.errors?.[0]?.message || e?.response?.data?.error?.message || e.message || "Upload failed";
     res.status(500).json({ error: msg });
   }
+});
+
+// ---- News video: pull today's real headlines → real-footage recap ----------
+function decodeEntities(s) {
+  return String(s || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/<[^>]+>/g, "").trim();
+}
+async function fetchHeadlines(topic) {
+  const q = encodeURIComponent(topic || "today");
+  const url = `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
+  const xml = await (await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })).text();
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => {
+    const t = m[1].match(/<title>([\s\S]*?)<\/title>/);
+    return t ? decodeEntities(t[1]) : "";
+  }).filter(Boolean);
+  return items.slice(0, 10);
+}
+async function selfPost(path, body) {
+  const r = await fetch(`http://localhost:${PORT}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `failed (${r.status})`);
+  return j;
+}
+app.get("/api/news/headlines", async (req, res) => {
+  try { res.json({ headlines: await fetchHeadlines(String(req.query.topic || "top stories")) }); }
+  catch (e) { res.status(500).json({ error: "Couldn't fetch news: " + e.message }); }
+});
+app.post("/api/news/video", async (req, res) => {
+  const b = req.body || {};
+  const topic = String(b.topic || "top stories").slice(0, 120).trim();
+  try {
+    const heads = await fetchHeadlines(topic);
+    if (!heads.length) return res.status(400).json({ error: `No news found for "${topic}".` });
+    const instructions = `This is a NEWS RECAP short. Base it ONLY on these REAL headlines from today about "${topic}" — summarize the key developments clearly and engagingly across 5-7 short scenes, newest/most important first. Do not invent facts beyond these headlines. Headlines:\n- ${heads.join("\n- ")}`;
+    const j = await selfPost("/api/generate", { topic: `Today in ${topic}`, instructions, count: 1, source: b.footage === "ai" ? "image" : "pexels", aspect: "9:16", quality: "1080", language: "English" });
+    res.json({ jobId: j.jobId, headlines: heads.slice(0, 6) });
+  } catch (e) { res.status(busy ? 409 : 500).json({ error: e.message }); }
+});
+
+// ---- In-app AI agent: talk to it, it makes the videos -----------------------
+async function runChatTool(tool, args = {}) {
+  const src = (f) => (f === "ai" ? "image" : "pexels");
+  switch (tool) {
+    case "create_short": { const j = await selfPost("/api/generate", { topic: args.topic || "", count: Math.min(5, Math.max(1, args.count || 1)), source: src(args.footage || "real"), language: args.language || "English", aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
+    case "create_story": { const j = await selfPost("/api/story", { topic: args.topic || "", storyType: args.storyType || "story", minutes: Math.min(10, Math.max(1, args.minutes || 3)), source: src(args.footage || "ai"), language: args.language || "English", aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
+    case "create_comparison": { const j = await selfPost("/api/comparison", { language: args.language || "Japanese", topic: args.topic || "", count: Math.min(10, Math.max(2, args.count || 6)), source: "image", voice: true }); return { jobId: j.jobId }; }
+    case "create_miniature": { const j = await selfPost("/api/miniature", { topic: args.topic || "", count: Math.min(6, Math.max(2, args.count || 4)), motionSource: ["none", "local", "cloud"].includes(args.motion) ? args.motion : "none", imageSource: "image", musicMood: args.music || "none", narrate: !!args.narrate, captions: true, aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
+    case "news_video": { const j = await selfPost("/api/news/video", { topic: args.topic || "top stories", footage: args.footage || "real" }); return { jobId: j.jobId, headlines: j.headlines }; }
+    case "set_autopilot": { const j = await selfPost("/api/autopilot", { enabled: !!args.enabled, niche: args.niche || "", type: ["shorts", "story", "comparison"].includes(args.type) ? args.type : "shorts", intervalHours: args.intervalHours || 24 }); return { autopilot: { enabled: j.enabled, niche: j.niche, type: j.type } }; }
+    case "suggest_topic": { const j = await selfPost("/api/topic", { forType: "shorts", hint: args.niche || "" }); return { topic: j.topic }; }
+    default: return {};
+  }
+}
+app.post("/api/chat", async (req, res) => {
+  const b = req.body || {};
+  const messages = Array.isArray(b.messages) ? b.messages.slice(-12) : [];
+  const userMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+  if (!userMsg.trim()) return res.json({ reply: "Tell me what video you'd like to make — a topic, a style, real footage or AI, anything.", action: null });
+  const sys = `You are the Shorts Studio assistant — a friendly AI that MAKES VIDEOS for the user by choosing ONE tool.
+Respond with STRICT JSON ONLY (no markdown, no prose): {"reply":"<one or two friendly sentences>","action": null | {"tool":"<name>","args":{...}}}
+Tools:
+- create_short {topic, count?:1-5, footage?:"real"|"ai", language?} — a short. footage "real" = real stock footage (Pexels); "ai" = AI images.
+- create_story {topic, storyType?, minutes?:1-10, footage?:"real"|"ai"} — a narrated story (styles: space, history, mystery, bedtime, biography, motivational…).
+- create_comparison {language, topic?, count?:2-10} — split-screen language video (e.g. Textbook vs Casual Japanese).
+- create_miniature {topic, count?:2-6, motion?:"none"|"local"|"cloud", music?:"none"|"uplifting"|"calm", narrate?:bool} — tiny tilt-shift diorama video.
+- news_video {topic, footage?:"real"|"ai"} — a recap of TODAY'S real news headlines on a topic, with real footage.
+- set_autopilot {enabled, niche?, type?:"shorts"|"story"|"comparison", intervalHours?} — the self-running channel.
+- suggest_topic {niche?} — invent a fresh topic idea (no video).
+- none — the user is just chatting/asking; put the answer in "reply", action null.
+Rules: pick EXACTLY one tool or none. Default footage to "real" for real/actual/news/world topics, "ai" for imaginative ones. Keep "reply" short and warm; if you start a video, say what you're making. Output ONLY the JSON.
+Conversation:
+${messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n")}
+Assistant JSON:`;
+  let parsed;
+  try { parsed = parseLLMJson(await callLLM(sys, getEnvValue("LLM_PROVIDER"))); }
+  catch { return res.json({ reply: "Hmm, I didn't quite get that — could you say it another way?", action: null }); }
+  const reply = String(parsed.reply || "On it!").slice(0, 500);
+  const action = parsed.action && parsed.action.tool ? parsed.action : null;
+  if (!action) return res.json({ reply, action: null });
+  if (busy && action.tool !== "suggest_topic" && action.tool !== "set_autopilot") {
+    return res.json({ reply: "I'm still finishing the last video — give me a moment, then ask again.", action: null });
+  }
+  try { const result = await runChatTool(action.tool, action.args || {}); return res.json({ reply, action: action.tool, args: action.args || {}, ...result }); }
+  catch (e) { return res.json({ reply: reply + ` (Couldn't start it: ${e.message})`, action: action.tool, error: e.message }); }
+});
+
+// speak-to-the-assistant: transcribe a recorded mic clip with local Whisper
+app.post("/api/chat/transcribe", async (req, res) => {
+  const parts = String((req.body || {}).audioDataUrl || "").split(",");
+  if (parts.length < 2 || !/^data:audio\//.test(parts[0])) return res.status(400).json({ error: "no audio" });
+  const py = whisperPython();
+  if (!py) return res.status(400).json({ error: "Speech-to-text isn't installed — run local-voice-server/setup-whisper.sh." });
+  const raw = join(PUBLIC, "chat_rec.webm"), wav = join(PUBLIC, "chat_rec.wav");
+  try {
+    writeFileSync(raw, Buffer.from(parts.slice(1).join(","), "base64"));
+    execFileSync("ffmpeg", ["-y", "-i", raw, "-ac", "1", "-ar", "16000", wav], { stdio: "ignore" });
+    const out = execFileSync(py, [join(ROOT, "local-voice-server", "whisper_transcribe.py"), wav, "base"], { maxBuffer: 32 * 1024 * 1024 }).toString();
+    const tr = JSON.parse(out); if (tr.error) throw new Error(tr.error);
+    res.json({ text: (tr.segments || []).map((s) => s.text).join(" ").trim() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ---- Autopilot: invents topics and generates videos on a timer -------------

@@ -206,6 +206,11 @@ function createWindow() {
     show: false,
   });
 
+  // Allow microphone access (for the Assistant's voice input) inside the app.
+  try {
+    win.webContents.session.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === "media" || permission === "audioCapture"));
+  } catch {}
+
   win.loadURL(URL);
   win.once("ready-to-show", () => win.show());
   // Fallbacks: show even if ready-to-show is delayed, and retry on a failed load.
