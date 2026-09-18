@@ -64,10 +64,13 @@ const ROOT = prepareStore();
 
 // Bundled ffmpeg/ffprobe ship inside Remotion's compositor package (so a fresh
 // Mac needs no Homebrew ffmpeg). Location, if present.
+const IS_WIN = process.platform === "win32";
+const FFEXE = IS_WIN ? "ffmpeg.exe" : "ffmpeg";
 function compositorDir() {
-  for (const a of ["darwin-arm64", "darwin-x64"]) {
+  const arches = IS_WIN ? ["win32-x64"] : ["darwin-arm64", "darwin-x64"];
+  for (const a of arches) {
     const d = path.join(ROOT, "node_modules", "@remotion", "compositor-" + a);
-    if (fs.existsSync(path.join(d, "ffmpeg"))) return d;
+    if (fs.existsSync(path.join(d, FFEXE))) return d;
   }
   return "";
 }
@@ -75,9 +78,9 @@ function compositorDir() {
 // Is a system ffmpeg already on the user's normal PATH? If so we use it and
 // leave the environment untouched — never override a working ffmpeg.
 function hasSystemFfmpeg() {
-  const dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", `${process.env.HOME}/.local/bin`];
-  const extra = (process.env.PATH || "").split(":");
-  return [...dirs, ...extra].some((d) => d && fs.existsSync(path.join(d, "ffmpeg")));
+  const dirs = IS_WIN ? [] : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", `${process.env.HOME}/.local/bin`];
+  const extra = (process.env.PATH || "").split(path.delimiter);
+  return [...dirs, ...extra].some((d) => d && fs.existsSync(path.join(d, FFEXE)));
 }
 
 // Only when there's NO system ffmpeg: expose the bundled binaries through tiny
@@ -90,6 +93,9 @@ function ffmpegBinDir() {
   if (hasSystemFfmpeg()) return "";
   const comp = compositorDir();
   if (!comp) return "";
+  // Windows: the bundled ffmpeg.exe loads its sibling DLLs from its own folder,
+  // so just put that folder on PATH — no shims, no DYLD.
+  if (IS_WIN) return comp;
   const bin = path.join(ROOT, "runtime-bin");
   try {
     fs.mkdirSync(bin, { recursive: true });
@@ -119,14 +125,19 @@ let win = null;
 // Resolve the user's real login-shell PATH so the render pipeline (node, npx,
 // ffmpeg, ffprobe, python3, remotion) is found. Falls back to common locations.
 function resolveUserPath() {
+  const sep = path.delimiter;
+  if (IS_WIN) {
+    // Windows: the process PATH already carries the user's tools; nothing to shell out for.
+    return process.env.PATH || "";
+  }
   const common = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin", `${process.env.HOME}/.local/bin`];
   let shellPath = "";
   try {
     const sh = process.env.SHELL || "/bin/zsh";
     shellPath = execSync(`${sh} -ilc 'echo -n $PATH'`, { timeout: 4000 }).toString().trim();
   } catch {}
-  const parts = new Set([...(shellPath ? shellPath.split(":") : []), ...(process.env.PATH ? process.env.PATH.split(":") : []), ...common].filter(Boolean));
-  return [...parts].join(":");
+  const parts = new Set([...(shellPath ? shellPath.split(sep) : []), ...(process.env.PATH ? process.env.PATH.split(sep) : []), ...common].filter(Boolean));
+  return [...parts].join(sep);
 }
 
 // Env for the server + render subprocesses. Uses the user's real PATH; only if
@@ -136,7 +147,7 @@ function resolveUserPath() {
 function childEnv(extra = {}) {
   const ffdir = ffmpegBinDir();
   const base = resolveUserPath();
-  const PATH = ffdir ? `${ffdir}:${base}` : base;
+  const PATH = ffdir ? `${ffdir}${path.delimiter}${base}` : base;
   return { ...process.env, PATH, ...extra };
 }
 
@@ -275,7 +286,8 @@ function buildMenu() {
         { role: "toggleDevTools" },
       ],
     },
-    {
+    // The one-click local-AI servers use macOS .command/bash scripts — only on Mac.
+    ...(isMac ? [{
       label: "Local Servers",
       submenu: [
         { label: "Start voice + images (offline mode)", click: () => runLocalScript("start-local-servers.command", "Starting local servers…") },
@@ -283,7 +295,7 @@ function buildMenu() {
         { type: "separator" },
         { label: "What is this?", click: () => dialog.showMessageBox(win, { type: "info", title: "Local Servers", message: "Fully-offline generation", detail: "Start these to generate voice (XTTS) and AI images (ComfyUI/SDXL) entirely on your Mac — no internet, no keys. Without them, Shorts Studio uses cloud voice/images instead." }) },
       ],
-    },
+    }] : []),
     { role: "windowMenu" },
     {
       role: "help",

@@ -10,6 +10,7 @@
     "desktop": "electron .",
     "icon": "python3 scripts/make-icon.py",
     "dist": "npm run icon && electron-builder --mac",
+    "dist:win": "electron-builder --win",
     "build": "node scripts/build.mjs",
     "studio": "remotion studio",
     "render": "remotion render Short out/video.mp4 --props=public/props.json",
@@ -59,6 +60,22 @@
         }
       ]
     },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
     "dmg": {
       "title": "Shorts Studio",
       "contents": [
@@ -85,6 +102,9 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "remotion": "4.0.392"
+  },
+  "optionalDependencies": {
+    "@remotion/compositor-win32-x64": "4.0.392"
   },
   "devDependencies": {
     "@types/react": "19.0.0",
