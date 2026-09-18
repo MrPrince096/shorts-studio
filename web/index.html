@@ -433,7 +433,8 @@
           <label style="margin-top:12px">Motion</label>
           <select id="miniMotion">
             <option value="local">Animate locally — LTX (free/offline, softer, slow on M1)</option>
-            <option value="cloud">Animate in the cloud — Kling/Seedance via fal.ai (best, needs FAL key)</option>
+            <option value="cloud">Animate in the cloud — Kling/Seedance via fal.ai (needs FAL key)</option>
+            <option value="higgsfield">Animate with Higgsfield — cinematic DoP camera (best, needs Higgsfield key)</option>
             <option value="none">Stills only — tilt-shift + gentle zoom (instant, free)</option>
           </select>
           <div class="row" style="margin-top:12px">
@@ -918,6 +919,9 @@
         <label style="margin-top:16px">fal.ai API key <span class="muted">— paid, best quality</span></label>
         <div class="field"><input id="falKey" type="password" placeholder="paste key…" /><span class="fstat" id="falState"></span></div>
         <a class="getlink" href="https://fal.ai/dashboard/keys" target="_blank">Get a fal.ai key →</a>
+        <label style="margin-top:16px">Higgsfield key <span class="muted">— paid; cinematic image→video (KEY_ID:KEY_SECRET)</span></label>
+        <div class="field"><input id="higgsfieldKey" type="password" placeholder="KEY_ID:KEY_SECRET" /><span class="fstat" id="higgsfieldState"></span></div>
+        <a class="getlink" href="https://cloud.higgsfield.ai/" target="_blank">Get a Higgsfield key →</a>
         <label style="margin-top:16px">Local image server URL <span class="muted">— free & unlimited</span></label>
         <input id="localUrl" placeholder="http://localhost:7801/generate" />
       </div>
@@ -1341,7 +1345,7 @@ function toggleLlm(){const p=$('#llmProvider').value;$('#geminiBox').style.displ
 async function loadSettings(){
   const s=await(await fetch('/api/settings')).json();
   $('#llmProvider').value=s.llmProvider||'gemini';$('#openaiModel').value=s.openaiModel||'';$('#ollamaUrl').value=s.ollamaUrl||'';$('#ollamaModel').value=s.ollamaModel||'';$('#localUrl').value=s.localImageUrl||'';$('#localAvatarUrl').value=s.localAvatarUrl||'';$('#piperModel').value=s.piperModel||'';$('#piperPython').value=s.piperPython||'';$('#xttsUrl').value=s.xttsUrl||'';$('#elevenVoice').value=s.elevenVoice||'';
-  setStat($('#pexelsState'),s.keys.pexels);if(s.keys.jamendo)setStat($('#jamendoState'),s.keys.jamendo);setStat($('#geminiState'),s.keys.gemini);setStat($('#openaiState'),s.keys.openai);setStat($('#hfState'),s.keys.hf);setStat($('#falState'),s.keys.fal);
+  setStat($('#pexelsState'),s.keys.pexels);if(s.keys.jamendo)setStat($('#jamendoState'),s.keys.jamendo);setStat($('#geminiState'),s.keys.gemini);setStat($('#openaiState'),s.keys.openai);setStat($('#hfState'),s.keys.hf);setStat($('#falState'),s.keys.fal);if(s.keys.higgsfield)setStat($('#higgsfieldState'),s.keys.higgsfield);
   setStat($('#didState'),s.keys.did);setStat($('#heygenState'),s.keys.heygen);setStat($('#elevenState'),s.keys.eleven);
   const ve=s.voiceEngines||{};
   $('#exprStatus').className='note '+((ve.xtts||ve.eleven)?'':'warn');
@@ -1384,10 +1388,10 @@ $('#navSettings').onclick=openS; $('#navSettings2').onclick=openS;
 $('#closeSettings').onclick=()=>$('#settingsOverlay').classList.remove('open');
 $('#settingsOverlay').onclick=(e)=>{if(e.target.id==='settingsOverlay')$('#settingsOverlay').classList.remove('open');};
 $('#saveSettings').onclick=async()=>{
-  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),jamendo:$('#jamendoKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim(),piperModel:$('#piperModel').value.trim(),piperPython:$('#piperPython').value.trim(),xttsUrl:$('#xttsUrl').value.trim(),eleven:$('#elevenKey').value.trim(),elevenVoice:$('#elevenVoice').value.trim()};
+  const body={llmProvider:$('#llmProvider').value,pexels:$('#pexelsKey').value.trim(),jamendo:$('#jamendoKey').value.trim(),gemini:$('#geminiKey').value.trim(),openai:$('#openaiKey').value.trim(),openaiModel:$('#openaiModel').value.trim(),ollamaUrl:$('#ollamaUrl').value.trim(),ollamaModel:$('#ollamaModel').value.trim(),fal:$('#falKey').value.trim(),higgsfield:$('#higgsfieldKey').value.trim(),hf:$('#hfKey').value.trim(),did:$('#didKey').value.trim(),heygen:$('#heygenKey').value.trim(),localImageUrl:$('#localUrl').value.trim(),localAvatarUrl:$('#localAvatarUrl').value.trim(),piperModel:$('#piperModel').value.trim(),piperPython:$('#piperPython').value.trim(),xttsUrl:$('#xttsUrl').value.trim(),eleven:$('#elevenKey').value.trim(),elevenVoice:$('#elevenVoice').value.trim()};
   const r=await(await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   $('#saveMsg').innerHTML=r.saved&&r.saved.length?'<span class="ok">Saved ✓</span>':'Nothing to save';
-  ['pexelsKey','jamendoKey','geminiKey','openaiKey','falKey','hfKey','didKey','heygenKey','elevenKey'].forEach(id=>$('#'+id).value='');loadSettings();
+  ['pexelsKey','jamendoKey','geminiKey','openaiKey','falKey','higgsfieldKey','hfKey','didKey','heygenKey','elevenKey'].forEach(id=>$('#'+id).value='');loadSettings();
 };
 
 const IDEAS=['how to grow tomatoes at home','how to make sourdough bread','how to start composting','foods that boost your brain','how to build discipline','how to make cold brew coffee','how to start a vegetable garden','how sleep repairs your body','how to make homemade pasta','beginner guide to beekeeping'];

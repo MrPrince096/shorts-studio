@@ -62,13 +62,22 @@
     "dmg": {
       "title": "Shorts Studio",
       "contents": [
-        { "x": 140, "y": 200 },
-        { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
+        {
+          "x": 140,
+          "y": 200
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
+    "@higgsfield/client": "^0.2.6",
     "@remotion/cli": "4.0.392",
     "express": "^4.22.2",
     "googleapis": "^173.0.0",
