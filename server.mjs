@@ -6,7 +6,7 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import open from "open";
-import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines, generateMiniature, callLLM, parseLLMJson } from "./scripts/generate.mjs";
+import { generateScripts, generateIdeas, generateAdIdeas, generateStory, generateTopic, generateLyrics, generateComparison, translateLines, generateMiniature, generateMeta, callLLM, parseLLMJson } from "./scripts/generate.mjs";
 import { createOutline, episodeConfig } from "./scripts/series.mjs";
 import { detectHardware, tierConfig, downloadPlan, installPlan, installCommand } from "./scripts/hardware.mjs";
 import { visionScript, describeImage } from "./scripts/vision.mjs";
@@ -576,6 +576,21 @@ function pushLog(job, s) {
 }
 function slugify(t) {
   return (t || "short").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+}
+// Write the YouTube upload metadata sidecar (title/description/tags/hashtags) so
+// the video modal + one-click publish have real metadata for the direct-render
+// video types (miniature/comparison/dub/montage) — not just the make.mjs shorts.
+function hashify(tags) {
+  return (tags || []).map((t) => "#" + String(t).replace(/[^\p{L}\p{N}_]/gu, "")).filter((h) => h.length > 1).join(" ");
+}
+async function writeVideoMeta(outName, subject, kind = "short video", language = "English") {
+  try {
+    const base = outName.replace(/\.mp4$/, "");
+    const meta = await generateMeta({ subject, kind, language, llmProvider: getEnvValue("LLM_PROVIDER") });
+    const sidecar = { title: meta.title || subject, description: meta.description || "", tags: meta.tags || [], hashtags: hashify(meta.tags || []) };
+    if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true });
+    writeFileSync(join(DATA, base + ".json"), JSON.stringify(sidecar, null, 2));
+  } catch {}
 }
 function renderOne(config, job) {
   return new Promise((resolve) => {
@@ -1634,7 +1649,7 @@ app.post("/api/comparison", (req, res) => {
         child.stdout.on("data", onData); child.stderr.on("data", onData);
         child.on("close", () => resolve());
       });
-      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `${leftLabel} vs ${rightLabel}`; job.status = "done"; pushLog(job, "✅ Done!"); }
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `${leftLabel} vs ${rightLabel}`; job.status = "done"; pushLog(job, "✅ Done!"); await writeVideoMeta(outName, `${leftLabel} vs ${rightLabel} — learn ${language} phrases (${topic || "everyday"})`, `${language} learning short`, "English"); }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
@@ -1791,6 +1806,7 @@ app.post("/api/miniature", (req, res) => {
         job.files = [outName]; job.title = mw.title; job.status = "done"; pushLog(job, "✅ Done!");
         // save the narration as a voice sidecar so the Editor can remix music on it
         try { if (audioFile && existsSync(join(PUBLIC, "mini_voice.mp3"))) { if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true }); copyFileSync(join(PUBLIC, "mini_voice.mp3"), join(DATA, outName.replace(/\.mp4$/, "") + ".voice.mp3")); } } catch {}
+        await writeVideoMeta(outName, `${mw.title} — a miniature tilt-shift diorama video about ${topic || "tiny people"}`, "miniature short video");
       }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
@@ -1859,7 +1875,7 @@ app.post("/api/montage", (req, res) => {
         const onData = (d) => pushLog(job, d.toString()); child.stdout.on("data", onData); child.stderr.on("data", onData);
         child.on("close", () => resolve());
       });
-      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = b.title || "Montage"; job.status = "done"; pushLog(job, "✅ Done!"); }
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = b.title || "Montage"; job.status = "done"; pushLog(job, "✅ Done!"); await writeVideoMeta(outName, b.title || (lyric[0] && lyric[0].text) || "my clips montage", "montage short video", String(b.language || "English")); }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
@@ -1973,7 +1989,7 @@ app.post("/api/dub", (req, res) => {
         const onData = (d) => pushLog(job, d.toString()); child.stdout.on("data", onData); child.stderr.on("data", onData);
         child.on("close", () => resolve());
       });
-      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `Dub → ${targetLang}`; job.status = "done"; pushLog(job, "✅ Done!"); }
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = `Dub → ${targetLang}`; job.status = "done"; pushLog(job, "✅ Done!"); await writeVideoMeta(outName, `${(translated[0] || segs[0].text || "video").slice(0, 60)} — dubbed into ${targetLang}`, "dubbed short video", targetLang); }
       else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
       busy = false;
     } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
@@ -2264,8 +2280,9 @@ app.post("/api/chat", async (req, res) => {
   const messages = Array.isArray(b.messages) ? b.messages.slice(-12) : [];
   const userMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
   if (!userMsg.trim()) return res.json({ reply: "Tell me what video you'd like to make — a topic, a style, real footage or AI, anything.", action: null });
-  const sys = `You are the Shorts Studio assistant — a friendly AI that MAKES VIDEOS for the user by choosing ONE tool.
-Respond with STRICT JSON ONLY (no markdown, no prose): {"reply":"<one or two friendly sentences>","action": null | {"tool":"<name>","args":{...}}}
+  const sys = `You are Aria, the warm and upbeat creative partner inside Shorts Studio — you help the user make videos and you're genuinely friendly, encouraging, and fun (a little emoji is welcome). You chat naturally AND you can make videos by choosing ONE tool.
+Respond with STRICT JSON ONLY (no markdown, no prose): {"reply":"<a warm, natural, human reply — greet back, answer questions, hype up their idea; 1-3 sentences>","action": null | {"tool":"<name>","args":{...}}}
+If the user just says hi / small-talk / asks a question, set action to null and reply like a friendly human would (and gently suggest something you could make). Only set an action when they actually want a video made.
 Tools:
 - create_short {topic, count?:1-5, footage?:"real"|"ai", language?} — a short. footage "real" = real stock footage (Pexels); "ai" = AI images.
 - create_story {topic, storyType?, minutes?:1-10, footage?:"real"|"ai"} — a narrated story (styles: space, history, mystery, bedtime, biography, motivational…).

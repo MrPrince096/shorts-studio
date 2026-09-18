@@ -217,6 +217,23 @@ ${language && language.toLowerCase() !== "english" ? `Write the lyrics in ${lang
     .slice(0, lines).join("\n");
 }
 
+// ---- YouTube upload metadata (title + description + tags) for any video ----
+export async function generateMeta({ subject, kind = "short video", language = "English", llmProvider } = {}) {
+  const inLang = language && language.toLowerCase() !== "english" ? ` Write the title and description in ${language}.` : "";
+  const prompt = `Write YouTube Shorts upload metadata for a ${kind} about: "${subject}".
+Return ONLY JSON, no prose: {"title":"catchy title under 80 chars","description":"2-4 engaging sentences with a call to action and where relevant a line of hashtags","tags":["8-12 short lowercase keyword tags"]}.${inLang}`;
+  try {
+    const j = parseLLMJson(await callLLM(prompt, llmProvider));
+    return {
+      title: String(j.title || subject).slice(0, 95).trim(),
+      description: String(j.description || "").slice(0, 1500).trim(),
+      tags: Array.isArray(j.tags) ? j.tags.map((t) => String(t).replace(/^#/, "").slice(0, 30).trim()).filter(Boolean).slice(0, 15) : [],
+    };
+  } catch {
+    return { title: String(subject).slice(0, 95), description: "", tags: [] };
+  }
+}
+
 // ---- "Miniature world" videos (tiny tilt-shift diorama people, cinematic) ----
 // The LLM invents a tiny emotional/epic scene arc: a recurring cast of miniature
 // figurine people doing something against oversized everyday objects/nature.
