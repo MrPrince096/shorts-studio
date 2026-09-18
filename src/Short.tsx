@@ -53,7 +53,7 @@ const VIGNETTE_EFFECTS = new Set(["tiltshift", "vintage", "noir", "dreamy"]);
 // top/bottom visible, middle transparent → reveals a blurred copy only at the edges
 const TILT_MASK = "linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.55) 16%, transparent 34%, transparent 66%, rgba(0,0,0,0.55) 84%, #000 100%)";
 
-const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: string; effect: string }> = ({ src, durationInFrames, motion, effect }) => {
+const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: string; effect: string; sceneAudio?: boolean }> = ({ src, durationInFrames, motion, effect, sceneAudio }) => {
   const frame = useCurrentFrame();
   const [from, to] = MOTION_RANGE[motion] || MOTION_RANGE.in;
   const scale = interpolate(frame, [0, durationInFrames], [from, to], {
@@ -63,7 +63,7 @@ const SceneClip: React.FC<{ src: string; durationInFrames: number; motion: strin
   const filter = EFFECT_FILTER[effect] || "";
   const media = { width: "100%", height: "100%", objectFit: "cover" as const, transform: `scale(${scale})`, filter };
   const Media: React.FC<{ extra?: React.CSSProperties }> = ({ extra }) =>
-    isImage ? <Img src={src} style={{ ...media, ...extra }} /> : <OffthreadVideo src={src} muted style={{ ...media, ...extra }} />;
+    isImage ? <Img src={src} style={{ ...media, ...extra }} /> : <OffthreadVideo src={src} muted={!sceneAudio} style={{ ...media, ...extra }} />;
   return (
     <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "black" }}>
       <Media />
@@ -171,7 +171,7 @@ const Captions: React.FC<{ words: Word[]; font: string; rtl: boolean; captionPos
   );
 };
 
-export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "", effect = "none", lyricLines = [] }) => {
+export const Short: React.FC<Props & { sceneAudio?: boolean }> = ({ scenes, words, audio, music, font = "Arial Black", fontCss = "", rtl = false, watermark = "", watermarkImage = "", captionPos = "bottom", motion = "in", talkingVideo = "", effect = "none", lyricLines = [], sceneAudio = false }) => {
   const { fps, width, height } = useVideoConfig();
   const mOpts = ["in", "out", "subtle"];
   const sceneMotion = (i: number) => (motion === "random" ? mOpts[i % mOpts.length] : motion);
@@ -205,7 +205,7 @@ export const Short: React.FC<Props> = ({ scenes, words, audio, music, font = "Ar
           const durationInFrames = Math.max(1, Math.ceil((s.end - s.start) * fps));
           return (
             <Sequence key={i} from={from} durationInFrames={durationInFrames}>
-              <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} effect={effect} />
+              <SceneClip src={staticFile(s.video)} durationInFrames={durationInFrames} motion={sceneMotion(i)} effect={effect} sceneAudio={sceneAudio} />
             </Sequence>
           );
         })

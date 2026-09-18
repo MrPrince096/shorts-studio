@@ -1771,6 +1771,74 @@ app.post("/api/miniature", (req, res) => {
   })();
 });
 
+// ---- Montage: stitch YOUR OWN clips/photos into a finished short -----------
+// Great for assembling Veo clips made in Google Flow, phone videos, or photos —
+// with captions, music, optional narration, and keeping the clips' own audio.
+app.post("/api/montage", (req, res) => {
+  if (busy) return res.status(409).json({ error: "A render is already running. Please wait." });
+  const b = req.body || {};
+  const clips = Array.isArray(b.clips) ? b.clips.filter((c) => /^data:(video|image)\//.test(String(c))) : [];
+  if (!clips.length) return res.status(400).json({ error: "Add at least one photo or video." });
+  const imageDuration = Math.min(10, Math.max(1.5, parseFloat(b.imageDuration) || 3.5));
+  const audioMode = ["keep", "narrate", "silent"].includes(b.audioMode) ? b.audioMode : "keep";
+  const music = (b.music === "none") ? "" : (b.music === "calm" ? "bg_calm.mp3" : (b.music === "uplifting" ? "bg_uplifting.mp3" : ""));
+  const captions = Array.isArray(b.captions) ? b.captions : [];
+  const effect = String(b.effect || "none");
+  const { width, height } = dims(b.aspect || "9:16", b.quality || "1080");
+  busy = true;
+  const job = newJob(clips.length, "render");
+  res.json({ jobId: job.id });
+  (async () => {
+    try {
+      const scenes = [], lyric = []; let cursor = 0;
+      for (let i = 0; i < clips.length; i++) {
+        job.current = i + 1;
+        const m = String(clips[i]).match(/^data:([^;]+);base64,(.+)$/); if (!m) continue;
+        const isVideo = m[1].startsWith("video");
+        pushLog(job, `📥 [${i + 1}/${clips.length}] adding your ${isVideo ? "clip" : "photo"}…`);
+        let file, dur;
+        if (isVideo) {
+          file = `mont_${i}.mp4`; writeFileSync(join(PUBLIC, file), Buffer.from(m[2], "base64"));
+          dur = ffprobeDur(join(PUBLIC, file)); if (!(dur > 0.3)) dur = 4;
+        } else {
+          const raw = join(PUBLIC, `mont_${i}.raw`); writeFileSync(raw, Buffer.from(m[2], "base64"));
+          file = `mont_${i}.jpg`; if (!toJpeg(raw, join(PUBLIC, file))) copyFileSync(raw, join(PUBLIC, file));
+          try { unlinkSync(raw); } catch {}
+          dur = imageDuration;
+        }
+        scenes.push({ video: file, start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
+        if (captions[i]) lyric.push({ text: String(captions[i]).slice(0, 120), start: +cursor.toFixed(3), end: +(cursor + dur).toFixed(3) });
+        cursor += dur;
+      }
+      if (!scenes.length) throw new Error("Couldn't read any of the uploads.");
+      // narration (optional) → one voice track over the montage
+      let audioFile = "";
+      if (audioMode === "narrate" && String(b.narration || "").trim()) {
+        try { const p = await ttsSegment("edge", String(b.voice || ""), String(b.narration).slice(0, 1200), String(b.language || "English"), join(PUBLIC, "mont_narr")); audioFile = p.split("/").pop(); } catch (e) { pushLog(job, "↷ narration failed (" + e.message + ")"); }
+      }
+      const props = {
+        fps: 30, width, height, durationInSeconds: Math.ceil(cursor) + 0.3,
+        scenes, words: [], audio: audioFile, music,
+        sceneAudio: audioMode === "keep", // keep the clips' own audio (e.g. Veo audio)
+        lyricLines: lyric, captionPos: "bottom", motion: "subtle", effect,
+        watermark: String(b.watermark || "").slice(0, 40),
+      };
+      writeFileSync(join(PUBLIC, "montage.json"), JSON.stringify(props, null, 2));
+      const outName = (slugify(b.title || "montage") || "montage") + "-" + Date.now().toString(36) + ".mp4";
+      pushLog(job, "🎬 Stitching your montage…");
+      await new Promise((resolve) => {
+        const { cmd, args, env } = remotionCmd(["render", "Short", `out/${outName}`, "--props=public/montage.json"]);
+        const child = spawn(cmd, args, { cwd: ROOT, env });
+        const onData = (d) => pushLog(job, d.toString()); child.stdout.on("data", onData); child.stderr.on("data", onData);
+        child.on("close", () => resolve());
+      });
+      if (existsSync(join(OUT, outName))) { job.files = [outName]; job.title = b.title || "Montage"; job.status = "done"; pushLog(job, "✅ Done!"); }
+      else { job.status = "error"; pushLog(job, "❌ Render produced no file — see log."); }
+      busy = false;
+    } catch (e) { pushLog(job, "❌ " + e.message); job.status = "error"; busy = false; }
+  })();
+});
+
 // ---- Dub: transcribe an uploaded video → translate → re-voice + subtitles ---
 function whisperPython() {
   const env = getEnvValue("WHISPER_PYTHON");

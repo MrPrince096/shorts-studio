@@ -313,6 +313,7 @@
     <div class="nav" data-nav="song"><span class="ic" data-icon="spark"></span> Song</div>
     <div class="nav" data-nav="comparison"><span class="ic" data-icon="columns"></span> Compare</div>
     <div class="nav" data-nav="dub"><span class="ic" data-icon="globe"></span> Dub</div>
+    <div class="nav" data-nav="montage"><span class="ic" data-icon="film"></span> My Clips</div>
     <div class="nav" data-nav="miniature"><span class="ic" data-icon="cube"></span> Miniature</div>
     <div class="nav" data-nav="autopilot"><span class="ic" data-icon="bot"></span> Autopilot</div>
     <div class="nav" data-nav="series"><span class="ic" data-icon="book"></span> Series</div>
@@ -446,6 +447,27 @@
           <input id="miniWatermark" class="big" placeholder="@yourchannel" />
           <button class="btn grad big" id="goMini" style="width:100%;margin-top:16px"><span data-icon="cube"></span>Create Miniature Video</button>
           <div class="note" style="margin-top:12px">The tilt-shift look + story are done locally. For true motion like the viral clips, <b>Cloud (Kling/Seedance)</b> matches best (needs a fal.ai key); <b>Local LTX</b> is free but softer and slow (~5–8 min per scene on an M1). Renders vertical.</div>
+        </div>
+        <!-- MONTAGE (my own clips/photos) -->
+        <div class="card tabpanel" id="tab-montage" hidden>
+          <h2><span data-icon="film"></span> My Clips → Short</h2>
+          <div class="cardsub">Bring your own videos & photos — e.g. Veo clips from Google Flow — and stitch them into a finished short with captions, music & voice.</div>
+          <div class="withbtn"><input id="montName" placeholder="0 items added" readonly style="cursor:default" /><button class="btn ghost" id="montPick">Add clips / photos</button></div>
+          <input type="file" id="montFile" accept="video/*,image/*" multiple hidden />
+          <div id="montList" class="dllist" style="margin-top:10px"></div>
+          <div class="row" style="margin-top:12px">
+            <div><label>Audio</label><select id="montAudio"><option value="keep">Keep the clips' own sound (Veo audio)</option><option value="narrate">AI narration over them</option><option value="silent">No sound (music only)</option></select></div>
+            <div><label>Music</label><select id="montMusic"><option value="none">None</option><option value="uplifting">Uplifting</option><option value="calm">Calm</option></select></div>
+          </div>
+          <div id="montNarrWrap" hidden><label style="margin-top:12px">Narration script <span class="muted">— spoken over the montage</span></label><textarea id="montNarration" rows="3" placeholder="Type what the voice should say…"></textarea></div>
+          <div class="row" style="margin-top:12px">
+            <div><label>Photo duration <span class="muted">— seconds each</span></label><select id="montImgDur"><option value="2.5">2.5s</option><option value="3.5" selected>3.5s</option><option value="5">5s</option></select></div>
+            <div><label>Look</label><select id="montEffect"><option value="none">Clean</option><option value="tiltshift">Tilt-shift</option><option value="vintage">Vintage</option><option value="vibrant">Vibrant</option><option value="cinematic">—</option></select></div>
+          </div>
+          <label style="margin-top:12px">Watermark <span class="muted">— optional</span></label>
+          <input id="montWatermark" class="big" placeholder="@yourchannel" />
+          <button class="btn grad big" id="goMont" style="width:100%;margin-top:16px"><span data-icon="film"></span>Stitch into a Short</button>
+          <div class="note" style="margin-top:12px">Tip: make cinematic clips in <b>Google Flow</b> (included in your Google AI Pro plan), download them, and drop them here to add captions/voice/music. Clips play in the order you add them; add a caption per item below.</div>
         </div>
         <!-- DUB -->
         <div class="card tabpanel" id="tab-dub" hidden>
@@ -1522,6 +1544,30 @@ $('#songWrite')&&($('#songWrite').onclick=async()=>{
   b.disabled=false;b.textContent='✨ Write lyrics';
 });
 $('#goSong').onclick=()=>{const lyrics=$('#songLyrics').value.trim();if(!lyrics){alert('Write lyrics from a topic (✨) or paste your own — one line each.');return;}run('/api/song',{songDataUrl:window.__songData||'',lyrics,topic:$('#songTopic').value.trim(),theme:$('#songTheme').value.trim(),perLineImages:$('#songPerLine').checked,...fmt()});};
+// ---- Montage: my own clips/photos ----
+window.__montClips=[];
+function montRender(){
+  $('#montName').value=window.__montClips.length?window.__montClips.length+' item(s) added':'0 items added';
+  const list=$('#montList');
+  list.innerHTML=window.__montClips.map((c,i)=>`<div class="dlitem"><span class="dlmark">${c.isVideo?'🎬':'🖼️'}</span><span style="flex:1">${esc(c.name.slice(0,26))}</span><input class="montcap" data-i="${i}" placeholder="caption (optional)" value="${esc(c.cap||'')}" style="flex:2;padding:6px 10px;font-size:12px"><button class="montdel" data-i="${i}" title="remove" style="background:none;border:none;color:var(--err);cursor:pointer;font-size:16px">×</button></div>`).join('');
+  list.querySelectorAll('.montcap').forEach(inp=>inp.oninput=()=>{window.__montClips[+inp.dataset.i].cap=inp.value;});
+  list.querySelectorAll('.montdel').forEach(b=>b.onclick=()=>{window.__montClips.splice(+b.dataset.i,1);montRender();});
+}
+$('#montPick')&&($('#montPick').onclick=()=>$('#montFile').click());
+$('#montFile')&&($('#montFile').onchange=()=>{
+  const files=[...$('#montFile').files]; if(!files.length)return;
+  let pending=files.length;
+  files.forEach(f=>{
+    if(f.size>120*1024*1024){alert(f.name+' is over 120 MB — skipping.');if(--pending===0)montRender();return;}
+    const rd=new FileReader();rd.onload=()=>{window.__montClips.push({data:rd.result,name:f.name,isVideo:f.type.startsWith('video'),cap:''});if(--pending===0)montRender();};rd.readAsDataURL(f);
+  });
+  $('#montFile').value='';
+});
+$('#montAudio')&&($('#montAudio').onchange=()=>{$('#montNarrWrap').hidden=$('#montAudio').value!=='narrate';});
+$('#goMont')&&($('#goMont').onclick=()=>{
+  if(!window.__montClips.length){alert('Add at least one clip or photo.');return;}
+  run('/api/montage',{clips:window.__montClips.map(c=>c.data),captions:window.__montClips.map(c=>c.cap||''),audioMode:$('#montAudio').value,narration:$('#montNarration').value.trim(),music:$('#montMusic').value,imageDuration:$('#montImgDur').value,effect:$('#montEffect').value,watermark:$('#montWatermark').value.trim(),...fmt()});
+});
 // ---- AI Assistant (chat agent) ----
 let chatHistory=[]; window.__chatSpeak=false;
 function chatAdd(role,html,cls=''){const log=$('#chatLog');const d=document.createElement('div');d.className='msg '+(role==='user'?'user':'bot')+(cls?' '+cls:'');d.innerHTML=html;log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
