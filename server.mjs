@@ -1661,10 +1661,36 @@ async function higgsfieldI2V(imgPath, prompt) {
   if (!vurl) throw new Error("Higgsfield returned no video (check your key/credits).");
   return Buffer.from(await (await fetch(vurl)).arrayBuffer());
 }
-// Turn one image into a motion clip — local LTX, cloud fal, or Higgsfield.
+// Cinematic image-to-video via Google Veo (Gemini API, paid / billing enabled).
+async function veoI2V(imgPath, prompt, aspect = "9:16") {
+  const key = getEnvValue("GEMINI_API_KEY");
+  if (!key) throw new Error("Veo uses your Gemini API key with billing enabled — add GEMINI_API_KEY in Settings.");
+  const model = getEnvValue("VEO_MODEL") || "veo-3.1-generate-preview";
+  const b64 = readFileSync(imgPath).toString("base64");
+  const body = { instances: [{ prompt, image: { inlineData: { mimeType: "image/jpeg", data: b64 } } }], parameters: { aspectRatio: aspect === "16:9" ? "16:9" : "9:16" } };
+  const hdr = { "x-goog-api-key": key, "Content-Type": "application/json" };
+  const start = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning`, { method: "POST", headers: hdr, body: JSON.stringify(body) });
+  if (!start.ok) { const t = await start.text(); throw new Error(`Veo ${start.status}: ${t.slice(0, 180)} (Veo needs billing enabled on the key)`); }
+  const op = (await start.json()).name;
+  if (!op) throw new Error("Veo: no operation returned.");
+  const t0 = Date.now();
+  while (Date.now() - t0 < 360000) {
+    await new Promise((r) => setTimeout(r, 6000));
+    const st = await (await fetch(`https://generativelanguage.googleapis.com/v1beta/${op}`, { headers: { "x-goog-api-key": key } })).json();
+    if (st.error) throw new Error("Veo: " + (st.error.message || "failed"));
+    if (st.done) {
+      const uri = st.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+      if (!uri) throw new Error("Veo: no video in the result.");
+      return Buffer.from(await (await fetch(uri, { headers: { "x-goog-api-key": key } })).arrayBuffer());
+    }
+  }
+  throw new Error("Veo timed out (over 6 min).");
+}
+// Turn one image into a motion clip — local LTX, cloud fal, Higgsfield, or Veo.
 async function animateImage(motionSource, imgPath, motionPrompt, tc) {
   const b64 = readFileSync(imgPath).toString("base64");
   const dataUri = `data:image/jpeg;base64,${b64}`;
+  if (motionSource === "veo") return veoI2V(imgPath, motionPrompt);
   if (motionSource === "higgsfield") return higgsfieldI2V(imgPath, motionPrompt);
   if (motionSource === "cloud") {
     const model = getEnvValue("VIDEO_MODEL") || "fal-ai/kling-video/v1.6/standard/image-to-video";
@@ -1685,7 +1711,7 @@ app.post("/api/miniature", (req, res) => {
   const b = req.body || {};
   const topic = String(b.topic || "").slice(0, 200).trim();
   const count = Math.min(6, Math.max(2, parseInt(b.count) || 4));
-  const motionSource = ["cloud", "none", "higgsfield", "local"].includes(b.motionSource) ? b.motionSource : "local";
+  const motionSource = ["cloud", "none", "higgsfield", "veo", "local"].includes(b.motionSource) ? b.motionSource : "local";
   const imageSource = b.imageSource === "local" ? "local" : "image";
   const captionsOn = !!b.captions;
   const narrate = !!b.narrate;
@@ -1694,6 +1720,7 @@ app.post("/api/miniature", (req, res) => {
   const music = (b.musicMood === "none") ? "" : ((b.musicMood === "calm" || b.musicMood === "bedtime") ? "bg_calm.mp3" : "bg_uplifting.mp3");
   if (motionSource === "cloud" && !getEnvValue("FAL_KEY")) return res.status(400).json({ error: "Cloud motion needs a fal.ai key — add FAL_KEY in Settings, or switch motion to Local." });
   if (motionSource === "higgsfield" && !getEnvValue("HIGGSFIELD_KEY")) return res.status(400).json({ error: "Higgsfield motion needs your Higgsfield key (KEY_ID:KEY_SECRET) — add it in Settings." });
+  if (motionSource === "veo" && !getEnvValue("GEMINI_API_KEY")) return res.status(400).json({ error: "Veo uses your Gemini API key (with billing enabled) — add GEMINI_API_KEY in Settings." });
   busy = true;
   const job = newJob(count, motionSource === "cloud" ? "render" : "animate");
   res.json({ jobId: job.id });
@@ -2225,7 +2252,7 @@ async function runChatTool(tool, args = {}) {
     case "create_short": { const j = await selfPost("/api/generate", { topic: args.topic || "", count: Math.min(5, Math.max(1, args.count || 1)), source: src(args.footage || "real"), language: args.language || "English", aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
     case "create_story": { const j = await selfPost("/api/story", { topic: args.topic || "", storyType: args.storyType || "story", minutes: Math.min(10, Math.max(1, args.minutes || 3)), source: src(args.footage || "ai"), language: args.language || "English", aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
     case "create_comparison": { const j = await selfPost("/api/comparison", { language: args.language || "Japanese", topic: args.topic || "", count: Math.min(10, Math.max(2, args.count || 6)), source: "image", voice: true }); return { jobId: j.jobId }; }
-    case "create_miniature": { const j = await selfPost("/api/miniature", { topic: args.topic || "", count: Math.min(6, Math.max(2, args.count || 4)), motionSource: ["none", "local", "cloud", "higgsfield"].includes(args.motion) ? args.motion : "none", imageSource: "image", musicMood: args.music || "none", narrate: !!args.narrate, captions: true, aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
+    case "create_miniature": { const j = await selfPost("/api/miniature", { topic: args.topic || "", count: Math.min(6, Math.max(2, args.count || 4)), motionSource: ["none", "local", "cloud", "higgsfield", "veo"].includes(args.motion) ? args.motion : "none", imageSource: "image", musicMood: args.music || "none", narrate: !!args.narrate, captions: true, aspect: "9:16", quality: "1080" }); return { jobId: j.jobId }; }
     case "news_video": { const j = await selfPost("/api/news/video", { topic: args.topic || "top stories", footage: args.footage || "real" }); return { jobId: j.jobId, headlines: j.headlines }; }
     case "set_autopilot": { const j = await selfPost("/api/autopilot", { enabled: !!args.enabled, niche: args.niche || "", type: ["shorts", "story", "comparison"].includes(args.type) ? args.type : "shorts", intervalHours: args.intervalHours || 24 }); return { autopilot: { enabled: j.enabled, niche: j.niche, type: j.type } }; }
     case "suggest_topic": { const j = await selfPost("/api/topic", { forType: "shorts", hint: args.niche || "" }); return { topic: j.topic }; }
