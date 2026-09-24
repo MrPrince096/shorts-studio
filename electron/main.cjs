@@ -213,13 +213,14 @@ function createWindow() {
     // longer overlap the "Shorts Studio" logo in the app's sidebar.
     titleBarStyle: "default",
     icon: path.join(ROOT, "build", "icon.png"),
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, "preload.cjs") },
     show: false,
   });
 
   // Allow microphone access (for the Assistant's voice input) inside the app.
   try {
-    win.webContents.session.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === "media" || permission === "audioCapture"));
+    win.webContents.session.setPermissionRequestHandler((_wc, permission, cb) =>
+      cb(["media", "audioCapture", "clipboard-read", "clipboard-sanitized-write", "clipboard-write"].includes(permission)));
   } catch {}
 
   win.loadURL(URL);

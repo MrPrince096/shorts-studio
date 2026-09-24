@@ -1007,6 +1007,14 @@
 
 <script>
 const $=(s)=>document.querySelector(s);
+// Robust copy — the async clipboard API is often blocked inside the desktop app,
+// so fall back to a hidden textarea + execCommand('copy'), which always works.
+async function copyText(t){
+  t=String(t==null?'':t);
+  try{ if(window.__native && window.__native.copy){ if(window.__native.copy(t)!==false) return true; } }catch{}
+  try{ if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(t); return true; } }catch{}
+  try{ const ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='-1000px'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0,t.length); const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok; }catch{ return false; }
+}
 function opt(v,l){const o=document.createElement('option');o.value=v;o.textContent=l;return o;}
 
 // clean line icons (Lucide)
@@ -1451,7 +1459,7 @@ function renderGallery(){
   const f=window.__galF||'all';
   const list=VIDEOS.map((v,i)=>({v,i})).filter(({v})=>f==='all'||vidShape(v)===f);
   if(!list.length){g.innerHTML='<div class="empty">No '+f+' videos yet.</div>';return;}
-  g.innerHTML=list.map(({v,i})=>`<div class="vcard"><img class="thumb" loading="lazy" style="aspect-ratio:${(v.w||9)}/${(v.h||16)}" ${v.thumb?`src="/data/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB · ${v.w&&v.h?v.w+'×'+v.h:''}</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><button onclick="editVideo('${encodeURIComponent(v.file)}')">✎ Edit</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i})">📋 Meta</button></div></div></div>`).join('');
+  g.innerHTML=list.map(({v,i})=>`<div class="vcard"><img class="thumb" loading="lazy" style="aspect-ratio:${(v.w||9)}/${(v.h||16)}" ${v.thumb?`src="/data/${encodeURIComponent(v.thumb)}"`:''} onclick="openVid(${i})"><div class="vinfo"><div class="vt">${esc((v.title||v.file.replace('.mp4','')).slice(0,60))}</div><div class="vm">${(v.size/1048576).toFixed(1)} MB · ${v.w&&v.h?v.w+'×'+v.h:''}</div><div class="vacts"><button onclick="openVid(${i})">▶ Play</button><button onclick="editVideo('${encodeURIComponent(v.file)}')">✎ Edit</button><a href="/out/${encodeURIComponent(v.file)}" download>⬇</a><button onclick="copyMeta(${i},event)">📋 Meta</button></div></div></div>`).join('');
 }
 document.querySelectorAll('#galFilter button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#galFilter button').forEach(x=>x.classList.toggle('on',x===b));window.__galF=b.dataset.f;renderGallery();});
 window.editVideo=(f)=>{window.__edPre=decodeURIComponent(f);document.querySelector('[data-nav=editor]').click();};
@@ -1462,7 +1470,7 @@ window.openVid=(i)=>{const v=VIDEOS[i];$('#vidTitle').textContent=v.title||v.fil
   if(v.titleLocal||v.descriptionLocal||v.hashtagsLocal){rows+=`<div class="metarow" style="margin-top:12px"><b style="color:var(--accent2)">— In ${esc(v.language||'your language')} —</b></div>`+mr('Title',v.titleLocal)+mr('Description',v.descriptionLocal)+mr('Hashtags',v.hashtagsLocal,'→ description')+mr('Tags',v.tagsCsvLocal,'→ Tags box');}
   rows+=`<a class="getlink" href="/out/${encodeURIComponent(v.file)}" download>⬇ Download video</a></div>`;
   $('#vidMeta').innerHTML=rows;
-  document.querySelectorAll('#vidMeta .cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(b.dataset.c);const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1000);});
+  document.querySelectorAll('#vidMeta .cp').forEach(b=>b.onclick=async()=>{const ok=await copyText(b.dataset.c);const o=b.textContent;b.textContent=ok?'✓':'⚠︎';setTimeout(()=>b.textContent=o,1100);});
   renderPublish(v);
   $('#vidOverlay').classList.add('open');};
 async function renderPublish(v){
@@ -1494,7 +1502,7 @@ async function renderPublish(v){
     }catch(e){$('#pubMsg').innerHTML='<span class="err">'+esc(e.message)+'</span>';btn.disabled=false;}
   };
 }
-window.copyMeta=(i)=>{const v=VIDEOS[i];navigator.clipboard.writeText([v.title,v.description,v.hashtags].filter(Boolean).join('\n\n'));};
+window.copyMeta=async(i,ev)=>{const v=VIDEOS[i];const b=ev&&ev.target;const txt=[v.title,v.description,v.hashtags].filter(Boolean).join('\n\n');if(!txt){if(b){const o=b.textContent;b.textContent='no meta yet';setTimeout(()=>b.textContent=o,1300);}return;}const ok=await copyText(txt);if(b){const o=b.textContent;b.textContent=ok?'✓ Copied':'⚠︎ blocked';setTimeout(()=>b.textContent=o,1300);}};
 $('#vidClose').onclick=()=>{$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';};
 $('#vidOverlay').onclick=(e)=>{if(e.target.id==='vidOverlay'){$('#vidOverlay').classList.remove('open');$('#vidPlay').innerHTML='';}};
 window.showPreview=(f)=>{$('#previewBox').innerHTML=`<video class="preview" controls autoplay muted src="/out/${f}"></video>`;};
